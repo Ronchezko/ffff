@@ -21,7 +21,8 @@
     "mineflayer": "^4.14.0",
     "moment": "^2.29.4",
     "node-fetch": "^2.7.0",
-    "socks-proxy-agent": "^8.0.2"
+    "socks-proxy-agent": "^8.0.2",
+    "sqlite": "^5.1.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
