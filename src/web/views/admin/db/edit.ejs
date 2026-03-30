@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактирование | Resistance</title>
+    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <style>
+        /* Те же базовые стили */
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
+        :root { --bg-color:#f5f7fa; --text-color:#333; --card-bg:#ffffff; --header-bg:rgba(255,255,255,0.95); --border-color:rgba(0,0,0,0.1); --primary:#4a3aff; --gradient-2:linear-gradient(45deg,#6343d4,#aa4eff); --shadow-md:0 15px 40px rgba(0,0,0,0.1); }
+        [data-theme="dark"] { --bg-color:#0b0c1e; --text-color:#e0e0e0; --card-bg:#1a1b2f; --header-bg:rgba(10,10,20,0.95); --border-color:rgba(255,255,255,0.1); --primary:#aa4eff; }
+        body { background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
+        .logo { display: flex; align-items: center; gap: 15px; }
+        .logo img { height: 50px; }
+        .logo h2 { font-size: 1.8rem; background: var(--gradient-2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .user-info { display: flex; align-items: center; gap: 20px; }
+        .btn-logout { padding: 8px 20px; background: var(--gradient-2); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; }
+        .theme-toggle { background: none; border: none; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; color: var(--text-color); }
+        .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        h1 { font-size: 2.5rem; margin-bottom: 30px; background: var(--gradient-2); -webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+color: transparent; display: inline-block; }
+        .form-card { background: var(--card-bg); border-radius: 30px; padding: 30px; border: 1px solid var(--border-color); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        input, textarea { width: 100%; padding: 12px 15px; border: 2px solid var(--border-color); background: rgba(255,255,255,0.1); border-radius: 30px; font-size: 1rem; color: var(--text-color); }
+        input:focus { outline: none; border-color: var(--primary); }
+        .form-actions { display: flex; gap: 15px; margin-top: 30px; }
+        .btn { padding: 12px 30px; border: none; border-radius: 30px; background: var(--gradient-2); color: white; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: var(--primary); }
+        .footer { text-align: center; padding: 30px 0; color: #999; border-top: 1px solid var(--border-color); margin-top: 50px; }
+        .notification { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 15px 25px; border-radius: 30px; background: white; border-left: 5px solid; animation: slideIn 0.3s; }
+        .notification.success { border-color: #00d25b; background: #d4edda; color: #155724; }
+        .notification.error { border-color: #ff4757; background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
+    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+
+    <header class="header">
+        <div class="logo"><img src="/images/logo.jpg" alt="Resistance"><h2>Resistance Admin</h2></div>
+        <div class="user-info">
+            <span><%= user.username %></span>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <a href="/admin/logout" class="btn-logout">Выйти</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>Редактирование записи (ID: <%= row.id %>)</h1>
+        <div class="form-card">
+            <form method="POST" action="/admin/db/<%= table %>/edit/<%= row.id %>">
+                <% columns.forEach(col => { %>
+                    <% if (col.name !== 'id') { %>
+                        <div class="form-group">
+                            <label for="<%= col.name %>"><%= col.name %></label>
+                            <input type="text" id="<%= col.name %>" name="<%= col.name %>" value="<%= row[col.name] || '' %>">
+                        </div>
+                    <% } %>
+                <% }) %>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Сохранить</button>
+                    <a href="/admin/db/<%= table %>" class="btn btn-secondary">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="footer"><p>Resistance City Project • 2026</p></footer>
+
+    <script>
+        // Переключение темы (аналогично)
+        (function() {
+            const toggle = document.getElementById('theme-toggle');
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggle.textContent = '☀️';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                toggle.textContent = '🌙';
+            }
+            toggle.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme');
+                const newTheme = current === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+            });
+        })();
+        setTimeout(() => { document.querySelectorAll('.notification').forEach(el => el.remove()); }, 5000);
+    </script>
+</body>
+</html>

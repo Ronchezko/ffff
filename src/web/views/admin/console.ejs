@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Консоль бота | Resistance</title>
+    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <style>
+        /* ===== ОБЩИЕ СТИЛИ ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        :root {
+            --bg-color: #f5f7fa;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --header-bg: rgba(255,255,255,0.95);
+            --border-color: rgba(0,0,0,0.1);
+            --primary: #4a3aff;
+            --primary-hover: #3728e0;
+            --nav-link-color: #333;
+            --nav-link-hover: #4a3aff;
+            --footer-color: #999;
+            --gradient-2: linear-gradient(45deg, #6343d4, #aa4eff);
+            --shadow-sm: 0 10px 30px rgba(0,0,0,0.05);
+            --shadow-md: 0 15px 40px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.2);
+            --log-bg: #0b0c1e;
+            --log-text: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0b0c1e;
+            --text-color: #e0e0e0;
+            --card-bg: #1a1b2f;
+            --header-bg: rgba(10,10,20,0.95);
+            --border-color: rgba(255,255,255,0.1);
+            --primary: #aa4eff;
+            --primary-hover: #8a3fcc;
+            --nav-link-color: #e0e0e0;
+            --nav-link-hover: #aa4eff;
+            --footer-color: #666;
+            --log-bg: #0b0c1e;
+            --log-text: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: var(--header-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo img {
+            height: 50px;
+            filter: drop-shadow(0 0 10px rgba(170,78,255,0.5));
+        }
+
+        .logo h2 {
+            font-size: 1.8rem;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: var(--gradient-2);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .btn-logout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            transition: background 0.3s;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(128,128,128,0.2);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+            flex: 1;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 25px;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+
+        /* ===== КОНСОЛЬ ===== */
+        .console-container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .command-panel {
+            background: var(--card-bg);
+            border-radius: 30px;
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .command-panel h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-group select,
+        .input-group input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 20px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            border-radius: 30px;
+            font-size: 1rem;
+            color: var(--text-color);
+            transition: border 0.3s, box-shadow 0.3s;
+            appearance: none;
+        }
+
+        .input-group select {
+            background-image: url("data:image/svg+xml;utf8,<svg fill='%234a3aff' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 20px;
+        }
+
+        .input-group select option {
+            background: var(--card-bg);
+            color: var(--text-color);
+            padding: 10px;
+        }
+
+        .input-group select:focus,
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(170,78,255,0.2);
+        }
+
+        .input-group button {
+            padding: 12px 30px;
+            background: var(--gradient-2);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .input-group button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
+        }
+
+        #playerNameInput {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #playerNameInput input {
+            width: 100%;
+        }
+
+        .log-panel {
+            background: var(--card-bg);
+            border-radius: 30px;
+            padding: 25px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            display: none;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .log-panel.active {
+            display: flex;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .log-header h2 {
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+
+        .log-header button {
+            padding: 8px 20px;
+            background: var(--primary);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .log-header button:hover {
+            background: var(--primary-hover);
+        }
+
+        .log-content {
+            flex: 1;
+            overflow-y: auto;
+            background: var(--log-bg);
+            border-radius: 20px;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border: 1px solid var(--border-color);
+            color: var(--log-text);
+        }
+
+        .log-entry {
+            padding: 2px 0;
+            margin: 0;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            font-family: inherit;
+            border-bottom: none;
+        }
+
+        .log-entry.admin {
+            font-weight: bold;
+            color: #ffff00;
+        }
+
+        .log-entry.error {
+            color: #ff5555;
+        }
+
+        .log-entry.success {
+            color: #55ff55;
+        }
+
+        .log-entry.warn {
+            color: #ffff55;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .tab {
+            padding: 10px 25px;
+            border-radius: 30px;
+            cursor: pointer;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            transition: background 0.3s, color 0.3s;
+            font-weight: 600;
+        }
+        .tab.active {
+            background: var(--gradient-2);
+            color: white;
+            border-color: transparent;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--footer-color);
+            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 30px;
+            background: white;
+            box-shadow: var(--shadow-lg);
+            border-left: 5px solid;
+            animation: slideIn 0.3s;
+            z-index: 9999;
+        }
+        .notification.success { border-color: #00d25b; background: #d4edda; color: #155724; }
+        .notification.error { border-color: #ff4757; background: #f8d7da; color: #721c24; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0%); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
+    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+
+    <header class="header">
+        <div class="logo">
+            <img src="/images/logo.jpg" alt="Resistance Logo">
+            <h2>Resistance Admin</h2>
+        </div>
+        <div class="user-info">
+            <span><%= user.username %></span>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <a href="/admin/logout" class="btn-logout">Выйти</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h1>Консоль бота</h1>
+        <div class="console-container">
+            <!-- Панель отправки команд -->
+            <div class="command-panel">
+                <h2>Отправить команду</h2>
+                <div class="input-group">
+                    <select id="commandTarget">
+                        <option value="clan">Клановый чат (/cc)</option>
+                        <option value="global">Обычный чат</option>
+                        <option value="@player">Личное сообщение</option>
+                    </select>
+                    <input type="text" id="commandInput" placeholder="Введите команду или сообщение..." />
+                    <button id="sendCommand">Отправить</button>
+                </div>
+                <div id="playerNameInput" style="display:none;">
+                    <input type="text" id="playerName" placeholder="Никнейм игрока" />
+                </div>
+            </div>
+
+            <!-- Вкладки -->
+            <div class="tabs">
+                <div class="tab active" data-tab="chat">Чат</div>
+                <div class="tab" data-tab="system">Система</div>
+            </div>
+
+            <!-- Логи чата -->
+            <div class="log-panel active" id="chatPanel">
+                <div class="log-header">
+                    <h2>Логи чата (новые снизу)</h2>
+                    <button id="clearChatLogs">Очистить</button>
+                </div>
+                <div class="log-content" id="chatLogContent"></div>
+            </div>
+
+            <!-- Логи системы -->
+            <div class="log-panel" id="systemPanel">
+                <div class="log-header">
+                    <h2>Системные логи (новые снизу)</h2>
+                    <button id="clearSystemLogs">Очистить</button>
+                </div>
+                <div class="log-content" id="systemLogContent"></div>
+            </div>
+        </div>
+        <div style="margin-top:30px;">
+            <a href="/admin/dashboard" class="btn-logout" style="background:var(--primary);">← Назад</a>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Resistance City Project • 2026</p>
+    </footer>
+
+    <!-- Встроенная простая реализация ansi-to-html на случай, если CDN недоступен -->
+    <script>
+        // Простая реализация AnsiToHtml, если библиотека не загрузится
+        window.SimpleAnsiToHtml = function() {
+            this.toHtml = function(text) {
+                // Очень простая обработка: заменяем ANSI-коды на пустые строки
+                // Это временное решение, чтобы не ломать консоль
+                return text.replace(/\u001b\[[0-9;]*m/g, '');
+            };
+        };
+        
+        // Пытаемся загрузить настоящую библиотеку, но если не получится - используем простую
+        window.AnsiToHtml = window.AnsiToHtml || window.SimpleAnsiToHtml;
+    </script>
+
+    <script>
+        (function() {
+            // === Глобальные переменные ===
+            let chatLogs = [];
+            let systemLogs = [];
+            let activeTab = 'chat';
+            let ansiConverter;
+
+            // === Функция форматирования Minecraft сообщений ===
+            function formatMinecraftMessage(text) {
+                if (!text) return text;
+                
+                // Сначала заменяем hex-цвета &#RRGGBB
+                text = text.replace(/&#([0-9A-Fa-f]{6})/g, '<span style="color: #$1;">$&</span>');
+                
+                const mapping = {
+                    '0': 'color: #000000;', '1': 'color: #0000AA;', '2': 'color: #00AA00;',
+                    '3': 'color: #00AAAA;', '4': 'color: #AA0000;', '5': 'color: #AA00AA;',
+                    '6': 'color: #FFAA00;', '7': 'color: #AAAAAA;', '8': 'color: #555555;',
+                    '9': 'color: #5555FF;', 'a': 'color: #55FF55;', 'b': 'color: #55FFFF;',
+                    'c': 'color: #FF5555;', 'd': 'color: #FF55FF;', 'e': 'color: #FFFF55;',
+                    'f': 'color: #FFFFFF;',
+                    'l': 'font-weight: bold;',
+                    'o': 'font-style: italic;',
+                    'n': 'text-decoration: underline;',
+                    'm': 'text-decoration: line-through;',
+                    'k': 'filter: blur(1px);'
+                };
+
+                let result = '';
+                let i = 0;
+                while (i < text.length) {
+                    if (text[i] === '&' && i+1 < text.length) {
+                        const code = text[i+1].toLowerCase();
+                        if (mapping[code]) {
+                            result += `<span style="${mapping[code]}">`;
+                        } else {
+                            result += '&';
+                        }
+                        i += 2;
+                    } else {
+                        result += text[i];
+                        i++;
+                    }
+                }
+                return result;
+            }
+
+            // === Рендеринг чата ===
+            function renderChat() {
+                const container = document.getElementById('chatLogContent');
+                if (!container) return;
+                let html = '';
+                for (let i = 0; i < chatLogs.length; i++) {
+                    const entry = chatLogs[i];
+                    const formatted = formatMinecraftMessage(entry.message);
+                    html += `<div class="log-entry ${entry.type}">[${entry.timestamp}] ${formatted}</div>`;
+                }
+                container.innerHTML = html;
+            }
+
+            // === Рендеринг системы ===
+            function renderSystem() {
+                const container = document.getElementById('systemLogContent');
+                if (!container) return;
+                let html = '';
+                for (let i = 0; i < systemLogs.length; i++) {
+                    const entry = systemLogs[i];
+                    let ansiHtml;
+                    try {
+                        if (ansiConverter && typeof ansiConverter.toHtml === 'function') {
+                            ansiHtml = ansiConverter.toHtml(entry.message);
+                        } else {
+                            // Если конвертер не работает, просто показываем текст без цветов
+                            ansiHtml = entry.message.replace(/\u001b\[[0-9;]*m/g, '');
+                        }
+                    } catch (e) {
+                        ansiHtml = entry.message.replace(/\u001b\[[0-9;]*m/g, '');
+                    }
+                    html += `<div class="log-entry ${entry.level}">[${entry.timestamp}] ${ansiHtml}</div>`;
+                }
+                container.innerHTML = html;
+            }
+
+            // === Загрузка данных с сервера ===
+            async function fetchChatLogs() {
+                try {
+                    const res = await fetch('/admin/console/logs');
+                    const data = await res.json();
+                    if (data.logs) {
+                        chatLogs = data.logs;
+                        if (activeTab === 'chat') renderChat();
+                    }
+                } catch (e) { 
+                    console.error('Ошибка получения логов чата:', e); 
+                }
+            }
+
+            async function fetchSystemLogs() {
+                try {
+                    const res = await fetch('/admin/system/logs');
+                    const data = await res.json();
+                    if (data.logs) {
+                        systemLogs = data.logs;
+                        if (activeTab === 'system') renderSystem();
+                    }
+                } catch (e) { 
+                    console.error('Ошибка получения системных логов:', e); 
+                }
+            }
+
+            // === Отправка команды ===
+            async function sendCommand() {
+                const targetSelect = document.getElementById('commandTarget');
+                const commandInput = document.getElementById('commandInput');
+                const playerNameInput = document.getElementById('playerName');
+                const playerNameDiv = document.getElementById('playerNameInput');
+
+                const target = targetSelect.value;
+                let command = commandInput.value.trim();
+                if (!command) {
+                    alert('Введите команду');
+                    return;
+                }
+
+                let payload = { command, target };
+                if (target === '@player') {
+                    const player = playerNameInput.value.trim();
+                    if (!player) {
+                        alert('Введите ник игрока');
+                        return;
+                    }
+                    payload.target = `@${player}`;
+                }
+
+                try {
+                    const res = await fetch('/admin/console/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        commandInput.value = '';
+                        if (playerNameDiv.style.display === 'block') {
+                            playerNameInput.value = '';
+                        }
+                        // Добавляем команду в локальный лог
+                        const newEntry = {
+                            timestamp: new Date().toLocaleTimeString('ru-RU', { hour12: false }),
+                            type: 'admin',
+                            message: `[ADMIN] Отправлено: ${payload.command}`
+                        };
+                        chatLogs.push(newEntry);
+                        if (chatLogs.length > 1000) chatLogs.shift();
+                        if (activeTab === 'chat') renderChat();
+                    } else {
+                        alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                    }
+                } catch (e) {
+                    alert('Ошибка сети: ' + e.message);
+                }
+            }
+
+            // === Инициализация при загрузке страницы ===
+            window.addEventListener('load', function() {
+                console.log('Страница загружена, начинаем инициализацию');
+
+                // Инициализация ANSI конвертера (используем window.AnsiToHtml, который определён выше)
+                try {
+                    if (typeof AnsiToHtml === 'function') {
+                        ansiConverter = new AnsiToHtml({ 
+                            fg: '#ffffff', 
+                            bg: '#0b0c1e',
+                            colors: {
+                                0: '#000000', 1: '#AA0000', 2: '#00AA00', 3: '#AA5500',
+                                4: '#0000AA', 5: '#AA00AA', 6: '#00AAAA', 7: '#AAAAAA',
+                                8: '#555555', 9: '#FF5555', 10: '#55FF55', 11: '#FFFF55',
+                                12: '#5555FF', 13: '#FF55FF', 14: '#55FFFF', 15: '#FFFFFF'
+                            }
+                        });
+                        console.log('AnsiToHtml загружен');
+                    } else {
+                        console.warn('AnsiToHtml не загружен, используем заглушку');
+                        ansiConverter = { toHtml: (text) => text.replace(/\u001b\[[0-9;]*m/g, '') };
+                    }
+                } catch (e) {
+                    console.error('Ошибка инициализации AnsiToHtml:', e);
+                    ansiConverter = { toHtml: (text) => text.replace(/\u001b\[[0-9;]*m/g, '') };
+                }
+
+                // Загружаем начальные данные из EJS
+                try {
+                    chatLogs = <%- JSON.stringify(chatLogs || []) %>;
+                    systemLogs = <%- JSON.stringify(systemLogs || []) %>;
+                    console.log('Загружено логов чата:', chatLogs.length);
+                    console.log('Загружено системных логов:', systemLogs.length);
+                } catch (e) {
+                    console.error('Ошибка загрузки данных из EJS:', e);
+                    chatLogs = [];
+                    systemLogs = [];
+                }
+
+                // Первоначальный рендер
+                renderChat();
+                renderSystem();
+
+                // Переключение темы
+                const themeToggle = document.getElementById('theme-toggle');
+                if (themeToggle) {
+                    const savedTheme = localStorage.getItem('theme');
+                    if (savedTheme === 'dark') {
+                        document.documentElement.setAttribute('data-theme', 'dark');
+                        themeToggle.textContent = '☀️';
+                    } else {
+                        document.documentElement.setAttribute('data-theme', 'light');
+                        themeToggle.textContent = '🌙';
+                    }
+                    themeToggle.onclick = function() {
+                        const current = document.documentElement.getAttribute('data-theme');
+                        const newTheme = current === 'light' ? 'dark' : 'light';
+                        document.documentElement.setAttribute('data-theme', newTheme);
+                        localStorage.setItem('theme', newTheme);
+                        themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+                    };
+                }
+
+                // Поле для ника
+                const targetSelect = document.getElementById('commandTarget');
+                const playerNameDiv = document.getElementById('playerNameInput');
+                if (targetSelect && playerNameDiv) {
+                    targetSelect.onchange = function() {
+                        playerNameDiv.style.display = targetSelect.value === '@player' ? 'block' : 'none';
+                    };
+                }
+
+                // Переключение вкладок
+                const tabs = document.querySelectorAll('.tab');
+                const panels = document.querySelectorAll('.log-panel');
+                
+                for (let i = 0; i < tabs.length; i++) {
+                    tabs[i].onclick = function() {
+                        for (let j = 0; j < tabs.length; j++) {
+                            tabs[j].classList.remove('active');
+                        }
+                        this.classList.add('active');
+                        
+                        for (let j = 0; j < panels.length; j++) {
+                            panels[j].classList.remove('active');
+                        }
+                        
+                        const tabName = this.dataset.tab;
+                        activeTab = tabName;
+                        if (tabName === 'chat') {
+                            document.getElementById('chatPanel').classList.add('active');
+                            renderChat();
+                        } else {
+                            document.getElementById('systemPanel').classList.add('active');
+                            renderSystem();
+                        }
+                    };
+                }
+
+                // Отправка команды
+                const sendBtn = document.getElementById('sendCommand');
+                if (sendBtn) {
+                    sendBtn.onclick = sendCommand;
+                }
+
+                // Очистка логов
+                const clearChatBtn = document.getElementById('clearChatLogs');
+                if (clearChatBtn) {
+                    clearChatBtn.onclick = function() {
+                        chatLogs = [];
+                        renderChat();
+                    };
+                }
+
+                const clearSystemBtn = document.getElementById('clearSystemLogs');
+                if (clearSystemBtn) {
+                    clearSystemBtn.onclick = function() {
+                        systemLogs = [];
+                        renderSystem();
+                    };
+                }
+
+                // Запуск периодического обновления
+                setInterval(fetchChatLogs, 2000);
+                setInterval(fetchSystemLogs, 2000);
+
+                // Скрытие уведомлений
+                setTimeout(() => {
+                    const notifications = document.querySelectorAll('.notification');
+                    for (let i = 0; i < notifications.length; i++) {
+                        notifications[i].remove();
+                    }
+                }, 5000);
+            });
+        })();
+    </script>
+</body>
+</html>

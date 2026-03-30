@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки | Resistance</title>
+    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+
+        :root {
+            --bg-color: #f5f7fa;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --header-bg: rgba(255,255,255,0.95);
+            --border-color: rgba(0,0,0,0.1);
+            --primary: #4a3aff;
+            --primary-hover: #3728e0;
+            --success: #00d25b;
+            --danger: #ff4757;
+            --warning: #ffaa00;
+            --gradient-2: linear-gradient(45deg, #6343d4, #aa4eff);
+            --shadow-sm: 0 10px 30px rgba(0,0,0,0.05);
+            --shadow-md: 0 15px 40px rgba(0,0,0,0.1);
+            --shadow-lg: 0 20px 50px rgba(0,0,0,0.2);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0b0c1e;
+            --text-color: #e0e0e0;
+            --card-bg: #1a1b2f;
+            --header-bg: rgba(10,10,20,0.95);
+            --border-color: rgba(255,255,255,0.1);
+            --primary: #aa4eff;
+            --primary-hover: #8a3fcc;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background 0.3s, color 0.3s;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: var(--header-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo img {
+            height: 50px;
+            filter: drop-shadow(0 0 10px rgba(170,78,255,0.5));
+        }
+
+        .logo h2 {
+            font-size: 1.8rem;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-logout {
+            padding: 8px 20px;
+            background: var(--gradient-2);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .btn-logout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            transition: background 0.3s;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(128,128,128,0.2);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 0 20px;
+            flex: 1;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: inline-block;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 25px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 30px;
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s, background 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            transform: translateX(-5px);
+            background: var(--primary);
+            color: white;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .settings-card {
+            background: var(--card-bg);
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 15px;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .settings-list {
+            list-style: none;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .settings-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .settings-list::-webkit-scrollbar-track {
+            background: var(--border-color);
+            border-radius: 10px;
+        }
+
+        .settings-list::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-info {
+            flex: 1;
+        }
+
+        .setting-name {
+            font-weight: 600;
+            margin-bottom: 3px;
+            text-transform: capitalize;
+        }
+
+        .setting-desc {
+            font-size: 0.85rem;
+            color: var(--footer-color);
+        }
+
+        .setting-control {
+            margin-left: 15px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .select-control {
+            padding: 8px 15px;
+            border-radius: 30px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            min-width: 120px;
+        }
+
+        .input-control {
+            padding: 8px 15px;
+            border-radius: 30px;
+            border: 2px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9rem;
+            width: 120px;
+        }
+
+        .save-btn {
+            padding: 10px 25px;
+            background: var(--gradient-2);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+            margin-top: 20px;
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
+        }
+
+        .danger-zone {
+            background: rgba(255,71,87,0.05);
+            border: 1px solid var(--danger);
+            border-radius: 30px;
+            padding: 25px;
+            margin-top: 40px;
+        }
+
+        .danger-zone h3 {
+            color: var(--danger);
+            margin-bottom: 15px;
+        }
+
+        .danger-btn {
+            padding: 10px 25px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+            margin-right: 15px;
+            margin-bottom: 10px;
+        }
+
+        .danger-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255,71,87,0.4);
+        }
+
+        .admin-logs {
+            background: var(--card-bg);
+            border-radius: 30px;
+            padding: 25px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            margin-top: 40px;
+        }
+
+        .admin-logs h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .logs-table th {
+            text-align: left;
+            padding: 12px 10px;
+            background: var(--primary);
+            color: white;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .logs-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logs-table tr:hover {
+            background: rgba(74,58,255,0.05);
+        }
+
+        .badge-success {
+            background: rgba(0,210,75,0.1);
+            color: var(--success);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .badge-danger {
+            background: rgba(255,71,87,0.1);
+            color: var(--danger);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            color: var(--footer-color);
+            border-top: 1px solid var(--border-color);
+            margin-top: 50px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 30px;
+            background: white;
+            box-shadow: var(--shadow-lg);
+            border-left: 5px solid;
+            animation: slideIn 0.3s;
+            z-index: 9999;
+        }
+        .notification.success { border-color: var(--success); background: #d4edda; color: #155724; }
+        .notification.error { border-color: var(--danger); background: #f8d7da; color: #721c24; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0%); opacity: 1; }
+        }
+
+        @media (max-width: 700px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            .logs-table {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
+    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+
+    <header class="header">
+        <div class="logo">
+            <img src="/images/logo.jpg" alt="Resistance Logo">
+            <h2>Resistance Admin</h2>
+        </div>
+        <div class="user-info">
+            <span><%= user.username %></span>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+            <a href="/admin/logout" class="btn-logout">Выйти</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Кнопка "Назад" -->
+        <a href="/admin/dashboard" class="back-button">
+            <span>←</span> Назад в панель управления
+        </a>
+
+        <h1>Настройки</h1>
+
+        <form id="settingsForm" method="POST" action="/admin/settings/update">
+            <div class="settings-grid">
+                <!-- Основные настройки -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">⚙️</div>
+                        <h2>Основные</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const mainSettings = [
+                            { key: 'auto_moderation_enabled', desc: 'Автоматическая модерация чата', type: 'boolean' },
+                            { key: 'clan_ad_enabled', desc: 'Реклама клана', type: 'boolean' },
+                            { key: 'payday_enabled', desc: 'Система PayDay', type: 'boolean' },
+                            { key: 'proxy_enabled', desc: 'Использование прокси', type: 'boolean' },
+                            { key: 'main_bot_active', desc: 'Какой бот активен', type: 'boolean' },
+                            { key: 'debug_mode', desc: 'Режим отладки', type: 'boolean' }
+                        ];
+                        
+                        mainSettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            const value = dbSetting ? dbSetting.value : 'false';
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" name="<%= setting.key %>" value="true" <%= value === 'true' ? 'checked' : '' %>>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- Экономика и налоги -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">💰</div>
+                        <h2>Экономика</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const economySettings = [
+                            { key: 'tax_property', desc: 'Налог на имущество (%)', type: 'number' },
+                            { key: 'tax_business', desc: 'Налог на бизнес (%)', type: 'number' },
+                            { key: 'tax_office', desc: 'Налог на офис (%)', type: 'number' },
+                            { key: 'license_business_price', desc: 'Цена бизнес-лицензии', type: 'number' },
+                            { key: 'license_office_price', desc: 'Цена офисной лицензии', type: 'number' },
+                            { key: 'license_duration', desc: 'Срок действия лицензии (дней)', type: 'number' }
+                        ];
+                        
+                        economySettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            const value = dbSetting ? dbSetting.value : '0';
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <input type="number" class="input-control" name="<%= setting.key %>" value="<%= value %>" step="0.01" min="0">
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- Модерация -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">🛡️</div>
+                        <h2>Модерация</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const modSettings = [
+                            { key: 'mute_duration', desc: 'Длительность мута (мин)', type: 'select', options: ['5','10','20','30','60','120','240'] },
+                            { key: 'kick_warning_threshold', desc: 'Предупреждений до кика', type: 'select', options: ['1','2','3','4','5'] },
+                            { key: 'blacklist_duration', desc: 'Длительность ЧС (мин)', type: 'select', options: ['60','120','240','360','720','1440'] },
+                            { key: 'warn_threshold', desc: 'Предупреждений до бана', type: 'select', options: ['1','2','3','4','5'] }
+                        ];
+                        
+                        modSettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            const value = dbSetting ? dbSetting.value : setting.options[2];
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <select class="select-control" name="<%= setting.key %>">
+                                        <% setting.options.forEach(opt => { %>
+                                            <option value="<%= opt %>" <%= value === opt ? 'selected' : '' %>><%= opt %></option>
+                                        <% }); %>
+                                    </select>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- Имущество и лицензии -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">🏠</div>
+                        <h2>Имущество</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const propertySettings = [
+                            { key: 'max_players_per_property', desc: 'Макс. жильцов на имущество', type: 'number' },
+                            { key: 'property_tax_rate', desc: 'Ставка налога на имущество (%)', type: 'number' },
+                            { key: 'property_tax_period', desc: 'Период налога (дней)', type: 'select', options: ['7','14','30'] },
+                            { key: 'business_license_required', desc: 'Требовать лицензию для бизнеса', type: 'boolean' },
+                            { key: 'office_license_required', desc: 'Требовать лицензию для офиса', type: 'boolean' }
+                        ];
+                        
+                        propertySettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            let value = dbSetting ? dbSetting.value : (setting.type === 'boolean' ? 'false' : (setting.type === 'select' ? '30' : '0'));
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <% if (setting.type === 'boolean') { %>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="<%= setting.key %>" value="true" <%= value === 'true' ? 'checked' : '' %>>
+                                            <span class="slider"></span>
+                                        </label>
+                                    <% } else if (setting.type === 'select') { %>
+                                        <select class="select-control" name="<%= setting.key %>">
+                                            <% setting.options.forEach(opt => { %>
+                                                <option value="<%= opt %>" <%= value === opt ? 'selected' : '' %>><%= opt %></option>
+                                            <% }); %>
+                                        </select>
+                                    <% } else { %>
+                                        <input type="number" class="input-control" name="<%= setting.key %>" value="<%= value %>" min="0">
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- PayDay -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">💵</div>
+                        <h2>PayDay</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const paydaySettings = [
+                            { key: 'payday_hour', desc: 'Час PayDay (0-23)', type: 'number' },
+                            { key: 'payday_bonus', desc: 'Бонус PayDay (%)', type: 'number' },
+                            { key: 'payday_min_duty_minutes', desc: 'Мин. минут на дежурстве', type: 'number' },
+                            { key: 'payday_notify_clan', desc: 'Уведомлять в клановый чат', type: 'boolean' }
+                        ];
+                        
+                        paydaySettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            let value = dbSetting ? dbSetting.value : (setting.type === 'boolean' ? 'true' : '0');
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <% if (setting.type === 'boolean') { %>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="<%= setting.key %>" value="true" <%= value === 'true' ? 'checked' : '' %>>
+                                            <span class="slider"></span>
+                                        </label>
+                                    <% } else { %>
+                                        <input type="number" class="input-control" name="<%= setting.key %>" value="<%= value %>" min="0" <%= setting.key === 'payday_hour' ? 'max="23"' : '' %>>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- Безопасность -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">🔒</div>
+                        <h2>Безопасность</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const securitySettings = [
+                            { key: 'admin_ip_whitelist_enabled', desc: 'Включить белый список IP', type: 'boolean' },
+                            { key: 'admin_session_timeout', desc: 'Таймаут сессии (минут)', type: 'number' },
+                            { key: 'admin_max_login_attempts', desc: 'Макс. попыток входа', type: 'number' },
+                            { key: 'admin_lockout_duration', desc: 'Блокировка при превышении (мин)', type: 'number' },
+                            { key: 'log_all_admin_actions', desc: 'Логировать все действия админов', type: 'boolean' }
+                        ];
+                        
+                        securitySettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            let value = dbSetting ? dbSetting.value : (setting.type === 'boolean' ? 'true' : '30');
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <% if (setting.type === 'boolean') { %>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="<%= setting.key %>" value="true" <%= value === 'true' ? 'checked' : '' %>>
+                                            <span class="slider"></span>
+                                        </label>
+                                    <% } else { %>
+                                        <input type="number" class="input-control" name="<%= setting.key %>" value="<%= value %>" min="0">
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <!-- Прочие -->
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-icon">🔧</div>
+                        <h2>Прочие</h2>
+                    </div>
+                    <div class="settings-list">
+                        <%
+                        const otherSettings = [
+                            { key: 'bot_activity_log_enabled', desc: 'Логировать активность бота', type: 'boolean' },
+                            { key: 'discord_bot_enabled', desc: 'Включить Discord бота', type: 'boolean' },
+                            { key: 'web_server_port', desc: 'Порт веб-сервера', type: 'number' },
+                            { key: 'session_secret', desc: 'Секретный ключ сессии', type: 'text' }
+                        ];
+                        
+                        otherSettings.forEach(setting => {
+                            const dbSetting = settings.find(s => s.key === setting.key);
+                            let value = dbSetting ? dbSetting.value : (setting.type === 'boolean' ? 'true' : (setting.type === 'number' ? '3000' : ''));
+                        %>
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <div class="setting-name"><%= setting.key.replace(/_/g, ' ') %></div>
+                                    <div class="setting-desc"><%= setting.desc %></div>
+                                </div>
+                                <div class="setting-control">
+                                    <% if (setting.type === 'boolean') { %>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" name="<%= setting.key %>" value="true" <%= value === 'true' ? 'checked' : '' %>>
+                                            <span class="slider"></span>
+                                        </label>
+                                    <% } else { %>
+                                        <input type="<%= setting.type === 'number' ? 'number' : 'text' %>" class="input-control" name="<%= setting.key %>" value="<%= value %>">
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопка сохранения -->
+            <div style="text-align: center; margin: 30px 0;">
+                <button type="submit" class="save-btn">💾 Сохранить все изменения</button>
+            </div>
+        </form>
+
+        <!-- Логи действий администраторов -->
+        <div class="admin-logs">
+            <h2>📋 Логи действий администраторов</h2>
+            <table class="logs-table">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Администратор</th>
+                        <th>IP-адрес</th>
+                        <th>Действие</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (adminLogs && adminLogs.length > 0) { %>
+                        <% adminLogs.slice(0, 20).forEach(log => { %>
+                            <tr>
+                                <td><%= log.timestamp %></td>
+                                <td><%= log.username %></td>
+                                <td><%= log.ip %></td>
+                                <td><%= log.action %></td>
+                                <td>
+                                    <% if (log.success) { %>
+                                        <span class="badge-success">Успешно</span>
+                                    <% } else { %>
+                                        <span class="badge-danger">Ошибка</span>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 30px;">Нет записей</td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Опасная зона -->
+        <div class="danger-zone">
+            <h3>⚠️ Опасная зона</h3>
+            <p style="margin-bottom: 20px; color: var(--text-color);">Эти действия необратимы. Будьте осторожны!</p>
+            <button class="danger-btn" id="resetSettingsBtn">🔄 Сбросить настройки</button>
+            <button class="danger-btn" id="clearAllDataBtn">🗑️ Очистить все данные</button>
+            <button class="danger-btn" id="reloadDatabaseBtn">🔄 Перезагрузить БД</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>Resistance City Project • 2026</p>
+    </footer>
+
+    <script>
+        (function() {
+            // Переключение темы
+            const toggle = document.getElementById('theme-toggle');
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                toggle.textContent = '☀️';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                toggle.textContent = '🌙';
+            }
+            toggle.onclick = function() {
+                const current = document.documentElement.getAttribute('data-theme');
+                const newTheme = current === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+            };
+
+            // Опасная зона - сброс настроек
+            document.getElementById('resetSettingsBtn')?.addEventListener('click', async () => {
+                if (confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) {
+                    try {
+                        const res = await fetch('/admin/settings/reset', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('✅ Настройки сброшены');
+                            location.reload();
+                        } else {
+                            alert('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    } catch (e) {
+                        alert('❌ Ошибка сети: ' + e.message);
+                    }
+                }
+            });
+
+            // Очистка всех данных
+            document.getElementById('clearAllDataBtn')?.addEventListener('click', async () => {
+                const confirm1 = confirm('⚠️ ВНИМАНИЕ! Это удалит ВСЕ данные из базы. Это действие необратимо. Продолжить?');
+                if (!confirm1) return;
+                
+                const password = prompt('Для подтверждения введите ваш пароль администратора:');
+                if (!password) return;
+                
+                try {
+                    const res = await fetch('/admin/database/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert('✅ Все данные удалены');
+                        location.reload();
+                    } else {
+                        alert('❌ Ошибка: ' + (data.error || 'Неверный пароль'));
+                    }
+                } catch (e) {
+                    alert('❌ Ошибка сети: ' + e.message);
+                }
+            });
+
+            // Перезагрузка БД
+            document.getElementById('reloadDatabaseBtn')?.addEventListener('click', async () => {
+                if (confirm('Перезагрузить базу данных? Это может занять несколько секунд.')) {
+                    try {
+                        const res = await fetch('/admin/database/reload', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert('✅ База данных перезагружена');
+                        } else {
+                            alert('❌ Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    } catch (e) {
+                        alert('❌ Ошибка сети: ' + e.message);
+                    }
+                }
+            });
+
+            // Скрытие уведомлений
+            setTimeout(() => {
+                document.querySelectorAll('.notification').forEach(el => el.remove());
+            }, 5000);
+        })();
+    </script>
+</body>
+</html>

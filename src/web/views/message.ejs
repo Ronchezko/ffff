@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title %></title>
+    <style>
+        body { font-family: sans-serif; background: #f5f7fb; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .message-box { background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .error { color: #ef4444; }
+        .success { color: #10b981; }
+        .btn { margin-top: 20px; display: inline-block; padding: 10px 20px; background: #6343d4; color: white; text-decoration: none; border-radius: 9999px; }
+    </style>
+</head>
+<body>
+    <div class="message-box">
+        <h1 class="<%= type %>"><%= message %></h1>
+        <a href="/" class="btn">На главную</a>
+    </div>
+</body>
+</html>
+<script src="/js/theme.js"></script>
