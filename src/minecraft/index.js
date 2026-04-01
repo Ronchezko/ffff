@@ -106,8 +106,29 @@ class MinecraftBot extends EventEmitter {
         if (!this.bot) return;
         
         // ТОЛЬКО ПОСЛЕ ПОЛНОГО ПОЯВЛЕНИЯ В МИРЕ
+        // src/minecraft/index.js
+// В методе setupEventHandlers, внутри обработчика 'spawn':
+
         this.bot.once('spawn', async () => {
             this.addLog('🎮 Бот появился в мире', 'success');
+            
+            // ========== ПРОВЕРКА АКТИВНЫХ НАКАЗАНИЙ ==========
+            try {
+                const { getModerationSystem } = require('./moderation');
+                const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
+                
+                // Проверяем для всех участников клана (или для конкретных)
+                const clanMembers = await this.db.getAllClanMembers?.();
+                if (clanMembers && clanMembers.length > 0) {
+                    for (const member of clanMembers) {
+                        await moderation.checkActivePunishments(member.minecraft_nick);
+                    }
+                    this.addLog(`📋 Проверены активные наказания для ${clanMembers.length} участников клана`, 'info');
+                }
+            } catch (err) {
+                this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
+            }
+            
             await this.authorize();
         });
         

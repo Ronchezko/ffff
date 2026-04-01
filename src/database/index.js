@@ -379,7 +379,11 @@ async function addClanMember(nick, invitedBy = null) {
     logger.info(`➕ Игрок ${nick} добавлен в клан`);
     return true;
 }
-
+// Добавьте этот метод в класс базы данных
+async function all(sql, params = []) {
+    const db = getDb();
+    return await db.all(sql, params);
+}
 async function removeClanMember(nick) {
     const db = getDb();
     await db.run('DELETE FROM clan_members WHERE minecraft_nick = ?', [nick]);
@@ -704,22 +708,37 @@ async function checkStaffLimit(nick, actionType) {
     
     return { allowed, current, max };
 }
-
+async function getActivePunishmentsBySource(player, source = null) {
+    const db = getDb();
+    const now = new Date().toISOString();
+    
+    let sql = `SELECT * FROM punishments 
+               WHERE player = ? AND type = 'mute' AND active = 1 
+               AND (expires_at IS NULL OR expires_at > ?)`;
+    const params = [player, now];
+    
+    if (source) {
+        sql += ` AND source = ?`;
+        params.push(source);
+    }
+    
+    return await db.all(sql, params);
+}
 async function incrementStaffCounter(nick, actionType) {
     const db = getDb();
     const field = actionType === 'kick' ? 'kicks_today' : (actionType === 'mute' ? 'mutes_today' : 'bl_today');
     await db.run(`UPDATE staff_stats SET ${field} = ${field} + 1 WHERE minecraft_nick = ?`, [nick]);
 }
 
-async function addPunishment(player, type, reason, issuedBy, durationMinutes = null) {
+async function addPunishment(player, type, reason, issuedBy, durationMinutes = null, source = 'clan') {
     const db = getDb();
     
     const expiresAt = durationMinutes ? new Date(Date.now() + durationMinutes * 60000).toISOString() : null;
     
     const result = await db.run(
-        `INSERT INTO punishments (player, type, reason, issued_by, duration_minutes, expires_at, active)
-         VALUES (?, ?, ?, ?, ?, ?, 1)`,
-        [player, type, reason, issuedBy, durationMinutes, expiresAt]
+        `INSERT INTO punishments (player, type, reason, issued_by, duration_minutes, expires_at, active, source)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+        [player, type, reason, issuedBy, durationMinutes, expiresAt, source]
     );
     
     // Если это чёрный список, добавляем в отдельную таблицу
@@ -1003,6 +1022,7 @@ module.exports = {
     removePunishment,
     isBlacklisted,
     isMuted,
+    getActivePunishmentsBySource,
     
     // Имущество
     getProperty,
@@ -1023,5 +1043,6 @@ module.exports = {
     // Логи
     logClanChat,
     logPrivateMessage,
-    getChatLogs
+    getChatLogs,
+    all
 };

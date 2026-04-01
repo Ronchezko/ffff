@@ -109,8 +109,13 @@ class ChatHandler {
 // src/minecraft/chatHandler.js — ключевые изменения
 
     // В методе handleClanChat добавьте:
+// В методе handleClanChat - обязательно вызываем checkClanChat
+// В методе handleClanChat - УБРАН вывод о кулдауне
 async handleClanChat(nickname, message) {
     if (nickname === this.bot.username) return;
+    
+    // ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ
+    this.parentBot.addLog(`🔍 Клановый чат: ник="${nickname}", сообщение="${message}"`, 'debug');
     
     if (!this.moderation) {
         const { getModerationSystem } = require('./moderation');
@@ -128,13 +133,14 @@ async handleClanChat(nickname, message) {
     }
 }
 
-// В методе handlePrivateMessage добавьте:
+// В методе handlePrivateMessage - проверка команд
 async handlePrivateMessage(nickname, message) {
     if (!this.moderation) {
         const { getModerationSystem } = require('./moderation');
         this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot.addLog);
     }
     
+    // Проверка на мут
     if (await this.moderation.isMuted(nickname)) {
         this.parentBot.addLog(`🚫 Игнорирование ЛС от ${nickname} (в муте)`, 'debug');
         return;
@@ -143,16 +149,16 @@ async handlePrivateMessage(nickname, message) {
     if (message.startsWith('/')) {
         const command = message.slice(1).split(' ')[0];
         
+        // Проверка на одинаковые команды
         const cmdResult = await this.moderation.checkPrivateCommand(nickname, command);
         if (!cmdResult.allowed) {
-            if (!cmdResult.shouldIgnore) {
-                if (cmdResult.cooldown) {
-                    this.bot.chat(`/msg ${nickname} &e⏱️ ${cmdResult.reason}`);
-                }
+            if (!cmdResult.shouldIgnore && cmdResult.cooldown) {
+                this.bot.chat(`/msg ${nickname} &e⏱️ ${cmdResult.reason}`);
             }
             return;
         }
         
+        // Проверка на правильность команды
         const commands = require('./commands');
         const isValidCommand = commands.commandMap?.has(command.toLowerCase());
         

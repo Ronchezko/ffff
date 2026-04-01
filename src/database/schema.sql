@@ -540,3 +540,4 @@ CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);
 CREATE INDEX IF NOT EXISTS idx_verification_codes_active ON verification_codes(is_active);
 CREATE INDEX IF NOT EXISTS idx_pvp_stats_killer ON pvp_stats(killer);
 CREATE INDEX IF NOT EXISTS idx_pvp_stats_victim ON pvp_stats(victim);
+ALTER TABLE punishments ADD COLUMN source TEXT DEFAULT 'clan';

@@ -1,45 +1,41 @@
 // src/minecraft/moderation.js
-// Система авто-модерации с 3 предупреждениями и защитой от спама
+// Лояльная система для кланового чата, строгая для ЛС
 
 const utils = require('../shared/utils');
-
-// ============================================
-// КОНФИГУРАЦИЯ
-// ============================================
 
 const CONFIG = {
     enabled: true,
     
-    // Клановый чат
+    // КЛАНОВЫЙ ЧАТ - ЛОЯЛЬНО
     clanChat: {
-        messagesPerMinute: 10,          // 10 сообщений в минуту
-        warnCount: 3,                   // 3 предупреждения → мут
-        muteMinutes: 5,                 // мут на 5 минут
-        warnCooldown: 15,               // пауза между предупреждениями 15 сек
-        capsPercent: 75,
-        minMessageLength: 8,
-        repeatSameMessage: 3,
-        repeatWindow: 30000,
-        maxMentions: 6
+        messagesPerMinute: 12,           // 12 сообщений в минуту (лояльно)
+        warnCount: 3,                    // 3 предупреждения → мут
+        muteMinutes: 10,                 // мут на 10 минут
+        capsPercent: 80,                 // 80% капса (лояльно)
+        minMessageLength: 10,
+        repeatSameMessage: 4,            // 4 одинаковых сообщения
+        repeatWindow: 40000,
+        maxMentions: 8                   // 8 упоминаний
     },
     
-    // Личные сообщения
+    // ЛИЧНЫЕ СООБЩЕНИЯ - СТРОГО (защита бота)
     privateChat: {
-        sameCommandCooldown: 12,        // 12 сек между одинаковыми командами
-        maxSameCommandWarnings: 3,      // 3 одинаковые команды → блокировка
-        warnCooldown: 20,               // пауза между предупреждениями 20 сек
-        invalidCommandsPerMinute: 6,
-        warnCount: 3,                   // 3 предупреждения → блокировка
-        ignoreMinutes: 5                // блокировка на 5 минут
+        sameCommandCooldown: 15,         // 15 сек между одинаковыми командами
+        maxSameCommandWarnings: 2,       // 2 одинаковые команды → предупреждение
+        warnCount: 2,                    // 2 предупреждения → блокировка
+        blockMinutes: 5,                 // блокировка на 5 минут
+        invalidCommandsPerMinute: 5,     // 5 неверных команд в минуту
+        maxRepeatedMessages: 2,          // 2 одинаковых сообщения в ЛС → предупреждение
+        warnCooldown: 30                 // после предупреждения пауза 30 сек
     },
     
-    // Сообщения (в клановый чат)
+    // СООБЩЕНИЯ (в клановый чат)
     messages: {
         warning: '&e⚠️ [Модерация] &c{player} &7, {reason} &eПредупреждение {current}/{max}',
-        cooldown: '&e⏱️ [Модерация] &c{player} &7, {reason} &eПодождите {seconds} секунд',
         mute: '&c🔇 [Модерация] &e{player} &cполучил мут на {minutes} минут. Причина: {reason}',
         unmute: '&a🔊 [Модерация] &e{player} &aразмучен автоматически',
-        ignore: '&c🔇 [Модерация] &e{player} &cзаблокированы команды на {minutes} минут. Причина: {reason}'
+        block: '&c🔇 [Модерация] &e{player} &cзаблокированы команды на {minutes} минут. Причина: {reason}',
+        unblock: '&a🔊 [Модерация] &e{player} &aкоманды снова доступны'
     },
     
     // Нецензурная лексика
@@ -47,28 +43,11 @@ const CONFIG = {
         severe: ['сука', 'блядь', 'хуй', 'пизда', 'ебать', 'нахуй', 'залупа'],
         moderate: ['дурак', 'идиот', 'тупой', 'лох', 'дебил', 'кретин'],
         mild: ['блин', 'черт', 'ёлки-палки', 'жопа', 'хрен']
-    },
-    
-    // Уровни доверия
-    trustLevels: {
-        newbie: { multiplier: 1.0, warnThreshold: 3 },
-        regular: { multiplier: 1.3, warnThreshold: 3 },
-        trusted: { multiplier: 1.8, warnThreshold: 3 },
-        vip: { multiplier: 2.5, warnThreshold: 3 },
-        staff: { multiplier: 999, warnThreshold: 999 }
     }
 };
 
-// ============================================
-// ХРАНИЛИЩА
-// ============================================
-
 const playerStats = new Map();
 const pendingUnmutes = new Map();
-
-// ============================================
-// ОСНОВНОЙ КЛАСС
-// ============================================
 
 class ModerationSystem {
     constructor(bot, db, addLog) {
@@ -83,16 +62,62 @@ class ModerationSystem {
     // ============================================
     
     cleanNickname(nick) {
-        if (!nick) return '';
-        let cleaned = nick;
-        cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-        cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
-        cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
-        cleaned = cleaned.replace(/[⌜⌟ﾠ𐓏✦🌟🔧🛠🍁⭐]/g, '');
-        cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-        return cleaned.trim();
+    if (!nick) return '';
+    
+    let cleaned = nick;
+    
+    // 1. Удаляем все цветовые коды Minecraft
+    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+    
+    // 2. Удаляем HEX цвета &#RRGGBB
+    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
+    
+    // 3. Удаляем квадратные скобки и их содержимое
+    cleaned = cleaned.replace(/\[[^\]]*\]/g, '');
+    
+    // 4. Удаляем специальные символы (ранги, иконки)
+    cleaned = cleaned.replace(/[⌜⌟ﾠ𐓏✦🌟🔧🛠🍁⭐]/g, '');
+    
+    // 5. Удаляем ВСЕ русские слова-ранги (Новенький, Участник, Модератор и т.д.)
+    //    Включая вариант с латинскими символами "ноʙᴇньᴋий"
+    cleaned = cleaned.replace(/ноʙᴇньᴋий/gi, '');
+    cleaned = cleaned.replace(/новенький/gi, '');
+    cleaned = cleaned.replace(/участник/gi, '');
+    cleaned = cleaned.replace(/модератор/gi, '');
+    cleaned = cleaned.replace(/администратор/gi, '');
+    cleaned = cleaned.replace(/куратор/gi, '');
+    cleaned = cleaned.replace(/гл\.модератор/gi, '');
+    cleaned = cleaned.replace(/ст\.модератор/gi, '');
+    cleaned = cleaned.replace(/мл\.модератор/gi, '');
+    
+    // 6. Удаляем все, что не буква, не цифра, не подчеркивание
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+    
+    // 7. Удаляем пустые пробелы
+    cleaned = cleaned.trim();
+    
+    // 8. Если после очистки ничего не осталось, пробуем взять последнее слово из ника
+    if (!cleaned || cleaned.length < 2) {
+        const words = nick.split(/[\s:]/);
+        for (let i = words.length - 1; i >= 0; i--) {
+            const candidate = words[i].replace(/[^a-zA-Z0-9_]/g, '');
+            if (candidate && candidate.length >= 2 && !candidate.match(/^(ноʙᴇньᴋий|новенький|участник|модератор)$/i)) {
+                cleaned = candidate;
+                break;
+            }
+        }
     }
     
+    // 9. Финальная проверка
+    if (!cleaned || cleaned.length < 2) {
+        this.addLog(`⚠️ Не удалось очистить ник: "${nick}"`, 'warn');
+        return nick.replace(/[^a-zA-Z0-9_]/g, ''); // возвращаем хотя бы что-то
+    }
+    
+    this.addLog(`🧹 Очистка ника: "${nick}" → "${cleaned}"`, 'debug');
+    
+    return cleaned;
+}
     // ============================================
     // ПОЛУЧЕНИЕ СТАТИСТИКИ
     // ============================================
@@ -103,54 +128,24 @@ class ModerationSystem {
                 // Клановый чат
                 clanMessages: [],
                 clanWarnings: 0,
-                clanLastWarnTime: 0,
                 clanMutedUntil: 0,
-                clanCooldownUntil: 0,
+                lastClanMessage: '',
+                lastClanMessageTime: 0,
+                repeatCount: 0,
                 
-                // ЛС
-                privateCommands: [],
-                privateInvalidCommands: [],
+                // Личные сообщения
+                privateMessages: [],
                 privateLastCommand: '',
                 privateLastCommandTime: 0,
                 privateSameCommandCount: 0,
                 privateWarnings: 0,
                 privateLastWarnTime: 0,
-                privateIgnoredUntil: 0,
+                privateBlockedUntil: 0,
                 
-                lastViolation: 0,
-                trustScore: 50
+                lastViolation: 0
             });
         }
         return playerStats.get(nick);
-    }
-    
-    // ============================================
-    // УРОВЕНЬ ДОВЕРИЯ
-    // ============================================
-    
-    async getTrustLevel(nick) {
-        const cleanNick = this.cleanNickname(nick);
-        try {
-            const staffRank = await this.db.getStaffRank?.(cleanNick) || { rank_level: 0 };
-            if (staffRank.rank_level >= 1) {
-                return { level: 'staff', multiplier: 999, warnThreshold: 999 };
-            }
-        } catch (err) {}
-        
-        let score = playerStats.get(nick)?.trustScore || 50;
-        const stats = playerStats.get(nick);
-        
-        if (stats && stats.lastViolation) {
-            const hoursClean = (Date.now() - stats.lastViolation) / (60 * 60 * 1000);
-            if (hoursClean > 24) score = Math.min(100, score + 5);
-            if (hoursClean > 72) score = Math.min(100, score + 10);
-            score = Math.max(0, score - (stats.clanWarnings + stats.privateWarnings) * 5);
-        }
-        
-        if (score >= 80) return { level: 'vip', multiplier: 2.5, warnThreshold: 3 };
-        if (score >= 65) return { level: 'trusted', multiplier: 1.8, warnThreshold: 3 };
-        if (score >= 40) return { level: 'regular', multiplier: 1.3, warnThreshold: 3 };
-        return { level: 'newbie', multiplier: 1.0, warnThreshold: 3 };
     }
     
     // ============================================
@@ -163,10 +158,15 @@ class ModerationSystem {
         const cleanNick = this.cleanNickname(nick);
         
         if (stats.clanMutedUntil > now) return true;
-        if (stats.privateIgnoredUntil > now) return true;
+        if (stats.privateBlockedUntil > now) return true;
         
         try {
-            const mute = await this.db.isMuted?.(cleanNick);
+            const mute = await this.db.get?.(
+                `SELECT * FROM punishments 
+                 WHERE player = ? AND type = 'mute' AND active = 1 
+                 AND expires_at > CURRENT_TIMESTAMP`,
+                [cleanNick]
+            );
             if (mute && mute.expires_at) {
                 const expires = new Date(mute.expires_at).getTime();
                 if (expires > now) {
@@ -178,113 +178,169 @@ class ModerationSystem {
         
         return false;
     }
+    async removeClanMute(nick) {
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    const cleanNick = this.cleanNickname(nick);
+    const unmuteCommand = process.env.MC_UNMUTE_COMMAND || '/c unmute';
     
-    // ============================================
-    // ВЫДАЧА МУТА
-    // ============================================
-    
-    async applyMute(nick, minutes, reason, source = 'clan') {
-        const stats = this.getStats(nick);
-        const now = Date.now();
-        const muteUntil = now + minutes * 60 * 1000;
-        const cleanNick = this.cleanNickname(nick);
-        
-        if (source === 'clan') {
-            stats.clanMutedUntil = muteUntil;
-            stats.clanWarnings = 0;
-        } else {
-            stats.privateIgnoredUntil = muteUntil;
-            stats.privateWarnings = 0;
-        }
-        
-        await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', minutes);
-        
-        // Отправляем команду мута с ЧИСТЫМ ником
-        this.bot.chat(`/c mute ${cleanNick} ${reason}`);
-        
-        // Уведомления в ЛС и клановый чат
-        this.bot.chat(`/msg ${nick} &c🔇 Вы получили мут на ${minutes} минут. Причина: ${reason}`);
-        
-        const message = this.config.messages.mute
-            .replace('{player}', nick)
-            .replace('{minutes}', minutes)
-            .replace('{reason}', reason);
-        this.bot.chat(`/cc ${message}`);
-        
-        const timeoutId = setTimeout(async () => {
-            await this.removeMute(nick);
-        }, minutes * 60 * 1000);
-        
-        pendingUnmutes.set(cleanNick, timeoutId);
-        this.addLog(`🔇 Мут ${cleanNick} на ${minutes} мин (${source}): ${reason}`, 'warn');
+    if (pendingUnmutes.has(cleanNick)) {
+        clearTimeout(pendingUnmutes.get(cleanNick));
+        pendingUnmutes.delete(cleanNick);
     }
     
-    async removeMute(nick) {
-        const stats = this.getStats(nick);
-        const now = Date.now();
-        const cleanNick = this.cleanNickname(nick);
+    if (stats.clanMutedUntil > now) {
+        stats.clanMutedUntil = 0;
+        stats.clanWarnings = 0;
         
-        if (pendingUnmutes.has(cleanNick)) {
-            clearTimeout(pendingUnmutes.get(cleanNick));
-            pendingUnmutes.delete(cleanNick);
-        }
+        // Снимаем только клановый мут
+        await this.db.run?.(
+            `UPDATE punishments SET active = 0, lifted_by = 'system', lifted_at = CURRENT_TIMESTAMP 
+             WHERE player = ? AND type = 'mute' AND source = 'clan' AND active = 1`,
+            [cleanNick]
+        );
         
-        let wasMuted = false;
-        if (stats.clanMutedUntil > now) { stats.clanMutedUntil = 0; wasMuted = true; }
-        if (stats.privateIgnoredUntil > now) { stats.privateIgnoredUntil = 0; wasMuted = true; }
+        await utils.sleep(500);
+        this.bot.chat(`${unmuteCommand} ${cleanNick}`);
+        this.addLog(`📤 Снятие кланового мута: ${unmuteCommand} ${cleanNick}`, 'info');
         
-        if (wasMuted) {
-            stats.clanWarnings = 0;
-            stats.privateWarnings = 0;
-            stats.privateSameCommandCount = 0;
-            
-            await this.db.removePunishment?.(cleanNick, 'mute', 'system', 'Автоматическое снятие');
-            this.bot.chat(`/c unmute ${cleanNick}`);
-            this.bot.chat(`/msg ${nick} &a✅ Ваш мут снят. Можете снова пользоваться чатом!`);
-            
-            const message = this.config.messages.unmute.replace('{player}', nick);
-            this.bot.chat(`/cc ${message}`);
-            this.addLog(`🔊 Размут ${cleanNick}`, 'info');
-        }
+        this.bot.chat(`/msg ${nick} &a✅ Ваш мут снят. Можете снова пользоваться чатом!`);
+        this.bot.chat(`/cc &a🔊 &e${nick} &aразмучен автоматически.`);
+        this.addLog(`🔊 Снят клановый мут ${cleanNick}`, 'info');
+    }
+}
+    // ============================================
+    // ВЫДАЧА МУТА В КЛАНОВОМ ЧАТЕ
+    // ============================================
+    async removePrivateBlock(nick) {
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    const cleanNick = this.cleanNickname(nick);
+    
+    if (pendingUnmutes.has(cleanNick)) {
+        clearTimeout(pendingUnmutes.get(cleanNick));
+        pendingUnmutes.delete(cleanNick);
     }
     
+    if (stats.privateBlockedUntil > now) {
+        stats.privateBlockedUntil = 0;
+        stats.privateWarnings = 0;
+        stats.privateSameCommandCount = 0;
+        
+        await this.db.removePunishment?.(cleanNick, 'mute', 'system', 'Автоматическое снятие');
+        
+        this.bot.chat(`/msg ${nick} &a✅ Ваши команды снова доступны!`);
+        this.bot.chat(`/cc &a🔊 &e${nick} &aразблокированы автоматически.`);
+        
+        this.addLog(`🔊 Снята блокировка ЛС для ${cleanNick}`, 'info');
+    }
+}
+    async applyClanMute(nick, minutes, reason) {
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    const muteUntil = now + minutes * 60 * 1000;
+    const cleanNick = this.cleanNickname(nick);
+    const muteCommand = process.env.MC_MUTE_COMMAND || '/c mute';
+    
+    this.addLog(`🔍 МУТ (КЛАНОВЫЙ): ник="${cleanNick}", причина="${reason}"`, 'info');
+    
+    if (!cleanNick || cleanNick.length < 2) {
+        this.addLog(`❌ Невозможно выдать мут: ник "${cleanNick}" невалидный`, 'error');
+        return;
+    }
+    
+    stats.clanMutedUntil = muteUntil;
+    stats.clanWarnings = 0;
+    
+    // Сохраняем в БД с source = 'clan'
+    await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', minutes, 'clan');
+    
+    // Отправляем команду мута
+    await utils.sleep(500);
+    this.bot.chat(`${muteCommand} ${cleanNick} ${reason}`);
+    this.addLog(`📤 ОТПРАВЛЕНО: ${muteCommand} ${cleanNick} ${reason}`, 'info');
+    
+    // Уведомления
+    this.bot.chat(`/msg ${nick} &c🔇 Вы получили мут на ${minutes} минут. Причина: ${reason}`);
+    this.bot.chat(`/cc &c🔇 &e${nick} &cполучил мут на ${minutes} минут. Причина: ${reason}`);
+    
+    // Планируем авто-снятие
+    if (pendingUnmutes.has(cleanNick)) {
+        clearTimeout(pendingUnmutes.get(cleanNick));
+    }
+    const timeoutId = setTimeout(async () => {
+        await this.removeClanMute(nick);
+    }, minutes * 60 * 1000);
+    pendingUnmutes.set(cleanNick, timeoutId);
+    
+    this.addLog(`🔇 Клановый мут ${cleanNick} на ${minutes} мин: ${reason}`, 'warn');
+}
+    
     // ============================================
-    // ПРОВЕРКА КЛАНОВОГО ЧАТА
+    // БЛОКИРОВКА КОМАНД В ЛС
+    // ============================================
+    
+    async applyPrivateBlock(nick, minutes, reason) {
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    const blockUntil = now + minutes * 60 * 1000;
+    const cleanNick = this.cleanNickname(nick);
+    
+    stats.privateBlockedUntil = blockUntil;
+    stats.privateWarnings = 0;
+    stats.privateSameCommandCount = 0;
+    
+    // Сохраняем в БД с source = 'private'
+    await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', minutes, 'private');
+    
+    // Уведомления
+    this.bot.chat(`/cc &c🔇 &e${nick} &cзаблокированы команды на ${minutes} минут. Причина: ${reason}`);
+    this.bot.chat(`/msg ${nick} &c🔇 Ваши команды заблокированы на ${minutes} минут. Причина: ${reason}`);
+    
+    // Планируем авто-снятие
+    if (pendingUnmutes.has(cleanNick)) {
+        clearTimeout(pendingUnmutes.get(cleanNick));
+    }
+    const timeoutId = setTimeout(async () => {
+        await this.removePrivateBlock(nick);
+    }, minutes * 60 * 1000);
+    pendingUnmutes.set(cleanNick, timeoutId);
+    
+    this.addLog(`🔇 Блокировка ЛС ${cleanNick} на ${minutes} мин: ${reason}`, 'warn');
+}
+    
+    // ============================================
+    // ПРОВЕРКА КЛАНОВОГО ЧАТА (ЛОЯЛЬНО, БЕЗ КУЛДАУНОВ)
     // ============================================
     
     async checkClanChat(nick, message) {
         if (!this.config.enabled) return { allowed: true };
-        if (await this.isMuted(nick)) return { allowed: false, reason: 'Вы в муте' };
+        
+        // Проверка на мут
+        if (await this.isMuted(nick)) {
+            return { allowed: false, reason: 'Вы в муте', isMuted: true };
+        }
         
         const stats = this.getStats(nick);
-        const trust = await this.getTrustLevel(nick);
         const now = Date.now();
-        
-        // Проверка кулдауна после предупреждения
-        if (stats.clanCooldownUntil > now) {
-            const remaining = Math.ceil((stats.clanCooldownUntil - now) / 1000);
-            const cooldownMsg = this.config.messages.cooldown
-                .replace('{player}', nick)
-                .replace('{reason}', 'пожалуйста, не спамьте')
-                .replace('{seconds}', remaining);
-            this.bot.chat(`/cc ${cooldownMsg}`);
-            return { allowed: false, reason: 'Кулдаун после предупреждения' };
-        }
         
         // Очистка старых сообщений
         stats.clanMessages = stats.clanMessages.filter(t => now - t < 60000);
         stats.clanMessages.push(now);
         
-        const limit = Math.floor(this.config.clanChat.messagesPerMinute * trust.multiplier);
-        
-        // Сбор нарушений
+        const limit = this.config.clanChat.messagesPerMinute;
         let violation = null;
         
+        // Проверка на спам
         if (stats.clanMessages.length > limit) {
             violation = { type: 'spam', reason: `Спам сообщениями (${stats.clanMessages.length} за минуту)` };
-        } else if (this.checkCaps(message)) {
+        }
+        // Проверка на капс
+        else if (this.checkCaps(message)) {
             violation = { type: 'caps', reason: 'Чрезмерное использование CAPS' };
-        } else if (this.checkRepeatMessage(stats, message)) {
+        }
+        // Проверка на повтор
+        else if (this.checkRepeatMessage(stats, message)) {
             violation = { type: 'repeat', reason: 'Повторение одинаковых сообщений' };
         }
         
@@ -299,20 +355,20 @@ class ModerationSystem {
         }
         
         if (violation) {
-            return await this.handleClanViolation(nick, violation, stats, trust);
+            return await this.handleClanViolation(nick, violation, stats);
         }
         
         return { allowed: true };
     }
     
-    async handleClanViolation(nick, violation, stats, trust) {
+    async handleClanViolation(nick, violation, stats) {
         const now = Date.now();
-        const warnThreshold = Math.ceil(this.config.clanChat.warnCount / trust.multiplier);
+        const warnThreshold = this.config.clanChat.warnCount;
         
         stats.clanWarnings++;
         stats.lastViolation = now;
         
-        // Отправляем предупреждение в клановый чат
+        // Предупреждение в клановый чат
         const warnMessage = this.config.messages.warning
             .replace('{player}', nick)
             .replace('{reason}', violation.reason)
@@ -322,37 +378,31 @@ class ModerationSystem {
         
         this.addLog(`⚠️ [CLAN] ${nick}: ${violation.reason} (${stats.clanWarnings}/${warnThreshold})`, 'debug');
         
-        // Устанавливаем кулдаун на 15 секунд после предупреждения
-        stats.clanCooldownUntil = now + this.config.clanChat.warnCooldown * 1000;
-        stats.clanLastWarnTime = now;
-        
-        // Если достигнут порог (3 предупреждения) — мут
+        // Мут после 3 предупреждений
         if (stats.clanWarnings >= warnThreshold) {
-            await this.applyMute(nick, this.config.clanChat.muteMinutes, violation.reason, 'clan');
-            return { allowed: false, reason: 'Мут за нарушения в чате' };
+            await this.applyClanMute(nick, this.config.clanChat.muteMinutes, violation.reason);
+            return { allowed: false, reason: 'Мут', isMuted: true };
         }
         
         return { allowed: true, warned: true };
     }
     
     // ============================================
-    // ПРОВЕРКА ЛИЧНЫХ СООБЩЕНИЙ
+    // ПРОВЕРКА ЛИЧНЫХ СООБЩЕНИЙ (СТРОГО)
     // ============================================
     
     async checkPrivateCommand(nick, command) {
         if (!this.config.enabled) return { allowed: true };
-        if (await this.isMuted(nick)) {
-            return { allowed: false, reason: 'Вы в муте', shouldIgnore: true };
-        }
         
+        // Проверка на блокировку
         const stats = this.getStats(nick);
         const now = Date.now();
         
-        if (stats.privateIgnoredUntil > now) {
-            return { allowed: false, reason: 'Ваши команды временно заблокированы', shouldIgnore: true };
+        if (stats.privateBlockedUntil > now) {
+            return { allowed: false, reason: 'Команды временно заблокированы', shouldIgnore: true };
         }
         
-        // Проверка на одинаковые команды (3 раза подряд)
+        // Проверка на одинаковые команды
         if (stats.privateLastCommand === command && stats.privateLastCommandTime > 0) {
             const timeSince = now - stats.privateLastCommandTime;
             const cooldown = this.config.privateChat.sameCommandCooldown * 1000;
@@ -361,18 +411,14 @@ class ModerationSystem {
                 stats.privateSameCommandCount++;
                 const remaining = Math.ceil((cooldown - timeSince) / 1000);
                 
-                // Если 3 одинаковые команды подряд → сразу блокировка
+                // 2 одинаковые команды → предупреждение
                 if (stats.privateSameCommandCount >= this.config.privateChat.maxSameCommandWarnings) {
-                    await this.handlePrivateViolation(nick, `Повтор команды "${command}" (3 раза подряд)`, stats, true);
-                    return { allowed: false, reason: 'Команды временно заблокированы', shouldIgnore: true };
+                    await this.handlePrivateViolation(nick, `Повтор команды "${command}" (2 раза)`, stats);
+                    return { allowed: false, reason: 'Команды заблокированы', shouldIgnore: true };
                 }
                 
-                // Предупреждение в клановый чат о кулдауне
-                const cooldownMsg = this.config.messages.cooldown
-                    .replace('{player}', nick)
-                    .replace('{reason}', `повтор команды "${command}"`)
-                    .replace('{seconds}', remaining);
-                this.bot.chat(`/cc ${cooldownMsg}`);
+                // Предупреждение в клановый чат
+                this.bot.chat(`/cc &e⏱️ [Модерация] &c${nick} &7, повтор команды "${command}". Подождите ${remaining} секунд`);
                 
                 return { 
                     allowed: false, 
@@ -381,7 +427,6 @@ class ModerationSystem {
                     shouldIgnore: false
                 };
             } else {
-                // Сброс счётчика, если прошло достаточно времени
                 stats.privateSameCommandCount = 0;
             }
         } else {
@@ -393,37 +438,108 @@ class ModerationSystem {
         
         return { allowed: true };
     }
+    // src/minecraft/moderation.js
+// Добавьте этот метод в класс ModerationSystem
+
+async checkActivePunishments(nick) {
+    const cleanNick = this.cleanNickname(nick);
+    const now = Date.now();
     
+    try {
+        // Проверяем активные муты в БД
+        const activeMutes = await this.db.all?.(
+            `SELECT * FROM punishments 
+             WHERE player = ? AND type = 'mute' AND active = 1 
+             AND expires_at > CURRENT_TIMESTAMP`,
+            [cleanNick]
+        );
+        
+        if (activeMutes && activeMutes.length > 0) {
+            for (const mute of activeMutes) {
+                const expires = new Date(mute.expires_at).getTime();
+                const remaining = expires - now;
+                const source = mute.source || 'clan';
+                
+                if (remaining > 0) {
+                    const stats = this.getStats(nick);
+                    
+                    if (source === 'clan') {
+                        if (stats.clanMutedUntil < expires) {
+                            stats.clanMutedUntil = expires;
+                            this.addLog(`📋 Активный клановый мут для ${nick}, осталось ${Math.floor(remaining / 60000)} мин`, 'info');
+                            
+                            // Отправляем уведомление игроку
+                            this.bot.chat(`/msg ${nick} &c🔇 У вас активен мут ещё ${Math.floor(remaining / 60000)} минут. Причина: ${mute.reason}`);
+                        }
+                    } else {
+                        if (stats.privateBlockedUntil < expires) {
+                            stats.privateBlockedUntil = expires;
+                            this.addLog(`📋 Активная блокировка ЛС для ${nick}, осталось ${Math.floor(remaining / 60000)} мин`, 'info');
+                            
+                            this.bot.chat(`/msg ${nick} &c🔇 Ваши команды заблокированы ещё ${Math.floor(remaining / 60000)} минут. Причина: ${mute.reason}`);
+                        }
+                    }
+                    
+                    // Убеждаемся, что таймер на снятие установлен
+                    if (!pendingUnmutes.has(cleanNick)) {
+                        const timeoutId = setTimeout(async () => {
+                            if (source === 'clan') {
+                                await this.removeClanMute(nick);
+                            } else {
+                                await this.removePrivateBlock(nick);
+                            }
+                        }, remaining);
+                        pendingUnmutes.set(cleanNick, timeoutId);
+                    }
+                } else {
+                    // Если мут уже истёк, но в БД ещё активен — снимаем
+                    await this.db.run?.(
+                        `UPDATE punishments SET active = 0, lifted_by = 'system', lifted_at = CURRENT_TIMESTAMP 
+                         WHERE id = ?`,
+                        [mute.id]
+                    );
+                    this.addLog(`📋 Снят истёкший мут для ${cleanNick} (source: ${source})`, 'info');
+                }
+            }
+            return true;
+        }
+    } catch (err) {
+        this.addLog(`⚠️ Ошибка проверки активных наказаний: ${err.message}`, 'warn');
+    }
+    
+    return false;
+}
     async checkInvalidCommand(nick, command) {
         if (!this.config.enabled) return { allowed: true };
         
         const stats = this.getStats(nick);
         const now = Date.now();
         
-        if (stats.privateIgnoredUntil > now) {
-            return { allowed: false, reason: 'Ваши команды временно заблокированы', shouldIgnore: true };
+        if (stats.privateBlockedUntil > now) {
+            return { allowed: false, reason: 'Команды заблокированы', shouldIgnore: true };
         }
         
+        // Очистка старых записей
+        if (!stats.privateInvalidCommands) stats.privateInvalidCommands = [];
         stats.privateInvalidCommands = stats.privateInvalidCommands.filter(t => now - t < 60000);
         stats.privateInvalidCommands.push(now);
         
         const limit = this.config.privateChat.invalidCommandsPerMinute;
         
         if (stats.privateInvalidCommands.length > limit) {
-            const result = await this.handlePrivateViolation(nick, `Спам неверными командами (${stats.privateInvalidCommands.length} за минуту)`, stats, false);
-            if (result.blocked) {
-                return { allowed: false, reason: 'Ваши команды временно заблокированы', shouldIgnore: true };
-            }
+            await this.handlePrivateViolation(nick, `Спам неверными командами (${stats.privateInvalidCommands.length} за минуту)`, stats);
+            return { allowed: false, reason: 'Команды заблокированы', shouldIgnore: true };
         }
         
         return { allowed: true };
     }
     
-    async handlePrivateViolation(nick, reason, stats, isImmediateBlock = false) {
+    async handlePrivateViolation(nick, reason, stats) {
         const now = Date.now();
         
-        if (now - stats.privateLastWarnTime < this.config.privateChat.warnCooldown * 1000 && !isImmediateBlock) {
-            return { blocked: false, warned: false };
+        // Кулдаун между предупреждениями
+        if (now - (stats.privateLastWarnTime || 0) < this.config.privateChat.warnCooldown * 1000) {
+            return;
         }
         
         stats.privateLastWarnTime = now;
@@ -440,36 +556,10 @@ class ModerationSystem {
         
         this.addLog(`⚠️ [PRIVATE] ${nick}: ${reason} (${stats.privateWarnings}/${this.config.privateChat.warnCount})`, 'debug');
         
-        // Блокировка после 3 предупреждений или при 3 одинаковых командах
-        if (stats.privateWarnings >= this.config.privateChat.warnCount || isImmediateBlock) {
-            const ignoreUntil = now + this.config.privateChat.ignoreMinutes * 60 * 1000;
-            stats.privateIgnoredUntil = ignoreUntil;
-            stats.privateWarnings = 0;
-            stats.privateSameCommandCount = 0;
-            const cleanNick = this.cleanNickname(nick);
-            
-            await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', this.config.privateChat.ignoreMinutes);
-            
-            const message = this.config.messages.ignore
-                .replace('{player}', nick)
-                .replace('{minutes}', this.config.privateChat.ignoreMinutes)
-                .replace('{reason}', reason);
-            this.bot.chat(`/cc ${message}`);
-            this.bot.chat(`/msg ${nick} &c🔇 Ваши команды заблокированы на ${this.config.privateChat.ignoreMinutes} минут. Причина: ${reason}`);
-            
-            setTimeout(async () => {
-                if (stats.privateIgnoredUntil > 0) {
-                    stats.privateIgnoredUntil = 0;
-                    await this.db.removePunishment?.(cleanNick, 'mute', 'system', 'Автоматическое снятие');
-                    this.bot.chat(`/msg ${nick} &a✅ Ваши команды снова доступны!`);
-                    this.bot.chat(`/cc &a🔊 &e${nick} &aразблокированы автоматически.`);
-                }
-            }, this.config.privateChat.ignoreMinutes * 60 * 1000);
-            
-            return { blocked: true };
+        // Блокировка после 2 предупреждений
+        if (stats.privateWarnings >= this.config.privateChat.warnCount) {
+            await this.applyPrivateBlock(nick, this.config.privateChat.blockMinutes, reason);
         }
-        
-        return { blocked: false, warned: true };
     }
     
     // ============================================
@@ -514,32 +604,69 @@ class ModerationSystem {
     }
     
     async restorePunishments() {
-        try {
-            const activeMutes = await this.db.all?.('SELECT * FROM punishments WHERE type = "mute" AND active = 1 AND expires_at > CURRENT_TIMESTAMP');
-            if (activeMutes && activeMutes.length > 0) {
-                for (const mute of activeMutes) {
-                    const expires = new Date(mute.expires_at).getTime();
-                    let originalNick = mute.player;
+    if (this.isRestoring) return;
+    this.isRestoring = true;
+    
+    try {
+        // Восстанавливаем все активные муты
+        const activeMutes = await this.db.all?.(
+            `SELECT * FROM punishments 
+             WHERE type = 'mute' AND active = 1 
+             AND expires_at > CURRENT_TIMESTAMP`
+        );
+        
+        if (activeMutes && activeMutes.length > 0) {
+            this.addLog(`📋 Найдено ${activeMutes.length} активных мутов в БД`, 'info');
+            
+            for (const mute of activeMutes) {
+                const expires = new Date(mute.expires_at).getTime();
+                const cleanNick = mute.player;
+                const remaining = expires - Date.now();
+                const source = mute.source || 'clan';
+                
+                if (remaining > 0) {
+                    // Находим оригинальный ник с цветами
+                    let originalNick = cleanNick;
                     for (const [storedNick] of playerStats) {
-                        if (this.cleanNickname(storedNick) === mute.player) {
+                        if (this.cleanNickname(storedNick) === cleanNick) {
                             originalNick = storedNick;
                             break;
                         }
                     }
+                    
                     const stats = this.getStats(originalNick);
-                    stats.clanMutedUntil = expires;
-                    const remaining = expires - Date.now();
-                    if (remaining > 0) {
-                        setTimeout(async () => {
-                            await this.removeMute(originalNick);
-                        }, remaining);
+                    
+                    // Восстанавливаем в зависимости от источника
+                    if (source === 'clan') {
+                        stats.clanMutedUntil = expires;
+                        this.addLog(`📋 Восстановлен КЛАНОВЫЙ мут для ${cleanNick}, осталось ${Math.floor(remaining / 60000)} мин`, 'info');
+                    } else {
+                        stats.privateBlockedUntil = expires;
+                        this.addLog(`📋 Восстановлена БЛОКИРОВКА ЛС для ${cleanNick}, осталось ${Math.floor(remaining / 60000)} мин`, 'info');
                     }
+                    
+                    // Планируем снятие
+                    if (pendingUnmutes.has(cleanNick)) {
+                        clearTimeout(pendingUnmutes.get(cleanNick));
+                    }
+                    
+                    const timeoutId = setTimeout(async () => {
+                        if (source === 'clan') {
+                            await this.removeClanMute(originalNick);
+                        } else {
+                            await this.removePrivateBlock(originalNick);
+                        }
+                    }, remaining);
+                    
+                    pendingUnmutes.set(cleanNick, timeoutId);
                 }
-                this.addLog(`📋 Восстановлено ${activeMutes.length} активных мутов`, 'info');
             }
-        } catch (err) {
-            this.addLog(`⚠️ Ошибка восстановления мутов: ${err.message}`, 'warn');
         }
+    } catch (err) {
+        this.addLog(`⚠️ Ошибка восстановления мутов: ${err.message}`, 'warn');
+    }
+    
+    this.isRestoring = false;
     }
     
     reset() {
@@ -549,10 +676,6 @@ class ModerationSystem {
         this.addLog('🔄 Данные авто-модерации сброшены', 'info');
     }
 }
-
-// ============================================
-// ФАБРИЧНАЯ ФУНКЦИЯ
-// ============================================
 
 let moderationInstance = null;
 
