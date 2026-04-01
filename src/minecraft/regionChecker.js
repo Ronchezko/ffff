@@ -1,411 +1,244 @@
 // src/minecraft/regionChecker.js
-const logger = require('../shared/logger');
-const database = require('../database');
+// Периодическая проверка регионов на соответствие владельцам
 
-// Цвета Minecraft для красивого оформления
-const colors = {
-    black: '&0', dark_blue: '&1', dark_green: '&2', dark_aqua: '&3',
-    dark_red: '&4', dark_purple: '&5', gold: '&6', gray: '&7',
-    dark_gray: '&8', blue: '&9', green: '&a', aqua: '&b',
-    red: '&c', light_purple: '&d', yellow: '&e', white: '&f',
-    bold: '&l', reset: '&r'
-};
+const utils = require('../shared/utils');
 
-// Функция для красивого форматирования сообщений
-function formatMessage(prefix, message, color = colors.white) {
-    return `${colors.gold}[${color}${prefix}${colors.gold}]${colors.reset} ${color}${message}${colors.reset}`;
-}
+// Кэш для хранения информации о регионах
+const regionCache = new Map(); // { regionName: { owner, members, lastCheck } }
 
-// Функция для создания рамки
-function createFrame(title, lines) {
-    let frame = `${colors.gold}╔══════════════════════════════════╗${colors.reset}\n`;
-    frame += `${colors.gold}║ ${colors.light_purple}${colors.bold}${title}${colors.reset}`;
-    frame += ' '.repeat(32 - title.length - 2) + `${colors.gold}║${colors.reset}\n`;
-    frame += `${colors.gold}╠══════════════════════════════════╣${colors.reset}\n`;
-    for (const line of lines) {
-        frame += `${colors.gold}║ ${line}`;
-        const cleanLine = line.replace(/&[0-9a-fklmnor]/g, '');
-        frame += ' '.repeat(32 - cleanLine.length - 2) + `${colors.gold}║${colors.reset}\n`;
-    }
-    frame += `${colors.gold}╚══════════════════════════════════╝${colors.reset}`;
-    return frame;
-}
+// ============================================
+// ОСНОВНАЯ ПРОВЕРКА ВСЕХ РЕГИОНОВ
+// ============================================
 
-let bot = null;
-let pendingRegionChecks = new Map();
-let regionCache = new Map();
-
-// Префикс региона (должен совпадать с property.js)
-const REGION_PREFIX = 'TRTR';
-
-/**
- * Инициализация модуля
- */
-function init(minecraftBot) {
-    bot = minecraftBot;
-    logger.info('🏷️ Система проверки регионов инициализирована');
-    if (bot) {
-        setupMessageListener();
-    }
-}
-
-/**
- * Настройка обработчика сообщений для ответов на /rg i
- */
-function setupMessageListener() {
-    if (!bot) return;
-    
-    bot.on('message', (jsonMsg) => {
-        let text = '';
-        try {
-            if (typeof jsonMsg === 'string') {
-                text = jsonMsg;
-            } else if (jsonMsg.toString) {
-                text = jsonMsg.toString();
-            } else {
-                text = String(jsonMsg);
-            }
-            text = text.replace(/§[0-9a-fklmnor]/g, '');
-        } catch (e) {
-            text = String(jsonMsg);
-        }
-        
-        // Обработка ответов на /rg i
-        const regionMatch = text.match(/Информация о регионе '([^']+)'/);
-        if (regionMatch) {
-            const regionName = regionMatch[1];
-            const pending = pendingRegionChecks.get(regionName);
-            if (pending) {
-                clearTimeout(pending.timeout);
-                parseRegionInfo(text, regionName, pending.callback);
-                pendingRegionChecks.delete(regionName);
-            }
-            return;
-        }
-        
-        // Обработка ошибки "регион не найден"
-        const notFoundMatch = text.match(/Регион '([^']+)' не найден/);
-        if (notFoundMatch) {
-            const regionName = notFoundMatch[1];
-            const pending = pendingRegionChecks.get(regionName);
-            if (pending) {
-                clearTimeout(pending.timeout);
-                pending.callback(false, null);
-                pendingRegionChecks.delete(regionName);
-            }
-            return;
-        }
-        
-        // Обработка информации об участниках региона
-        const membersMatch = text.match(/Участники: (.+)/);
-        if (membersMatch && text.includes('Информация о регионе')) {
-            // Это уже обработано в регионе выше
-        }
-    });
-}
-
-/**
- * Парсинг информации о регионе
- */
-function parseRegionInfo(message, regionName, callback) {
+async function checkAllRegions(bot, db, addLog) {
     try {
-        const info = {
-            name: regionName,
-            exists: true,
-            owner: null,
-            members: [],
-            flags: {},
-            priority: 0
-        };
+        addLog('🏠 Запуск проверки регионов...', 'debug');
         
-        // Поиск владельца
-        const ownerMatch = message.match(/Владелец: ([^\n]+)/);
-        if (ownerMatch) {
-            info.owner = ownerMatch[1].trim();
-        }
+        // Получаем все занятые имущества
+        const properties = await db.all('SELECT id, owner_nick, type FROM property WHERE is_available = 0');
         
-        // Поиск участников
-        const membersMatch = message.match(/Участники: ([^\n]+)/);
-        if (membersMatch) {
-            const membersStr = membersMatch[1];
-            info.members = membersStr.split(',').map(m => m.trim()).filter(m => m && m !== info.owner);
-        }
-        
-        // Поиск флагов
-        const flagsMatch = message.match(/Флаги: ([^\n]+)/);
-        if (flagsMatch) {
-            const flagsStr = flagsMatch[1];
-            const flagPairs = flagsStr.split(',').map(f => f.trim());
-            for (const pair of flagPairs) {
-                const [flag, value] = pair.split(':');
-                if (flag && value) {
-                    info.flags[flag.trim()] = value.trim();
-                }
-            }
-        }
-        
-        // Поиск приоритета
-        const priorityMatch = message.match(/Приоритет: (\d+)/);
-        if (priorityMatch) {
-            info.priority = parseInt(priorityMatch[1]);
-        }
-        
-        // Кэшируем информацию
-        regionCache.set(regionName, {
-            ...info,
-            cachedAt: Date.now()
-        });
-        
-        callback(true, info);
-        
-    } catch (error) {
-        logger.error(`Ошибка парсинга информации о регионе ${regionName}:`, error);
-        callback(false, null);
-    }
-}
-
-/**
- * Проверка существования региона
- * @param {string} regionName - название региона
- * @param {Function} callback - callback(exists, info)
- * @param {number} timeoutMs - таймаут ожидания ответа (мс)
- */
-function checkRegionExists(regionName, callback, timeoutMs = 5000) {
-    if (!bot || !bot.chat) {
-        callback(false, null);
-        return;
-    }
-    
-    // Проверяем кэш (актуально 5 минут)
-    const cached = regionCache.get(regionName);
-    if (cached && Date.now() - cached.cachedAt < 300000) {
-        callback(true, cached);
-        return;
-    }
-    
-    // Удаляем старый pending запрос
-    if (pendingRegionChecks.has(regionName)) {
-        const old = pendingRegionChecks.get(regionName);
-        clearTimeout(old.timeout);
-        pendingRegionChecks.delete(regionName);
-    }
-    
-    // Создаём новый запрос
-    const timeout = setTimeout(() => {
-        if (pendingRegionChecks.has(regionName)) {
-            pendingRegionChecks.delete(regionName);
-            logger.warn(`⏰ Таймаут проверки региона ${regionName}`);
-            callback(false, null);
-        }
-    }, timeoutMs);
-    
-    pendingRegionChecks.set(regionName, {
-        timeout,
-        callback
-    });
-    
-    // Отправляем запрос
-    bot.chat(`/rg i ${regionName}`);
-}
-
-/**
- * Проверка региона по ID имущества
- * @param {number} propertyId - ID имущества
- * @param {Function} callback - callback(exists, info)
- */
-function checkRegionByPropertyId(propertyId, callback) {
-    const regionName = `${REGION_PREFIX}${propertyId}`;
-    checkRegionExists(regionName, callback);
-}
-
-/**
- * Получение информации о регионе из кэша
- */
-function getRegionInfo(regionName) {
-    return regionCache.get(regionName) || null;
-}
-
-/**
- * Получение информации о регионе по ID имущества
- */
-function getRegionInfoByPropertyId(propertyId) {
-    const regionName = `${REGION_PREFIX}${propertyId}`;
-    return regionCache.get(regionName) || null;
-}
-
-/**
- * Обновление информации о регионе
- */
-async function refreshRegionInfo(regionName) {
-    return new Promise((resolve) => {
-        checkRegionExists(regionName, (exists, info) => {
-            resolve(info);
-        });
-    });
-}
-
-/**
- * Проверка, является ли игрок владельцем региона
- */
-function isRegionOwner(regionName, playerNickname) {
-    const info = regionCache.get(regionName);
-    if (!info) return false;
-    return info.owner === playerNickname;
-}
-
-/**
- * Проверка, является ли игрок участником региона
- */
-function isRegionMember(regionName, playerNickname) {
-    const info = regionCache.get(regionName);
-    if (!info) return false;
-    return info.owner === playerNickname || info.members.includes(playerNickname);
-}
-
-/**
- * Получение списка участников региона
- */
-function getRegionMembers(regionName) {
-    const info = regionCache.get(regionName);
-    if (!info) return [];
-    return [info.owner, ...info.members];
-}
-
-/**
- * Проверка всех регионов клана (периодическая)
- */
-async function checkAllRegions(botInstance, logCallback) {
-    bot = botInstance || bot;
-    if (!bot) {
-        if (logCallback) logCallback('❌ Бот не инициализирован для проверки регионов', 'error');
-        return;
-    }
-    
-    try {
-        const db = database.getDb();
-        const properties = db.prepare(`
-            SELECT id, owner, type FROM properties WHERE owner IS NOT NULL
-        `).all();
-        
-        if (properties.length === 0) {
-            if (logCallback) logCallback('🏷️ Нет имущества для проверки регионов', 'info');
+        if (!properties || properties.length === 0) {
             return;
         }
         
-        let checked = 0;
-        let failed = 0;
-        
-        if (logCallback) logCallback(`🔍 Начинаю проверку ${properties.length} регионов...`, 'info');
+        let issuesFound = 0;
         
         for (const property of properties) {
-            const regionName = `${REGION_PREFIX}${property.id}`;
+            const regionName = `TRTR${property.id}`;
+            const regionInfo = await checkRegion(bot, regionName);
             
-            await new Promise((resolve) => {
-                checkRegionExists(regionName, (exists, info) => {
-                    checked++;
-                    if (!exists) {
-                        failed++;
-                        if (logCallback) {
-                            logCallback(`⚠️ Регион ${regionName} (имущество #${property.id}) не найден! Владелец: ${property.owner}`, 'warn');
-                        }
-                        
-                        // Отправляем уведомление в Discord
-                        const member = db.prepare('SELECT discord_id FROM clan_members WHERE minecraft_nick = ?').get(property.owner);
-                        if (member?.discord_id && global.botComponents?.discord) {
-                            global.botComponents.discord.users.fetch(member.discord_id).then(user => {
-                                user?.send(`⚠️ **Внимание!** Регион вашего имущества **#${property.id}** (${regionName}) не найден на сервере. Обратитесь к администрации.`);
-                            }).catch(() => {});
-                        }
+            if (!regionInfo) {
+                addLog(`⚠️ Регион ${regionName} не найден на сервере`, 'warn');
+                continue;
+            }
+            
+            // Проверяем, соответствует ли владелец
+            if (!regionInfo.members.includes(property.owner_nick)) {
+                addLog(`⚠️ Владелец ${property.owner_nick} не найден в регионе ${regionName}`, 'warn');
+                
+                // Восстанавливаем владельца
+                bot.chat(`/rg addmember ${regionName} ${property.owner_nick}`);
+                await utils.sleep(500);
+                issuesFound++;
+            }
+            
+            // Для квартир и домов проверяем сожителей
+            if (property.type === 'apartment' || property.type === 'house') {
+                const residents = await db.getPropertyResidents(property.id);
+                
+                for (const resident of residents) {
+                    if (!regionInfo.members.includes(resident) && resident !== property.owner_nick) {
+                        addLog(`⚠️ Сожитель ${resident} не найден в регионе ${regionName}`, 'warn');
+                        bot.chat(`/rg addmember ${regionName} ${resident}`);
+                        await utils.sleep(500);
+                        issuesFound++;
                     }
-                    resolve();
-                }, 3000);
-            });
-            
-            // Небольшая задержка между запросами
-            await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
         }
         
-        const lines = [
-            `${colors.white}Проверка регионов завершена!`,
-            `${colors.gold}────────────────────`,
-            `${colors.white}Всего проверено: ${colors.green}${checked}`,
-            `${colors.white}Ошибок: ${failed > 0 ? colors.red : colors.green}${failed}`,
-            `${colors.gold}────────────────────`,
-            `${colors.white}Дата проверки: ${colors.yellow}${new Date().toLocaleString('ru-RU')}`
-        ];
-        const frame = createFrame(`🔍 ПРОВЕРКА РЕГИОНОВ`, lines);
-        
-        if (logCallback) logCallback(frame, 'info');
+        if (issuesFound > 0) {
+            addLog(`🏠 Проверка регионов завершена. Исправлено ${issuesFound} проблем.`, 'info');
+        }
         
     } catch (error) {
-        logger.error('Ошибка при проверке регионов:', error);
-        if (logCallback) logCallback(`❌ Ошибка проверки регионов: ${error.message}`, 'error');
+        addLog(`❌ Ошибка проверки регионов: ${error.message}`, 'error');
     }
 }
 
-/**
- * Проверка конкретного региона
- */
-async function checkRegion(regionName, callback, logCallback) {
+// ============================================
+// ПРОВЕРКА ОДНОГО РЕГИОНА
+// ============================================
+
+async function checkRegion(bot, regionName) {
+    // Проверяем кэш (не чаще раза в 5 минут)
+    const cached = regionCache.get(regionName);
+    if (cached && Date.now() - cached.lastCheck < 5 * 60 * 1000) {
+        return cached;
+    }
+    
     return new Promise((resolve) => {
-        checkRegionExists(regionName, (exists, info) => {
-            if (callback) callback(exists, info);
+        const timeout = setTimeout(() => {
+            resolve(null);
+        }, 5000);
+        
+        const handler = (message) => {
+            const msg = message.toString();
             
-            if (logCallback) {
-                if (exists && info) {
-                    const lines = [
-                        `${colors.white}Регион: ${colors.aqua}${info.name}`,
-                        `${colors.white}Владелец: ${colors.yellow}${info.owner || 'нет'}`,
-                        `${colors.white}Участники: ${colors.green}${info.members.length}`,
-                        `${colors.white}Приоритет: ${colors.gray}${info.priority}`
-                    ];
-                    const frame = createFrame(`🔍 ИНФОРМАЦИЯ О РЕГИОНЕ`, lines);
-                    logCallback(frame, 'info');
-                } else {
-                    logCallback(formatMessage('❌', `Регион &e${regionName}&r не найден!`, colors.red), 'warn');
-                }
+            // Парсим информацию о регионе
+            // Формат: "Участники: ник1, ник2, ник3"
+            const membersMatch = msg.match(/Участники:\s*(.+)/i);
+            
+            if (membersMatch) {
+                clearTimeout(timeout);
+                bot.removeListener('message', handler);
+                
+                const membersStr = membersMatch[1];
+                const members = membersStr.split(',').map(m => m.trim());
+                
+                const regionInfo = {
+                    regionName,
+                    members,
+                    lastCheck: Date.now()
+                };
+                
+                regionCache.set(regionName, regionInfo);
+                resolve(regionInfo);
             }
-            
-            resolve({ exists, info });
-        });
+        };
+        
+        bot.once('message', handler);
+        bot.chat(`/rg info ${regionName}`);
     });
 }
 
-/**
- * Очистка кэша регионов
- */
-function clearRegionCache() {
-    regionCache.clear();
-    logger.info('🧹 Кэш регионов очищен');
+// ============================================
+// ВОССТАНОВЛЕНИЕ ВЛАДЕЛЬЦА В РЕГИОНЕ
+// ============================================
+
+async function restoreRegionOwner(bot, propertyId, owner, db, addLog) {
+    const regionName = `TRTR${propertyId}`;
+    
+    addLog(`🏠 Восстановление владельца ${owner} в регионе ${regionName}`, 'info');
+    
+    bot.chat(`/rg addmember ${regionName} ${owner}`);
+    await utils.sleep(1000);
+    
+    // Проверяем, что добавилось
+    const regionInfo = await checkRegion(bot, regionName);
+    if (regionInfo && regionInfo.members.includes(owner)) {
+        addLog(`✅ Владелец ${owner} восстановлен в регионе ${regionName}`, 'success');
+        return true;
+    } else {
+        addLog(`❌ Не удалось восстановить владельца ${owner} в регионе ${regionName}`, 'error');
+        return false;
+    }
 }
 
-/**
- * Получение списка всех зарегистрированных регионов в кэше
- */
-function getAllCachedRegions() {
-    return Array.from(regionCache.entries()).map(([name, info]) => ({
-        name,
-        owner: info.owner,
-        members: info.members,
-        priority: info.priority,
-        cachedAt: info.cachedAt
-    }));
+// ============================================
+// ПРОВЕРКА НАЛОГОВ НА ИМУЩЕСТВО
+// ============================================
+
+async function checkPropertyTaxes(bot, db, addLog) {
+    try {
+        const properties = await db.all('SELECT id, owner_nick, price, tax_accumulated, last_tax_pay FROM property WHERE is_available = 0');
+        const taxRate = await db.getSetting('property_tax_rate') || 0.01;
+        const now = new Date();
+        
+        for (const property of properties) {
+            const lastPay = property.last_tax_pay ? new Date(property.last_tax_pay) : now;
+            const monthsPassed = Math.max(0, (now - lastPay) / (30 * 24 * 60 * 60 * 1000));
+            
+            if (monthsPassed >= 1) {
+                const monthlyTax = property.price * taxRate;
+                const taxOwed = monthlyTax * Math.floor(monthsPassed);
+                
+                // Обновляем накопленный долг
+                const newDebt = (property.tax_accumulated || 0) + taxOwed;
+                await db.run('UPDATE property SET tax_accumulated = ?, last_tax_pay = CURRENT_TIMESTAMP WHERE id = ?', [newDebt, property.id]);
+                
+                // Если долг превышает 50% стоимости имущества, отправляем уведомление
+                if (newDebt > property.price * 0.5) {
+                    bot.chat(`/msg ${property.owner_nick} &c⚠️ ВНИМАНИЕ! Ваш долг по налогу за имущество #${property.id} составляет ${utils.formatMoney(newDebt)}!`);
+                    bot.chat(`/msg ${property.owner_nick} &cОплатите налог командой &e/imnalog dep ${property.id} [сумма]`);
+                }
+                
+                if (addLog) addLog(`💰 Начислен налог ${utils.formatMoney(taxOwed)} на имущество #${property.id} (долг: ${utils.formatMoney(newDebt)})`, 'info');
+            }
+        }
+        
+    } catch (error) {
+        addLog(`❌ Ошибка проверки налогов: ${error.message}`, 'error');
+    }
+}
+
+// ============================================
+// ПРОВЕРКА ЛИЦЕНЗИЙ
+// ============================================
+
+async function checkLicenses(bot, db, addLog) {
+    try {
+        const licenses = await db.all('SELECT * FROM licenses WHERE is_active = 1 AND expires_at < datetime("now", "+2 days")');
+        
+        for (const license of licenses) {
+            const expiresAt = new Date(license.expires_at);
+            const now = new Date();
+            const daysLeft = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+            
+            // Уведомляем за 2 дня, 1 день и в день истечения
+            if (daysLeft === 2 && !license.last_reminded_at) {
+                bot.chat(`/msg ${license.owner_nick} &c⚠️ Ваша лицензия на ${license.type} истекает через 2 дня!`);
+                await db.run('UPDATE licenses SET last_reminded_at = CURRENT_TIMESTAMP WHERE id = ?', [license.id]);
+                
+            } else if (daysLeft === 1) {
+                bot.chat(`/msg ${license.owner_nick} &c⚠️⚠️ Ваша лицензия на ${license.type} истекает ЗАВТРА!`);
+                
+            } else if (daysLeft === 0) {
+                bot.chat(`/msg ${license.owner_nick} &c❌ Ваша лицензия на ${license.type} ИСТЕКЛА! Продлите её в Discord.`);
+                await db.run('UPDATE licenses SET is_active = 0 WHERE id = ?', [license.id]);
+                
+                // Если лицензия на бизнес/офис истекла, замораживаем имущество
+                const property = await db.get('SELECT id FROM property WHERE owner_nick = ? AND type = ? AND is_available = 0', [license.owner_nick, license.type]);
+                if (property) {
+                    await db.run('UPDATE property SET is_available = 1, owner_nick = NULL WHERE id = ?', [property.id]);
+                    bot.chat(`/msg ${license.owner_nick} &cВаш ${license.type} #${property.id} заморожен до продления лицензии!`);
+                }
+            }
+        }
+        
+    } catch (error) {
+        addLog(`❌ Ошибка проверки лицензий: ${error.message}`, 'error');
+    }
+}
+
+// ============================================
+// ЗАПУСК ПЕРИОДИЧЕСКИХ ПРОВЕРОК
+// ============================================
+
+function startPeriodicChecks(bot, db, addLog) {
+    // Проверка регионов каждые 10 минут
+    setInterval(() => {
+        checkAllRegions(bot, db, addLog);
+    }, 10 * 60 * 1000);
+    
+    // Проверка налогов каждые 30 минут
+    setInterval(() => {
+        checkPropertyTaxes(bot, db, addLog);
+    }, 30 * 60 * 1000);
+    
+    // Проверка лицензий каждый час
+    setInterval(() => {
+        checkLicenses(bot, db, addLog);
+    }, 60 * 60 * 1000);
+    
+    addLog('🏠 Система периодических проверок запущена', 'success');
 }
 
 module.exports = {
-    init,
     checkAllRegions,
     checkRegion,
-    checkRegionExists,
-    checkRegionByPropertyId,
-    parseRegionInfo,
-    getRegionInfo,
-    getRegionInfoByPropertyId,
-    refreshRegionInfo,
-    isRegionOwner,
-    isRegionMember,
-    getRegionMembers,
-    clearRegionCache,
-    getAllCachedRegions,
-    REGION_PREFIX
+    restoreRegionOwner,
+    checkPropertyTaxes,
+    checkLicenses,
+    startPeriodicChecks
 };

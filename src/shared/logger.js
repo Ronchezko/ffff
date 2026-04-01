@@ -1,6 +1,9 @@
 // src/shared/logger.js
+// Модуль для красивого логирования с цветами
+
 const colors = require('colors');
 
+// Настройка цветов
 colors.setTheme({
     info: 'cyan',
     warn: 'yellow',
@@ -9,28 +12,52 @@ colors.setTheme({
     debug: 'gray'
 });
 
+// Форматирование времени
 function getTimestamp() {
     const now = new Date();
-    return `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+    return `[${now.toLocaleTimeString('ru-RU', { hour12: false })}]`;
 }
 
-const ignorePatterns = [
-    'Ignoring block entities', 'chunk failed to load', 'JSON', 'skin', 'textures', 'SKIN',
-    'DecoderException', 'OverflowPacketException', 'string had more data'
-];
-
-function shouldIgnore(msg) {
-    if (!msg) return false;
-    const msgStr = String(msg);
-    return ignorePatterns.some(pattern => msgStr.includes(pattern));
-}
-
+// Основные методы логгера
 const logger = {
-    info: (msg) => { if (!shouldIgnore(msg)) console.log(`📘 ${getTimestamp()} [INFO] ${msg}`.info); },
-    warn: (msg) => { if (!shouldIgnore(msg)) console.log(`⚠️ ${getTimestamp()} [WARN] ${msg}`.warn); },
-    error: (msg, err) => { if (!shouldIgnore(msg)) { console.log(`❌ ${getTimestamp()} [ERROR] ${msg}`.error); if (err && !shouldIgnore(err)) console.log(err); } },
-    success: (msg) => { if (!shouldIgnore(msg)) console.log(`✅ ${getTimestamp()} [SUCCESS] ${msg}`.success); },
-    debug: (msg) => { if (process.env.DEBUG === 'true' && !shouldIgnore(msg)) console.log(`🐛 ${getTimestamp()} [DEBUG] ${msg}`.debug); }
+    info: (message, ...args) => {
+        console.log(`${getTimestamp()} ℹ️ `.info + String(message).info, ...args);
+    },
+    
+    warn: (message, ...args) => {
+        console.log(`${getTimestamp()} ⚠️ `.warn + String(message).warn, ...args);
+    },
+    
+    error: (message, ...args) => {
+        console.log(`${getTimestamp()} ❌ `.error + String(message).error, ...args);
+    },
+    
+    success: (message, ...args) => {
+        console.log(`${getTimestamp()} ✅ `.success + String(message).success, ...args);
+    },
+    
+    debug: (message, ...args) => {
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`${getTimestamp()} 🔍 `.debug + String(message).debug, ...args);
+        }
+    },
+    
+    // Для обычных сообщений без иконок
+    log: (message, ...args) => {
+        console.log(`${getTimestamp()} ${message}`, ...args);
+    },
+    
+    // Разделитель
+    separator: () => {
+        console.log('─'.repeat(60).gray);
+    },
+    
+    // Заголовок
+    header: (title) => {
+        console.log('\n' + '═'.repeat(60).cyan);
+        console.log(`  ${title}`.cyan.bold);
+        console.log('═'.repeat(60).cyan + '\n');
+    }
 };
 
 module.exports = logger;

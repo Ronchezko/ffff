@@ -1,437 +1,531 @@
 // src/minecraft/commands/rp.js
-const database = require('../../database');
+// RolePlay команды: организации, дежурства, структуры
+
 const utils = require('../../shared/utils');
-const payday = require('../payday');
+const permissions = require('../../shared/permissions');
 
-// Цвета Minecraft для красивого оформления
-const colors = {
-    black: '&0', dark_blue: '&1', dark_green: '&2', dark_aqua: '&3',
-    dark_red: '&4', dark_purple: '&5', gold: '&6', gray: '&7',
-    dark_gray: '&8', blue: '&9', green: '&a', aqua: '&b',
-    red: '&c', light_purple: '&d', yellow: '&e', white: '&f',
-    bold: '&l', reset: '&r'
-};
-
-// Функция для красивого форматирования сообщений
-function formatMessage(prefix, message, color = colors.white) {
-    return `${colors.gold}[${color}${prefix}${colors.gold}]${colors.reset} ${color}${message}${colors.reset}`;
-}
-
-// Функция для создания рамки
-function createFrame(title, lines) {
-    let frame = `${colors.gold}╔══════════════════════════════════╗${colors.reset}\n`;
-    frame += `${colors.gold}║ ${colors.light_purple}${colors.bold}${title}${colors.reset}`;
-    frame += ' '.repeat(32 - title.length - 2) + `${colors.gold}║${colors.reset}\n`;
-    frame += `${colors.gold}╠══════════════════════════════════╣${colors.reset}\n`;
-    for (const line of lines) {
-        frame += `${colors.gold}║ ${line}`;
-        const cleanLine = line.replace(/&[0-9a-fklmnor]/g, '');
-        frame += ' '.repeat(32 - cleanLine.length - 2) + `${colors.gold}║${colors.reset}\n`;
+// ============================================
+// /arp - Административные RP команды
+// ============================================
+async function arp(bot, sender, args, db, addLog) {
+    if (args.length < 1) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp [balance/rank/points/blacklist/payday/warn/stats/rp/idim/org]`);
+        return;
     }
-    frame += `${colors.gold}╚══════════════════════════════════╝${colors.reset}`;
-    return frame;
+    
+    const subCmd = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+    
+    // Проверка прав (требуется ранг модератора+)
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 2) {
+        bot.chat(`/msg ${sender} &cУ вас нет прав для использования /arp!`);
+        return;
+    }
+    
+    switch(subCmd) {
+        case 'balance':
+            await arpBalance(bot, sender, subArgs, db, addLog);
+            break;
+        case 'rank':
+            await arpRank(bot, sender, subArgs, db, addLog);
+            break;
+        case 'points':
+            await arpPoints(bot, sender, subArgs, db, addLog);
+            break;
+        case 'blacklist':
+        case 'bl':
+            await arpBlacklist(bot, sender, subArgs, db, addLog);
+            break;
+        case 'payday':
+            await arpPayday(bot, sender, subArgs, db, addLog);
+            break;
+        case 'warn':
+            await arpWarn(bot, sender, subArgs, db, addLog);
+            break;
+        case 'stats':
+            await arpStats(bot, sender, subArgs, db);
+            break;
+        case 'rp':
+            await arpRpDel(bot, sender, subArgs, db, addLog);
+            break;
+        case 'idim':
+            await arpIdim(bot, sender, subArgs, db, addLog);
+            break;
+        case 'org':
+            await arpOrg(bot, sender, subArgs, db, addLog);
+            break;
+        default:
+            bot.chat(`/msg ${sender} &cНеизвестная подкоманда /arp ${subCmd}`);
+    }
 }
 
-const RANK_ORDER = ['Мл.Модератор', 'Модератор', 'Ст.Модератор', 'Гл.Модератор', 'Куратор', 'Администратор'];
-
-/**
- * /arp - администрирование RolePlay
- */
-async function arp(bot, player, args, db, logCallback, sendPrivate, sendClan) {
+// /arp balance set/give/reset/del [ник] [сумма]
+async function arpBalance(bot, sender, args, db, addLog) {
     if (args.length < 2) {
-        sendPrivate(player, formatMessage('❌', `Использование: &e/arp [команда] [параметры]`, colors.red));
-        sendPrivate(player, formatMessage('ℹ️', 'Доступные команды: &ebalance, rank, points, blacklist, payday, warn, stats, rp, idim, org, stopall, reloadbd', colors.yellow));
+        bot.chat(`/msg ${sender} &cИспользование: /arp balance [set/give/reset/del] [ник] [сумма]`);
         return;
     }
     
-    const staffRank = await database.getStaffRank(player);
-    const command = args[1];
-    const subArgs = args.slice(2);
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const amount = parseFloat(args[2]);
     
-    if (!staffRank) {
-        sendPrivate(player, formatMessage('❌', 'У вас нет прав для использования этой команды!', colors.red));
+    const profile = await db.getRPProfile(target);
+    if (!profile) {
+        bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RP!`);
         return;
     }
     
-    const actorLevel = RANK_ORDER.indexOf(staffRank);
+    let newBalance = profile.money;
+    let description = '';
     
-    // ========== BALANCE ==========
-    if (command === 'balance' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const amount = parseInt(subArgs[2]);
-        
-        if (isNaN(amount)) {
-            sendPrivate(player, formatMessage('❌', 'Неверная сумма.', colors.red));
-            return;
-        }
-        
-        if (actorLevel < RANK_ORDER.indexOf('Ст.Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eСт.Модератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const rpPlayer = await database.getRPPlayer(target);
-        if (!rpPlayer) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не в RolePlay.`, colors.red));
-            return;
-        }
-        
-        if (action === 'set') {
-            await database.updatePlayerMoney(target, amount - rpPlayer.money, `Админ: ${player} установил баланс`, player);
-            sendPrivate(player, formatMessage('✅', `Баланс &e${target}&r установлен на &e${amount.toLocaleString('ru-RU')}&r ₽`, colors.green));
-        } else if (action === 'give') {
-            await database.updatePlayerMoney(target, amount, `Админ: ${player} выдал`, player);
-            sendPrivate(player, formatMessage('✅', `Выдано &e${amount.toLocaleString('ru-RU')}&r ₽ игроку &e${target}`, colors.green));
-        } else if (action === 'reset') {
-            await database.updatePlayerMoney(target, -rpPlayer.money, `Админ: ${player} обнулил баланс`, player);
-            sendPrivate(player, formatMessage('✅', `Баланс &e${target}&r сброшен до &e0&r ₽`, colors.green));
-        } else if (action === 'del') {
-            if (rpPlayer.money < amount) {
-                sendPrivate(player, formatMessage('❌', `У игрока &e${target}&r недостаточно средств.`, colors.red));
+    switch(action) {
+        case 'set':
+            if (isNaN(amount)) {
+                bot.chat(`/msg ${sender} &cУкажите сумму!`);
                 return;
             }
-            await database.updatePlayerMoney(target, -amount, `Админ: ${player} забрал`, player);
-            sendPrivate(player, formatMessage('✅', `Забрано &e${amount.toLocaleString('ru-RU')}&r ₽ у &e${target}`, colors.green));
-        } else {
-            sendPrivate(player, formatMessage('❌', 'Используйте: &eset, give, reset, del', colors.red));
-            return;
-        }
-        
-        if (logCallback) logCallback(`💰 ${player} изменил баланс ${target} (${action} ${amount}₽)`, 'info');
-    }
-    
-    // ========== RANK ==========
-    else if (command === 'rank' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const structure = subArgs[2];
-        const rank = subArgs[3];
-        
-        if (actorLevel < RANK_ORDER.indexOf('Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eМодератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const rpPlayer = await database.getRPPlayer(target);
-        if (!rpPlayer) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не в RolePlay.`, colors.red));
-            return;
-        }
-        
-        if (action === 'set') {
-            if (!rank) {
-                sendPrivate(player, formatMessage('❌', 'Укажите ранг.', colors.red));
+            newBalance = amount;
+            description = `Установка баланса администратором ${sender}`;
+            await db.updateMoney(target, newBalance - profile.money, 'admin_set', description, sender);
+            bot.chat(`/msg ${sender} &a✅ Баланс ${target} установлен на ${utils.formatMoney(amount)}`);
+            break;
+            
+        case 'give':
+            if (isNaN(amount) || amount <= 0) {
+                bot.chat(`/msg ${sender} &cУкажите корректную сумму!`);
                 return;
             }
-            db.getDb().prepare('UPDATE rp_players SET structure = ?, organization_rank = ? WHERE minecraft_nick = ?').run(structure, rank, target);
-            sendPrivate(player, formatMessage('✅', `&e${target}&r назначен в &e${structure}&r на должность &e${rank}`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('✅', `Вы назначены в &e${structure}&r на должность &e${rank}`, colors.green));
-            }, 500);
-            if (logCallback) logCallback(`👔 ${player} назначил ${target} в ${structure} (${rank})`, 'info');
-        } else if (action === 'del') {
-            db.getDb().prepare('UPDATE rp_players SET structure = NULL, organization_rank = NULL WHERE minecraft_nick = ?').run(target);
-            sendPrivate(player, formatMessage('✅', `&e${target}&r удалён из организаций`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('⚠️', `Вы удалены из организаций`, colors.yellow));
-            }, 500);
-            if (logCallback) logCallback(`👔 ${player} удалил ${target} из организаций`, 'info');
-        } else {
-            sendPrivate(player, formatMessage('❌', 'Используйте: &eset, del', colors.red));
-        }
-    }
-    
-    // ========== POINTS ==========
-    else if (command === 'points' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const points = parseInt(subArgs[2]);
-        
-        if (isNaN(points)) {
-            sendPrivate(player, formatMessage('❌', 'Неверное количество баллов.', colors.red));
-            return;
-        }
-        
-        if (actorLevel < RANK_ORDER.indexOf('Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eМодератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const rpPlayer = await database.getRPPlayer(target);
-        if (!rpPlayer) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не в RolePlay.`, colors.red));
-            return;
-        }
-        
-        if (action === 'add') {
-            const newPoints = (rpPlayer.unique_points || 0) + points;
-            db.getDb().prepare('UPDATE rp_players SET unique_points = ? WHERE minecraft_nick = ?').run(newPoints, target);
-            sendPrivate(player, formatMessage('✅', `Игроку &e${target}&r добавлено &e${points}&r баллов. Всего: &e${newPoints}`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('⭐', `Вам начислено &e${points}&r баллов активности!`, colors.green));
-            }, 500);
-        } else if (action === 'del') {
-            const newPoints = Math.max(0, (rpPlayer.unique_points || 0) - points);
-            db.getDb().prepare('UPDATE rp_players SET unique_points = ? WHERE minecraft_nick = ?').run(newPoints, target);
-            sendPrivate(player, formatMessage('✅', `У игрока &e${target}&r удалено &e${points}&r баллов. Всего: &e${newPoints}`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('⚠️', `У вас удалено &e${points}&r баллов активности.`, colors.yellow));
-            }, 500);
-        }
-        
-        if (logCallback) logCallback(`⭐ ${player} изменил баллы ${target} (${action} ${points})`, 'info');
-    }
-    
-    // ========== BLACKLIST (структур) ==========
-    else if (command === 'blacklist' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const structure = subArgs[2];
-        
-        if (actorLevel < RANK_ORDER.indexOf('Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eМодератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const blKey = `blacklist_${structure}`;
-        const current = JSON.parse(database.getSetting(blKey) || '[]');
-        
-        if (action === 'add') {
-            if (!current.includes(target)) {
-                current.push(target);
-                database.setSetting(blKey, JSON.stringify(current));
-                sendPrivate(player, formatMessage('✅', `&e${target}&r добавлен в ЧС структуры &e${structure}`, colors.green));
-                if (logCallback) logCallback(`🚫 ${player} добавил ${target} в ЧС структуры ${structure}`, 'warn');
-            } else {
-                sendPrivate(player, formatMessage('⚠️', `&e${target}&r уже в ЧС этой структуры.`, colors.yellow));
-            }
-        } else if (action === 'del') {
-            const filtered = current.filter(n => n !== target);
-            database.setSetting(blKey, JSON.stringify(filtered));
-            sendPrivate(player, formatMessage('✅', `&e${target}&r удалён из ЧС структуры &e${structure}`, colors.green));
-            if (logCallback) logCallback(`✅ ${player} удалил ${target} из ЧС структуры ${structure}`, 'info');
-        }
-    }
-    
-    // ========== PAYDAY ==========
-    else if (command === 'payday') {
-        if (actorLevel < RANK_ORDER.indexOf('Администратор')) {
-            sendPrivate(player, formatMessage('❌', 'Только &eАдминистратор&r может использовать эту команду!', colors.red));
-            return;
-        }
-        
-        await payday.performPayday();
-        sendClan(formatMessage('💵', 'Внеплановый PayDay запущен администратором!', colors.green));
-        sendPrivate(player, formatMessage('✅', 'Внеплановый PayDay запущен!', colors.green));
-        if (logCallback) logCallback(`💵 ${player} запустил внеплановый PayDay`, 'info');
-    }
-    
-    // ========== WARN ==========
-    else if (command === 'warn' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const reason = subArgs.slice(2).join(' ');
-        
-        if (actorLevel < RANK_ORDER.indexOf('Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eМодератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const rpPlayer = await database.getRPPlayer(target);
-        if (!rpPlayer) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не в RolePlay.`, colors.red));
-            return;
-        }
-        
-        if (action === 'add') {
-            const newWarns = (rpPlayer.warns || 0) + 1;
-            db.getDb().prepare('UPDATE rp_players SET warns = ? WHERE minecraft_nick = ?').run(newWarns, target);
-            sendPrivate(player, formatMessage('⚠️', `&e${target}&r получил предупреждение (&e${newWarns}/3&r). Причина: &e${reason}`, colors.yellow));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('⚠️', `Вы получили предупреждение (&e${newWarns}/3&r). Причина: &e${reason}`, colors.yellow));
-            }, 500);
+            await db.updateMoney(target, amount, 'admin_give', `Выдача от ${sender}`, sender);
+            bot.chat(`/msg ${sender} &a✅ Выдано ${utils.formatMoney(amount)} игроку ${target}`);
+            break;
             
-            if (newWarns >= 3) {
-                db.getDb().prepare('UPDATE rp_players SET frozen = 1 WHERE minecraft_nick = ?').run(target);
-                sendPrivate(target, formatMessage('🚫', 'Вы отстранены от RolePlay за 3 предупреждения!', colors.red));
-                sendClan(formatMessage('🚫', `Игрок &e${target}&r отстранён от RolePlay за 3 предупреждения.`, colors.red));
-            }
-            if (logCallback) logCallback(`⚠️ ${player} выдал предупреждение ${target} (${newWarns}/3)`, 'warn');
+        case 'reset':
+            newBalance = 1000;
+            await db.updateMoney(target, newBalance - profile.money, 'admin_reset', `Сброс баланса ${sender}`, sender);
+            bot.chat(`/msg ${sender} &a✅ Баланс ${target} сброшен до 1000₽`);
+            break;
             
-        } else if (action === 'del') {
-            const newWarns = Math.max(0, (rpPlayer.warns || 0) - 1);
-            db.getDb().prepare('UPDATE rp_players SET warns = ? WHERE minecraft_nick = ?').run(newWarns, target);
-            sendPrivate(player, formatMessage('✅', `Предупреждение снято с &e${target}`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('✅', `С вас снято предупреждение.`, colors.green));
-            }, 500);
-            if (logCallback) logCallback(`✅ ${player} снял предупреждение с ${target}`, 'info');
-        }
-    }
-    
-    // ========== STATS ==========
-    else if (command === 'stats' && subArgs.length >= 1) {
-        const target = subArgs[0];
-        const member = await database.getPlayerByNickname(target);
-        const rpPlayer = await database.getRPPlayer(target);
-        
-        if (!member) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не найден.`, colors.red));
-            return;
-        }
-        
-        const lines = [];
-        lines.push(`${colors.aqua}Никнейм:${colors.reset} ${colors.white}${target}`);
-        lines.push(`${colors.aqua}Ранг в клане:${colors.reset} ${colors.yellow}${member.rank || 'Новичок'}`);
-        lines.push(`${colors.aqua}Статистика:${colors.reset} ${colors.white}${member.kills}⚔️ / ${member.deaths}💀`);
-        lines.push(`${colors.aqua}В клане с:${colors.reset} ${colors.white}${new Date(member.joined_at).toLocaleDateString()}`);
-        
-        if (rpPlayer) {
-            lines.push(`${colors.gold}────────────────────`);
-            lines.push(`${colors.light_purple}${colors.bold}ROLEPLAY ДАННЫЕ${colors.reset}`);
-            lines.push(`${colors.aqua}Баланс:${colors.reset} ${colors.green}${rpPlayer.money.toLocaleString('ru-RU')}₽`);
-            lines.push(`${colors.aqua}Структура:${colors.reset} ${colors.white}${rpPlayer.structure || 'не выбрана'}`);
-            lines.push(`${colors.aqua}Звание:${colors.reset} ${colors.yellow}${rpPlayer.organization_rank || 'нет'}`);
-            lines.push(`${colors.aqua}Баллы:${colors.reset} ${colors.green}${rpPlayer.unique_points || 0}`);
-            lines.push(`${colors.aqua}Предупреждений:${colors.reset} ${rpPlayer.warns >= 3 ? colors.red : colors.yellow}${rpPlayer.warns || 0}/3`);
-            lines.push(`${colors.aqua}Статус:${colors.reset} ${rpPlayer.frozen ? colors.red + 'ЗАМОРОЖЕН' : colors.green + 'АКТИВЕН'}`);
-        } else {
-            lines.push(`${colors.gold}────────────────────`);
-            lines.push(`${colors.red}${colors.bold}ROLEPLAY: НЕ ЗАРЕГИСТРИРОВАН${colors.reset}`);
-        }
-        
-        const frame = createFrame(`📊 СТАТИСТИКА ${target}`, lines);
-        sendPrivate(player, frame);
-    }
-    
-    // ========== RP DEL ==========
-    else if (command === 'rp' && subArgs.length >= 2 && subArgs[0] === 'del') {
-        const target = subArgs[1];
-        const reason = subArgs.slice(2).join(' ') || 'Не указана';
-        
-        if (actorLevel < RANK_ORDER.indexOf('Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eМодератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const rpPlayer = await database.getRPPlayer(target);
-        if (!rpPlayer) {
-            sendPrivate(player, formatMessage('❌', `Игрок &e${target}&r не в RolePlay.`, colors.red));
-            return;
-        }
-        
-        db.getDb().prepare('DELETE FROM rp_players WHERE minecraft_nick = ?').run(target);
-        sendPrivate(player, formatMessage('✅', `RolePlay у &e${target}&r удалён. Причина: &e${reason}`, colors.green));
-        setTimeout(() => {
-            sendPrivate(target, formatMessage('🚫', `Ваш доступ к RolePlay отозван. Причина: &e${reason}`, colors.red));
-        }, 500);
-        if (logCallback) logCallback(`🗑️ ${player} удалил RP у ${target}: ${reason}`, 'warn');
-    }
-    
-    // ========== IDIM ADD/DEL ==========
-    else if (command === 'idim' && subArgs.length >= 3) {
-        const action = subArgs[0];
-        const target = subArgs[1];
-        const propertyId = parseFloat(subArgs[2]);
-        
-        if (actorLevel < RANK_ORDER.indexOf('Ст.Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eСт.Модератор&r или выше!', colors.red));
-            return;
-        }
-        
-        const property = await database.getProperty(propertyId);
-        if (!property) {
-            sendPrivate(player, formatMessage('❌', `Имущество #${propertyId} не найдено.`, colors.red));
-            return;
-        }
-        
-        if (action === 'add') {
-            db.getDb().prepare('UPDATE properties SET owner = ? WHERE id = ?').run(target, propertyId);
-            sendPrivate(player, formatMessage('✅', `Имущество #${propertyId} выдано &e${target}`, colors.green));
-            setTimeout(() => {
-                sendPrivate(target, formatMessage('🏠', `Вам выдано имущество #${propertyId} (${property.type})`, colors.green));
-            }, 500);
-            if (logCallback) logCallback(`🏠 ${player} выдал имущество #${propertyId} игроку ${target}`, 'info');
-        } else if (action === 'del') {
-            db.getDb().prepare('UPDATE properties SET owner = NULL, co_owners = "[]" WHERE id = ?').run(propertyId);
-            sendPrivate(player, formatMessage('✅', `Имущество #${propertyId} изъято у &e${property.owner}`, colors.green));
-            if (logCallback) logCallback(`🏠 ${player} изъял имущество #${propertyId} у ${property.owner}`, 'warn');
-        }
-    }
-    
-    // ========== ORG FREEZE/UNFREEZE ==========
-    else if (command === 'org' && subArgs.length >= 2 && (subArgs[0] === 'freeze' || subArgs[0] === 'unfreeze')) {
-        const action = subArgs[0];
-        const structure = subArgs[1];
-        
-        if (actorLevel < RANK_ORDER.indexOf('Гл.Модератор')) {
-            sendPrivate(player, formatMessage('❌', 'Требуется ранг &eГл.Модератор&r или выше!', colors.red));
-            return;
-        }
-        
-        if (action === 'freeze') {
-            db.getDb().prepare('UPDATE rp_players SET frozen = 1 WHERE structure = ?').run(structure);
-            sendClan(formatMessage('❄️', `Организация &e${structure}&r заморожена!`, colors.red));
-            if (logCallback) logCallback(`❄️ ${player} заморозил организацию ${structure}`, 'warn');
-        } else if (action === 'unfreeze') {
-            db.getDb().prepare('UPDATE rp_players SET frozen = 0 WHERE structure = ?').run(structure);
-            sendClan(formatMessage('✅', `Организация &e${structure}&r разморожена!`, colors.green));
-            if (logCallback) logCallback(`🔥 ${player} разморозил организацию ${structure}`, 'info');
-        }
-    }
-    
-    // ========== STOPALL ==========
-    else if (command === 'stopall') {
-        if (actorLevel < RANK_ORDER.indexOf('Администратор')) {
-            sendPrivate(player, formatMessage('❌', 'Только &eАдминистратор&r может использовать эту команду!', colors.red));
-            return;
-        }
-        
-        const isStopped = global.isRPStopped;
-        if (isStopped) {
-            global.isRPStopped = false;
-            sendClan(formatMessage('✅', 'Все RolePlay процессы возобновлены!', colors.green));
-        } else {
-            global.isRPStopped = true;
-            sendClan(formatMessage('⚠️', 'Все RolePlay процессы остановлены (подготовка к вайпу)!', colors.yellow));
-        }
-        if (logCallback) logCallback(`⏸️ ${player} ${isStopped ? 'возобновил' : 'остановил'} все RP процессы`, 'warn');
-    }
-    
-    // ========== RELOADBD ==========
-    else if (command === 'reloadbd') {
-        if (actorLevel < RANK_ORDER.indexOf('Администратор')) {
-            sendPrivate(player, formatMessage('❌', 'Только &eАдминистратор&r может использовать эту команду!', colors.red));
-            return;
-        }
-        
-        sendClan(formatMessage('⚠️', 'Идёт очистка базы данных...', colors.yellow));
-        
-        try {
-            const db = database.getDb();
-            db.exec('DELETE FROM clan_members WHERE rank NOT LIKE "%Администратор%"');
-            db.exec('DELETE FROM rp_players');
-            db.exec('DELETE FROM money_logs');
-            db.exec('DELETE FROM punishments');
-            db.exec('DELETE FROM clan_chat_logs');
-            db.exec('DELETE FROM staff');
-            db.exec('DELETE FROM verification_codes');
-            db.exec('DELETE FROM properties WHERE owner IS NOT NULL');
-            db.exec('DELETE FROM structure_members');
-            db.exec('DELETE FROM org_budgets');
+        case 'del':
+            await db.updateMoney(target, -profile.money, 'admin_remove', `Списание всех средств ${sender}`, sender);
+            bot.chat(`/msg ${sender} &a✅ Все средства списаны у ${target}`);
+            break;
             
-            sendClan(formatMessage('✅', 'База данных очищена (подготовка к вайпу)!', colors.green));
-            if (logCallback) logCallback(`🗑️ ${player} очистил базу данных (вайп)`, 'error');
-        } catch (err) {
-            sendPrivate(player, formatMessage('❌', `Ошибка очистки: ${err.message}`, colors.red));
-            if (logCallback) logCallback(`❌ Ошибка очистки БД: ${err.message}`, 'error');
-        }
+        default:
+            bot.chat(`/msg ${sender} &cНеизвестное действие. Используйте: set, give, reset, del`);
+            return;
     }
     
-    else {
-        sendPrivate(player, formatMessage('❌', `Неизвестная команда /arp ${command}. Используйте &e/arp help`, colors.red));
+    if (addLog) addLog(`💰 ${sender} изменил баланс ${target} (${action})`, 'info');
+}
+
+// /arp rank set/del [ник] [структура] [ранг]
+async function arpRank(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp rank [set/del] [ник] [структура] [ранг]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    
+    if (action === 'set') {
+        if (args.length < 4) {
+            bot.chat(`/msg ${sender} &cИспользование: /arp rank set [ник] [структура] [ранг]`);
+            return;
+        }
+        
+        const structure = args[2];
+        const rank = args[3];
+        
+        // Проверяем существование организации
+        const org = await db.getOrganization(structure);
+        if (!org) {
+            bot.chat(`/msg ${sender} &cСтруктура ${structure} не найдена!`);
+            return;
+        }
+        
+        // Проверяем ранг
+        const orgRank = await db.getOrgRank(structure, rank);
+        if (!orgRank) {
+            bot.chat(`/msg ${sender} &cРанг ${rank} не найден в структуре ${structure}!`);
+            return;
+        }
+        
+        await db.addOrgMember(target, structure, rank);
+        bot.chat(`/msg ${sender} &a✅ ${target} назначен на ${rank} в ${structure}`);
+        bot.chat(`/msg ${target} &a🎉 Вы назначены на должность ${rank} в ${getStructureIcon(structure)}`);
+        
+        if (addLog) addLog(`📋 ${sender} назначил ${target} на ${rank} в ${structure}`, 'info');
+        
+    } else if (action === 'del') {
+        // Получаем текущую структуру игрока
+        const profile = await db.getRPProfile(target);
+        if (!profile || profile.structure === 'Гражданин') {
+            bot.chat(`/msg ${sender} &c${target} не состоит в организации!`);
+            return;
+        }
+        
+        await db.removeOrgMember(target, profile.structure);
+        bot.chat(`/msg ${sender} &a✅ ${target} удалён из организации`);
+        bot.chat(`/msg ${target} &cВы были уволены из организации ${sender}`);
+        
+        if (addLog) addLog(`📋 ${sender} уволил ${target} из организации`, 'warn');
     }
 }
 
-module.exports = { arp };
+// /arp points add/del [ник] [количество]
+async function arpPoints(bot, sender, args, db, addLog) {
+    if (args.length < 3) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp points [add/del] [ник] [количество]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const points = parseInt(args[2]);
+    
+    if (isNaN(points) || points <= 0) {
+        bot.chat(`/msg ${sender} &cУкажите корректное количество баллов!`);
+        return;
+    }
+    
+    const profile = await db.getRPProfile(target);
+    if (!profile) {
+        bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RP!`);
+        return;
+    }
+    
+    let newPoints = profile.rp_points;
+    
+    if (action === 'add') {
+        newPoints = profile.rp_points + points;
+        bot.chat(`/msg ${sender} &a✅ Добавлено ${points} баллов игроку ${target}`);
+    } else if (action === 'del') {
+        newPoints = Math.max(0, profile.rp_points - points);
+        bot.chat(`/msg ${sender} &a✅ Снято ${points} баллов у игрока ${target}`);
+    } else {
+        bot.chat(`/msg ${sender} &cИспользуйте add или del`);
+        return;
+    }
+    
+    await db.run('UPDATE rp_players SET rp_points = ? WHERE minecraft_nick = ?', [newPoints, target]);
+    
+    if (addLog) addLog(`⭐ ${sender} ${action === 'add' ? 'добавил' : 'снял'} ${points} баллов у ${target}`, 'info');
+}
+
+// /arp blacklist add/del [ник] [структура]
+async function arpBlacklist(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp blacklist [add/del] [ник] [структура]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const structure = args[2];
+    
+    if (action === 'add') {
+        if (!structure) {
+            bot.chat(`/msg ${sender} &cУкажите структуру для ЧС!`);
+            return;
+        }
+        
+        await db.setSetting(`org_blacklist_${structure}_${target}`, 'true', sender);
+        bot.chat(`/msg ${sender} &a✅ ${target} добавлен в ЧС структуры ${structure}`);
+        if (addLog) addLog(`⛔ ${sender} добавил ${target} в ЧС структуры ${structure}`, 'warn');
+        
+    } else if (action === 'del') {
+        await db.setSetting(`org_blacklist_${structure}_${target}`, 'false', sender);
+        bot.chat(`/msg ${sender} &a✅ ${target} удалён из ЧС структуры ${structure}`);
+        if (addLog) addLog(`✅ ${sender} удалил ${target} из ЧС структуры ${structure}`, 'info');
+    }
+}
+
+// /arp payday - Внеплановый PayDay (только администратор)
+async function arpPayday(bot, sender, args, db, addLog) {
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 6) {
+        bot.chat(`/msg ${sender} &cВнеплановый PayDay могут делать только администраторы!`);
+        return;
+    }
+    
+    bot.chat(`/cc &a💰 ${sender} запускает внеплановый PayDay!`);
+    
+    // Импортируем payday модуль
+    const payday = require('../payday');
+    await payday.processPayDay(bot, db, addLog);
+    
+    if (addLog) addLog(`💰 ${sender} запустил внеплановый PayDay`, 'info');
+}
+
+// /arp warn add/del [ник] [причина]
+async function arpWarn(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp warn [add/del] [ник] [причина]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const reason = args.slice(2).join(' ');
+    
+    const profile = await db.getRPProfile(target);
+    if (!profile) {
+        bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RP!`);
+        return;
+    }
+    
+    if (action === 'add') {
+        if (!reason) {
+            bot.chat(`/msg ${sender} &cУкажите причину предупреждения!`);
+            return;
+        }
+        
+        const newWarnings = profile.warnings + 1;
+        await db.run('UPDATE rp_players SET warnings = ? WHERE minecraft_nick = ?', [newWarnings, target]);
+        await db.addPunishment(target, 'rp_warn', reason, sender, null);
+        
+        bot.chat(`/msg ${sender} &a✅ Выдано предупреждение ${target} (${newWarnings}/3)`);
+        bot.chat(`/msg ${target} &c⚠️ Вы получили предупреждение от ${sender} Причина: ${reason}`);
+        
+        if (newWarnings >= 3) {
+            await db.run('UPDATE rp_players SET is_frozen = 1 WHERE minecraft_nick = ?', [target]);
+            bot.chat(`/cc &c🔒 ${target} заморожен в RP за 3 предупреждения!`);
+        }
+        
+        if (addLog) addLog(`⚠️ ${sender} выдал предупреждение ${target} (${reason})`, 'warn');
+        
+    } else if (action === 'del') {
+        const newWarnings = Math.max(0, profile.warnings - 1);
+        await db.run('UPDATE rp_players SET warnings = ? WHERE minecraft_nick = ?', [newWarnings, target]);
+        
+        if (newWarnings < 3) {
+            await db.run('UPDATE rp_players SET is_frozen = 0 WHERE minecraft_nick = ?', [target]);
+        }
+        
+        bot.chat(`/msg ${sender} &a✅ Снято предупреждение с ${target}`);
+        if (addLog) addLog(`✅ ${sender} снял предупреждение с ${target}`, 'info');
+    }
+}
+
+// /arp stats [ник] - Показать статистику игрока
+async function arpStats(bot, sender, args, db) {
+    if (args.length < 1) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp stats [ник]`);
+        return;
+    }
+    
+    const target = args[0];
+    const stats = await db.getPlayerStats(target);
+    const rpProfile = await db.getRPProfile(target);
+    
+    if (!stats && !rpProfile) {
+        bot.chat(`/msg ${sender} &cИгрок ${target} не найден!`);
+        return;
+    }
+    
+    bot.chat(`/msg ${sender} &6╔══════════════════════════════════════════╗`);
+    bot.chat(`/msg ${sender} &6║ &l📊 СТАТИСТИКА ИГРОКА ${target} &6║`);
+    bot.chat(`/msg ${sender} &6╠══════════════════════════════════════════╣`);
+    
+    if (stats) {
+        bot.chat(`/msg ${sender} &6║ &7Ранг в клане: &e${stats.rank_name}`);
+        bot.chat(`/msg ${sender} &6║ &7Убийств/Смертей: &e${stats.kills}🗡️ / ${stats.deaths}💀`);
+        bot.chat(`/msg ${sender} &6║ &7В клане с: &e${new Date(stats.joined_at).toLocaleDateString()}`);
+    }
+    
+    if (rpProfile) {
+        bot.chat(`/msg ${sender} &6║ &7Структура: &e${rpProfile.structure}`);
+        bot.chat(`/msg ${sender} &6║ &7Должность: &e${rpProfile.job_rank}`);
+        bot.chat(`/msg ${sender} &6║ &7Баланс: &e${utils.formatMoney(rpProfile.money)}`);
+        bot.chat(`/msg ${sender} &6║ &7Баллы RP: &e${rpProfile.rp_points}`);
+        bot.chat(`/msg ${sender} &6║ &7Предупреждения: &e${rpProfile.warnings}/3`);
+        bot.chat(`/msg ${sender} &6║ &7Дежурство: &e${rpProfile.on_duty ? '✅ На дежурстве' : '❌ Не на дежурстве'}`);
+    }
+    
+    bot.chat(`/msg ${sender} &6╚══════════════════════════════════════════╝`);
+}
+
+// /arp rp del [ник] [причина] - Забрать доступ к RP
+async function arpRpDel(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp rp del [ник] [причина]`);
+        return;
+    }
+    
+    const target = args[0];
+    const reason = args.slice(1).join(' ');
+    
+    const profile = await db.getRPProfile(target);
+    if (!profile) {
+        bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RP!`);
+        return;
+    }
+    
+    // Сбрасываем RP профиль
+    await db.run(`UPDATE rp_players SET 
+        structure = 'Гражданин', 
+        job_rank = 'Нет', 
+        on_duty = 0, 
+        duty_start_time = NULL,
+        is_frozen = 1,
+        warnings = 0
+        WHERE minecraft_nick = ?`, [target]);
+    
+    // Удаляем из организаций
+    await db.run('DELETE FROM org_members WHERE minecraft_nick = ?', [target]);
+    
+    bot.chat(`/msg ${sender} &a✅ Доступ к RP забран у ${target}`);
+    bot.chat(`/msg ${target} &c❌ Вы лишены доступа к RolePlay! Причина: ${reason}`);
+    bot.chat(`/cc &c🔒 ${target} лишён доступа к RP ${sender} Причина: ${reason}`);
+    
+    if (addLog) addLog(`🔒 ${sender} лишил ${target} доступа к RP (${reason})`, 'warn');
+}
+
+// /arp idim add/del [ник] [id] - Управление имуществом
+async function arpIdim(bot, sender, args, db, addLog) {
+    if (args.length < 3) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp idim [add/del] [ник] [id]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const propertyId = args[2];
+    
+    const property = await db.getProperty(propertyId);
+    if (!property) {
+        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
+        return;
+    }
+    
+    if (action === 'add') {
+        await db.run('UPDATE property SET owner_nick = ?, is_available = 0 WHERE id = ?', [target, propertyId]);
+        bot.chat(`/msg ${sender} &a✅ Имущество ${propertyId} выдано ${target}`);
+        bot.chat(`/msg ${target} &a✅ Вам выдано имущество #${propertyId} (${property.type})`);
+        if (addLog) addLog(`🏠 ${sender} выдал имущество ${propertyId} игроку ${target}`, 'info');
+        
+    } else if (action === 'del') {
+        await db.run('UPDATE property SET owner_nick = NULL, is_available = 1 WHERE id = ?', [propertyId]);
+        bot.chat(`/msg ${sender} &a✅ Имущество ${propertyId} изъято у ${target}`);
+        bot.chat(`/msg ${target} &c❌ У вас изъято имущество #${propertyId} ${sender}`);
+        if (addLog) addLog(`🏠 ${sender} изъял имущество ${propertyId} у ${target}`, 'warn');
+    }
+}
+
+// /arp org freeze/unfreeze [структура]
+async function arpOrg(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &cИспользование: /arp org [freeze/unfreeze] [структура]`);
+        return;
+    }
+    
+    const action = args[0].toLowerCase();
+    const structure = args[1];
+    
+    const org = await db.getOrganization(structure);
+    if (!org) {
+        bot.chat(`/msg ${sender} &cСтруктура ${structure} не найдена!`);
+        return;
+    }
+    
+    if (action === 'freeze') {
+        await db.run('UPDATE organizations SET is_frozen = 1, frozen_at = CURRENT_TIMESTAMP, frozen_by = ? WHERE name = ?', [sender, structure]);
+        bot.chat(`/cc &c❄️ ${sender} ЗАМОРОЗИЛ структуру ${getStructureIcon(structure)}!`);
+        if (addLog) addLog(`❄️ ${sender} заморозил структуру ${structure}`, 'warn');
+        
+    } else if (action === 'unfreeze') {
+        await db.run('UPDATE organizations SET is_frozen = 0, frozen_at = NULL, frozen_by = NULL WHERE name = ?', [structure]);
+        bot.chat(`/cc &a✅ ${sender} РАЗМОРОЗИЛ структуру ${getStructureIcon(structure)}!`);
+        if (addLog) addLog(`✅ ${sender} разморозил структуру ${structure}`, 'info');
+    }
+}
+
+// ============================================
+// /duty - Встать на дежурство
+// ============================================
+async function duty(bot, sender, args, db) {
+    const profile = await db.getRPProfile(sender);
+    if (!profile) {
+        bot.chat(`/msg ${sender} &cВы не зарегистрированы в RolePlay! Используйте /rp`);
+        return;
+    }
+    
+    if (profile.structure === 'Гражданин') {
+        bot.chat(`/msg ${sender} &cВы не состоите в организации!`);
+        return;
+    }
+    
+    const isOnDuty = profile.on_duty === 1;
+    
+    if (!isOnDuty) {
+        await db.setDuty(sender, profile.structure, true);
+        bot.chat(`/msg ${sender} &a✅ Вы встали на дежурство в ${getStructureIcon(profile.structure)}`);
+        bot.chat(`/cc &a👮 ${sender} заступил на дежурство!`);
+    } else {
+        // Снимаем с дежурства и начисляем зарплату
+        await db.setDuty(sender, profile.structure, false);
+        
+        // Получаем отработанное время
+        const dutyTime = await db.getDutyTime(sender);
+        const salary = await db.calculateSalary(profile.structure, profile.job_rank, dutyTime);
+        
+        if (salary > 0) {
+            await db.updateMoney(sender, salary, 'salary', `Зарплата за дежурство`, 'system');
+            bot.chat(`/msg ${sender} &a✅ Вы получили ${utils.formatMoney(salary)} за ${Math.floor(dutyTime / 60)} минут дежурства`);
+        }
+        
+        bot.chat(`/msg ${sender} &a✅ Вы снялись с дежурства`);
+        bot.chat(`/cc &a👮 ${sender} снялся с дежурства`);
+    }
+}
+
+// ============================================
+// /status - Статус организации
+// ============================================
+async function status(bot, sender, args, db) {
+    const profile = await db.getRPProfile(sender);
+    if (!profile || profile.structure === 'Гражданин') {
+        bot.chat(`/msg ${sender} &cВы не состоите в организации!`);
+        return;
+    }
+    
+    const org = await db.getOrganization(profile.structure);
+    const members = await db.getOrgMembers(profile.structure);
+    const onDuty = members.filter(m => m.on_duty === 1).length;
+    
+    bot.chat(`/msg ${sender} &6╔══════════════════════════════════════╗`);
+    bot.chat(`/msg ${sender} &6║ &l${getStructureIcon(profile.structure)} СТАТУС &6║`);
+    bot.chat(`/msg ${sender} &6╠══════════════════════════════════════╣`);
+    bot.chat(`/msg ${sender} &6║ &7Всего сотрудников: &e${members.length}`);
+    bot.chat(`/msg ${sender} &6║ &7На дежурстве: &e${onDuty}`);
+    bot.chat(`/msg ${sender} &6║ &7Бюджет: &e${utils.formatMoney(org?.budget || 0)}`);
+    bot.chat(`/msg ${sender} &6║ &7Ставка налога: &e${((org?.tax_rate || 0) * 100)}%`);
+    bot.chat(`/msg ${sender} &6╚══════════════════════════════════════╝`);
+}
+
+// ============================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================
+
+function getStructureIcon(structure) {
+    const icons = {
+        'police': '👮 Полиция',
+        'army': '⚔️ Армия',
+        'hospital': '🏥 Больница',
+        'academy': '📚 Академия',
+        'government': '🏛️ Правительство'
+    };
+    return icons[structure] || structure;
+}
+
+// ============================================
+// ЭКСПОРТ
+// ============================================
+module.exports = {
+    arp,
+    duty,
+    status
+};

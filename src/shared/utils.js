@@ -1,226 +1,230 @@
 // src/shared/utils.js
-const moment = require('moment');
+// Вспомогательные функции для форматирования, валидации и т.д.
 
-const emojis = {
-    success: '✅',
-    error: '❌',
-    warning: '⚠️',
-    money: '💰',
-    house: '🏠',
-    office: '🏢',
-    business: '🏪',
-    police: '👮',
-    army: '⚔️',
-    hospital: '🏥',
-    academy: '📚',
-    court: '⚖️',
-    mute: '🔇',
-    kick: '👢',
-    ban: '🚫',
-    payday: '💵',
-    info: 'ℹ️',
-    time: '⏰',
-    stats: '📊',
-    discord: '💬',
-    link: '🔗',
-    key: '🔑',
-    staff: '👑',
-    wave: '👋',
-    alert: '🚨',
-    gift: '🎁',
-    upgrade: '⭐',
-    gift: '🎁'
-};
-
-const gradients = {
-    error: '&#FF0202',
-    username: '&#76C519',
-    text: '&#D4D4D4',
-    command: '&#80C4C5',
-    errorCommand: '&#CA4E4E',
-    noPermission: '&#C58383',
-    success: '&#55FF55',
-    warning: '&#FFFF55',
-    info: '&#55FFFF',
-    clan: '&#6343d4'
-};
-
-function formatMessage(text, options = {}) {
-    const { username, command, noPermission, usage } = options;
+// Форматирование времени
+function formatTime(seconds) {
+    if (!seconds) return '0 сек';
     
-    if (command) {
-        const cmd = command.length > 8 ? command.substring(0, 8) + '...' : command;
-        return `${gradients.error}| ${gradients.username}${username || ''}${gradients.text}, неизвестная команда: &c'${gradients.errorCommand}${cmd}&c'${gradients.text}. Напишите &c'${gradients.command}/help&c'${gradients.text} для списка команд&r`;
-    }
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
     
-    if (noPermission) {
-        return `${gradients.error}| ${gradients.username}${username || ''}${gradients.noPermission}, у вас нет прав для использования этой команды&r`;
-    }
+    const parts = [];
+    if (hours > 0) parts.push(`${hours} ч`);
+    if (minutes > 0) parts.push(`${minutes} мин`);
+    if (secs > 0 && hours === 0) parts.push(`${secs} сек`);
     
-    if (usage) {
-        return `${gradients.error}| ${gradients.username}${username || ''}${gradients.text}, использование: &c'${gradients.command}${usage}&c'&r`;
-    }
-    
-    return text;
+    return parts.join(' ');
 }
 
-function truncateMessage(message, maxLength = 190) {
+// Форматирование даты
+function formatDate(date, format = 'DD.MM.YYYY HH:MM') {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    
+    return format
+        .replace('DD', day)
+        .replace('MM', month)
+        .replace('YYYY', year)
+        .replace('HH', hours)
+        .replace('MM', minutes);
+}
+
+// Форматирование числа с разделителями
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+// Форматирование валюты
+function formatMoney(amount) {
+    return `💰 ${formatNumber(Math.floor(amount))}₽`;
+}
+
+// Генерация случайного кода
+function generateCode(length = 6) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < length; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// Задержка (promise)
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Ограничение количества вызовов (debounce)
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Ограничение частоты вызовов (throttle)
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func(...args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// Валидация никнейма Minecraft
+function isValidMinecraftNick(nick) {
+    if (!nick || typeof nick !== 'string') return false;
+    return /^[a-zA-Z0-9_]{3,16}$/.test(nick);
+}
+
+// Валидация суммы (положительное число)
+function isValidAmount(amount) {
+    const num = parseFloat(amount);
+    return !isNaN(num) && num > 0 && num <= 1000000;
+}
+
+// Эскейп специальных символов для чата
+function escapeMarkdown(text) {
+    if (!text) return '';
+    return text
+        .replace(/\\/g, '\\\\')
+        .replace(/\*/g, '\\*')
+        .replace(/_/g, '\\_')
+        .replace(/~/g, '\\~')
+        .replace(/`/g, '\\`');
+}
+
+// Ограничение длины сообщения с многоточием
+function truncateMessage(message, maxLength = 50) {
+    if (!message) return '';
     if (message.length <= maxLength) return message;
     return message.substring(0, maxLength - 3) + '...';
 }
-function calculateSimilarity(s1, s2) {
-    let longer = s1.toLowerCase();
-    let shorter = s2.toLowerCase();
-    if (s1.length < s2.length) {
-        longer = s2;
-        shorter = s1;
-    }
-    let longerLength = longer.length;
-    if (longerLength === 0) return 1.0;
-    return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
-}
 
-function editDistance(s1, s2) {
-    let costs = new Array();
-    for (let i = 0; i <= s1.length; i++) {
-        let lastValue = i;
-        for (let j = 0; j <= s2.length; j++) {
-            if (i == 0) costs[j] = j;
-            else {
-                if (j > 0) {
-                    let newValue = costs[j - 1];
-                    if (s1.charAt(i - 1) != s2.charAt(j - 1))
-                        newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
-                    costs[j - 1] = lastValue;
-                    lastValue = newValue;
-                }
-            }
-        }
-        if (i > 0) costs[s2.length] = lastValue;
-    }
-    return costs[s2.length];
-}
-function parseTimeToMinutes(str) {
-    if (!str) return null;
-    const match = str.match(/^(\d+)([smhd])$/i);
+// Парсинг времени из строки (1h, 30m, 1d)
+function parseTimeString(timeStr) {
+    const match = timeStr.match(/^(\d+)([hmd])$/i);
     if (!match) return null;
+    
     const value = parseInt(match[1]);
     const unit = match[2].toLowerCase();
-    const multipliers = { s: 1/60, m: 1, h: 60, d: 1440 };
-    return value * multipliers[unit];
-}
-
-function formatTime(minutes) {
-    if (minutes < 60) return `${minutes} мин`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours < 24) return mins ? `${hours}ч ${mins}м` : `${hours}ч`;
-    const days = Math.floor(hours / 24);
-    const hrs = hours % 24;
-    return hrs ? `${days}д ${hrs}ч` : `${days}д`;
-}
-
-function formatMoney(amount) {
-    return `${amount.toLocaleString('ru-RU')} ₽`;
-}
-
-function msUntilNextHour() {
-    const now = moment();
-    const next = moment().startOf('hour').add(1, 'hour');
-    return next.diff(now);
-}
-
-function getSalaryForRank(structure, rank) {
-    const salaries = {
-        police: {
-            'Рядовой': 4500, 'Сержант': 5500, 'Прапорщик': 6200,
-            'Лейтенант': 7500, 'Капитан': 9500, 'Подполковник': 11000, 'Полковник': 13000
-        },
-        army: {
-            'Рядовой': 4300, 'Сержант': 5000, 'Старшина': 5200, 'Прапорщик': 5800,
-            'Лейтенант': 6500, 'Капитан': 8000, 'Майор': 9000, 'Подполковник': 10500,
-            'Полковник': 12000, 'Маршал': 15000
-        },
-        hospital: {
-            'Санитар(ка)': 4200, 'Сестра-хозяйка': 4500, 'Медсёстры/Брат': 5000,
-            'Фельдшер': 5800, 'Лаборант': 5500, 'Акушерка': 6000,
-            'Врач': 9000, 'Главный врач': 14000
-        },
-        academy: {
-            'Стажёр': 4200, 'Ассистент': 4800, 'Преподаватель': 6000,
-            'Зав. кафедрой': 7000, 'Проректор': 9000, 'Директор': 11000
-        },
-        government: {
-            'Адвокат': 7500, 'Прокурор': 10500, 'Помощник судьи': 6500,
-            'Судья': 12000, 'Министр': 15000, 'Мэр': 17000
-        }
-    };
     
-    const structureSalaries = salaries[structure.toLowerCase()];
-    if (structureSalaries && structureSalaries[rank]) {
-        return structureSalaries[rank];
+    switch(unit) {
+        case 'h': return value * 60 * 60 * 1000;
+        case 'm': return value * 60 * 1000;
+        case 'd': return value * 24 * 60 * 60 * 1000;
+        default: return null;
+    }
+}
+
+// Проверка, находится ли игрок на дежурстве
+async function isOnDuty(nick, db) {
+    const profile = await db.get('SELECT on_duty FROM rp_players WHERE minecraft_nick = ?', [nick]);
+    return profile ? profile.on_duty === 1 : false;
+}
+
+// Получение структуры игрока
+async function getPlayerStructure(nick, db) {
+    const profile = await db.get('SELECT structure, job_rank FROM rp_players WHERE minecraft_nick = ?', [nick]);
+    if (!profile) return { structure: 'Гражданин', rank: 'Нет' };
+    return {
+        structure: profile.structure,
+        rank: profile.job_rank
+    };
+}
+
+// Градиентные цвета для сообщений (совместимость с &hex)
+function colorize(text, gradientStart, gradientEnd) {
+    // Простая реализация — возвращаем текст с HEX кодом
+    // На сервере должен быть плагин, поддерживающий &hex
+    return `&#${gradientStart}${text}&r`;
+}
+
+// Разбор команды из сообщения
+function parseCommand(message) {
+    if (!message || !message.startsWith('/')) return null;
+    
+    const parts = message.trim().split(/\s+/);
+    const command = parts[0].toLowerCase();
+    const args = parts.slice(1);
+    
+    return { command, args, raw: message };
+}
+
+// Проверка на спам (простая версия)
+class SpamDetector {
+    constructor(maxMessagesPerMinute = 3, cooldownSeconds = 30) {
+        this.maxMessages = maxMessagesPerMinute;
+        this.cooldownSeconds = cooldownSeconds;
+        this.userMessages = new Map();
     }
     
-    return 4000;
-}
-
-function getPropertyColor(type) {
-    const colors = {
-        apartment: '#00FF00',
-        house: '#00AAFF',
-        business: '#FFAA00',
-        office: '#AA00FF',
-        port: '#FF5500'
-    };
-    return colors[type] || '#FFFFFF';
-}
-
-function getRankColor(rank) {
-    const colors = {
-        'Новичок': '#7c9c5e',
-        'Участник': '#4ade80',
-        'Ветеран': '#60a5fa',
-        'Легенда': '#fbbf24',
-        'Мл.Модератор': '#59ff6d',
-        'Модератор': '#114fff',
-        'Ст.Модератор': '#ffb10c',
-        'Гл.Модератор': '#5323ff',
-        'Куратор': '#ff118d',
-        'Администратор': '#790101'
-    };
-    return colors[rank] || '#ffffff';
-}
-
-function getStructureEmoji(structure) {
-    const emojisMap = {
-        'Полиция': '🚔',
-        'Армия': '⚔️',
-        'Больница': '🏥',
-        'Академия': '📚',
-        'Мэрия': '🏛️',
-        'Суд': '⚖️'
-    };
-    return emojisMap[structure] || '📌';
-}
-
-function isPlayerOnline(bot, nickname) {
-    if (!bot || !bot.players) return false;
-    return bot.players[nickname] && bot.players[nickname].entity;
+    check(nick) {
+        const now = Date.now();
+        const userData = this.userMessages.get(nick) || { timestamps: [], mutedUntil: 0 };
+        
+        // Проверяем, не в муте ли пользователь
+        if (userData.mutedUntil > now) {
+            return { isSpam: true, remainingSeconds: Math.ceil((userData.mutedUntil - now) / 1000) };
+        }
+        
+        // Очищаем старые сообщения (старше 60 секунд)
+        userData.timestamps = userData.timestamps.filter(t => now - t < 60000);
+        
+        // Добавляем новое сообщение
+        userData.timestamps.push(now);
+        
+        // Проверяем, не спамит ли
+        if (userData.timestamps.length > this.maxMessages) {
+            userData.mutedUntil = now + this.cooldownSeconds * 1000;
+            this.userMessages.set(nick, userData);
+            return { isSpam: true, remainingSeconds: this.cooldownSeconds };
+        }
+        
+        this.userMessages.set(nick, userData);
+        return { isSpam: false };
+    }
+    
+    // Снять мут
+    unmute(nick) {
+        const userData = this.userMessages.get(nick);
+        if (userData) {
+            userData.mutedUntil = 0;
+            this.userMessages.set(nick, userData);
+        }
+    }
 }
 
 module.exports = {
-    emojis,
-    gradients,
-    formatMessage,
-    truncateMessage,
-    parseTimeToMinutes,
     formatTime,
+    formatDate,
+    formatNumber,
     formatMoney,
-    msUntilNextHour,
-    getSalaryForRank,
-    getPropertyColor,
-    getRankColor,
-    getStructureEmoji,
-    isPlayerOnline,
-    calculateSimilarity
+    generateCode,
+    sleep,
+    debounce,
+    throttle,
+    isValidMinecraftNick,
+    isValidAmount,
+    escapeMarkdown,
+    truncateMessage,
+    parseTimeString,
+    isOnDuty,
+    getPlayerStructure,
+    colorize,
+    parseCommand,
+    SpamDetector
 };
