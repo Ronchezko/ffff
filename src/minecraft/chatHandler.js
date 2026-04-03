@@ -2,8 +2,7 @@
 // Обработка сообщений чата, кланового чата, личных сообщений
 
 const utils = require('../shared/utils');
-const { getModerationSystem } = require('./moderation');
-// Регулярные выражения для распознавания сообщений
+
 const PATTERNS = {
     clanChat: /^КЛАН:\s*(?:[&§][0-9a-fklmnor])*([^:]+):\s*(.+)$/i,
     clanChatWithRank: /^КЛАН:\s*[&§][0-9a-fklmnor]*[^\s]+\s+([^:]+):\s*(.+)$/i,
@@ -19,31 +18,28 @@ const PATTERNS = {
 
 class ChatHandler {
     constructor(bot, db, parentBot) {
-    this.bot = bot;
-    this.db = db;
-    this.parentBot = parentBot;
-    this.moderation = null;
-    this.realnameCache = new Map();
-}
+        this.bot = bot;
+        this.db = db;
+        this.parentBot = parentBot;
+        this.moderation = null;
+        this.realnameCache = new Map();
+    }
     
     async handleMessage(jsonMessage) {
         const rawMessage = jsonMessage.toString();
         const message = rawMessage.replace(/[&§][0-9a-fklmnor]/g, '');
         
-        // 1. Проверка на перемещение в лобби
         if (PATTERNS.lobbyMove.test(message)) {
             await this.handleLobbyMove();
             return;
         }
         
-        // 2. Проверка на результат /realname
         const realnameMatch = message.match(PATTERNS.realnameResult);
         if (realnameMatch) {
             this.handleRealnameResult(realnameMatch[1], realnameMatch[2]);
             return;
         }
         
-        // 3. Проверка на клановый чат
         const clanMatch = message.match(PATTERNS.clanChat) || message.match(PATTERNS.clanChatWithRank);
         if (clanMatch) {
             const nickname = clanMatch[1].trim();
@@ -52,7 +48,6 @@ class ChatHandler {
             return;
         }
         
-        // 4. Проверка на личные сообщения
         const pmMatch = message.match(PATTERNS.privateMessage);
         if (pmMatch) {
             let nickname = pmMatch[1].trim();
@@ -65,37 +60,27 @@ class ChatHandler {
             return;
         }
         
-        // 5. Проверка на заявку в клан
         const joinRequestMatch = message.match(PATTERNS.joinRequest);
         if (joinRequestMatch) {
-            const nickname = joinRequestMatch[1];
-            await this.handleJoinRequest(nickname);
+            await this.handleJoinRequest(joinRequestMatch[1]);
             return;
         }
         
-        // 6. Проверка на присоединение к клану
         const joinClanMatch = message.match(PATTERNS.joinClan);
-        if (joinClanMatch) {
-            const nickname = joinClanMatch[1];
-            await this.handleJoinClan(nickname);
+        if (joinClanMatch && !joinClanMatch[1].includes(this.bot.username)) {
+            await this.handleJoinClan(joinClanMatch[1]);
             return;
         }
         
-        // 7. Проверка на выход из клана
         const leaveClanMatch = message.match(PATTERNS.leaveClan);
-        if (leaveClanMatch) {
-            const nickname = leaveClanMatch[1];
-            await this.handleLeaveClan(nickname);
+        if (leaveClanMatch && !leaveClanMatch[1].includes(this.bot.username)) {
+            await this.handleLeaveClan(leaveClanMatch[1]);
             return;
         }
         
-        // 8. Проверка на убийство
         const killMatch = message.match(PATTERNS.kill);
         if (killMatch) {
-            const killer = killMatch[1];
-            const victim = killMatch[2];
-            await this.handleKill(killer, victim);
-            return;
+            await this.handleKill(killMatch[1], killMatch[2]);
         }
     }
     
@@ -103,23 +88,19 @@ class ChatHandler {
     // ОБРАБОТКА КЛАНОВОГО ЧАТА
     // ============================================
     
-    // src/minecraft/chatHandler.js — ключевые изменения
-
-// В методе handleClanChat:
-// src/minecraft/chatHandler.js — ключевые изменения
-
-    // В методе handleClanChat добавьте:
-// В методе handleClanChat - обязательно вызываем checkClanChat
-// В методе handleClanChat - УБРАН вывод о кулдауне
-async handleClanChat(nickname, message) {
+    async handleClanChat(nickname, message) {
     if (nickname === this.bot.username) return;
-    
-    // ВРЕМЕННЫЙ ЛОГ ДЛЯ ОТЛАДКИ
-    this.parentBot.addLog(`🔍 Клановый чат: ник="${nickname}", сообщение="${message}"`, 'debug');
     
     if (!this.moderation) {
         const { getModerationSystem } = require('./moderation');
         this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot.addLog);
+    }
+    
+    // Проверяем ТОЛЬКО клановый мут (не блокировку ЛС)
+    const isClanMuted = await this.moderation.isClanMuted(nickname);
+    if (isClanMuted) {
+        this.parentBot.addLog(`🚫 Сообщение от ${nickname} отклонено (клановый мут)`, 'debug');
+        return;
     }
     
     const result = await this.moderation.checkClanChat(nickname, message);
@@ -132,83 +113,77 @@ async handleClanChat(nickname, message) {
         await this.db.logClanChat(nickname, message);
     }
 }
+    
+    // ============================================
+    // ОБРАБОТКА ЛИЧНЫХ СООБЩЕНИЙ
+    // ============================================
+    
+    // src/minecraft/chatHandler.js — исправленный метод handlePrivateMessage
 
-// В методе handlePrivateMessage - проверка команд
+// В handlePrivateMessage, после проверки на блокировку ЛС, добавьте проверку кулдауна:
+
 async handlePrivateMessage(nickname, message) {
     if (!this.moderation) {
         const { getModerationSystem } = require('./moderation');
         this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot.addLog);
     }
     
-    // Проверка на мут
-    if (await this.moderation.isMuted(nickname)) {
-        this.parentBot.addLog(`🚫 Игнорирование ЛС от ${nickname} (в муте)`, 'debug');
+    // Проверяем блокировку ЛС
+    if (await this.moderation.isPrivateMuted(nickname)) {
+        this.parentBot.addLog(`🚫 Игнорирование ЛС от ${nickname} (блокировка ЛС)`, 'debug');
         return;
     }
     
+    // Проверка на регистрацию RP
+    const codeMatch = message.match(/^([A-Z0-9]{6})$/i);
+    if (codeMatch) {
+        await this.handleRPVerification(nickname, codeMatch[1].toUpperCase());
+        return;
+    }
+    
+    // Обработка команд
     if (message.startsWith('/')) {
-        const command = message.slice(1).split(' ')[0];
+        const parts = message.slice(1).split(' ');
+        const command = parts[0];
+        const args = parts.slice(1);
         
-        // Проверка на одинаковые команды
+        // Проверка кулдауна
+        const cooldownResult = await this.moderation.checkCommandCooldown(nickname, command);
+        if (!cooldownResult.allowed) {
+            // Если это повтор той же команды - сообщение уже отправлено в клановый чат
+            // Если это разные команды - просто игнорируем без уведомления
+            return;
+        }
+        
+        // Остальная обработка команды...
         const cmdResult = await this.moderation.checkPrivateCommand(nickname, command);
         if (!cmdResult.allowed) {
-            if (!cmdResult.shouldIgnore && cmdResult.cooldown) {
-                this.bot.chat(`/msg ${nickname} &e⏱️ ${cmdResult.reason}`);
+            if (cmdResult.cooldown) {
+                // Уже отправлено
             }
             return;
         }
         
-        // Проверка на правильность команды
         const commands = require('./commands');
         const isValidCommand = commands.commandMap?.has(command.toLowerCase());
         
         if (!isValidCommand) {
             const invalidResult = await this.moderation.checkInvalidCommand(nickname, command);
-            if (!invalidResult.allowed) {
-                if (!invalidResult.shouldIgnore) {
-                    this.bot.chat(`/msg ${nickname} &c❌ ${invalidResult.reason}`);
-                }
+            if (!invalidResult.allowed && invalidResult.reason) {
                 return;
             }
             this.bot.chat(`/msg ${nickname} &cНеизвестная команда. Используйте /help`);
             return;
         }
         
-        const args = message.slice(1).split(' ').slice(1);
         await this.parentBot.executeCommand(nickname, command, args);
     }
-
-
-
-
-    
-    // Проверка на ответ на вопрос RP регистрации
-    if (global.pendingRegistrations && global.pendingRegistrations.has(nickname)) {
-        const pending = global.pendingRegistrations.get(nickname);
-        if (Date.now() < pending.expires) {
-            if (message.toUpperCase() === pending.code) {
-                // Успешная регистрация
-                await this.db.registerRP(nickname);
-                global.pendingRegistrations.delete(nickname);
-                
-                await sendDelayedMessage(this.bot, nickname, `&a✅ Поздравляем! Вы зарегистрированы в RolePlay!`);
-                await utils.sleep(500);
-                await sendDelayedMessage(this.bot, nickname, `&7Теперь вы гражданин города Resistance.`);
-                await utils.sleep(500);
-                await sendDelayedMessage(this.bot, nickname, `&7Используйте &e/pass &7для просмотра паспорта.`);
-                
-                this.parentBot.addLog(`🎭 ${nickname} зарегистрирован в RolePlay`, 'success');
-            } else {
-                await sendDelayedMessage(this.bot, nickname, `&c❌ Неверный код! Попробуйте снова командой /rp`);
-            }
-        } else {
-            global.pendingRegistrations.delete(nickname);
-            await sendDelayedMessage(this.bot, nickname, `&c⏰ Время действия кода истекло. Используйте /rp снова.`);
-        }
-    }
 }
-
-    // Добавьте этот метод в класс ChatHandler
+    
+    // ============================================
+    // ОБРАБОТКА RP РЕГИСТРАЦИИ
+    // ============================================
+    
     async handleRPVerification(nickname, code) {
         if (global.pendingRegistrations && global.pendingRegistrations.has(nickname)) {
             const pending = global.pendingRegistrations.get(nickname);
@@ -223,8 +198,6 @@ async handlePrivateMessage(nickname, message) {
             }
         }
     }
-
-
     
     // ============================================
     // ОБРАБОТКА ЗАЯВОК И ВСТУПЛЕНИЙ
@@ -341,11 +314,13 @@ async handlePrivateMessage(nickname, message) {
         return newCount;
     }
 }
+
 // Вспомогательная функция для отправки сообщений с задержкой
 async function sendDelayedMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
     await utils.sleep(400);
 }
+
 // Фабричная функция
 async function handleMessage(bot, message, db, parentBot) {
     const handler = new ChatHandler(bot, db, parentBot);

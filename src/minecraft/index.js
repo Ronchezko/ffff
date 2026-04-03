@@ -17,6 +17,8 @@ class MinecraftBot extends EventEmitter {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 5000;
+        this.lastCommandTime = new Map();
+        
         
         // Настройки из .env
         this.config = {
@@ -109,28 +111,32 @@ class MinecraftBot extends EventEmitter {
         // src/minecraft/index.js
 // В методе setupEventHandlers, внутри обработчика 'spawn':
 
-        this.bot.once('spawn', async () => {
-            this.addLog('🎮 Бот появился в мире', 'success');
-            
-            // ========== ПРОВЕРКА АКТИВНЫХ НАКАЗАНИЙ ==========
-            try {
-                const { getModerationSystem } = require('./moderation');
-                const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
-                
-                // Проверяем для всех участников клана (или для конкретных)
-                const clanMembers = await this.db.getAllClanMembers?.();
-                if (clanMembers && clanMembers.length > 0) {
-                    for (const member of clanMembers) {
-                        await moderation.checkActivePunishments(member.minecraft_nick);
-                    }
-                    this.addLog(`📋 Проверены активные наказания для ${clanMembers.length} участников клана`, 'info');
-                }
-            } catch (err) {
-                this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
-            }
-            
-            await this.authorize();
-        });
+        // src/minecraft/index.js
+// В методе setupEventHandlers, внутри обработчика 'spawn':
+
+this.bot.once('spawn', async () => {
+    this.addLog('🎮 Бот появился в мире', 'success');
+    
+    // ========== ПРОВЕРКА И СНЯТИЕ МУТОВ ПОСЛЕ ЗАХОДА ==========
+    try {
+        const { getModerationSystem } = require('./moderation');
+        const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
+        
+        // Проверяем всех игроков в клане
+        await moderation.checkAllPlayersPunishments();
+        
+        // Также проверяем самого бота (на случай если бот был в муте)
+        await moderation.checkActivePunishments(this.bot.username);
+        
+        // Дополнительная проверка истекших мутов
+        await moderation.checkAllExpiredMutes();
+        
+    } catch (err) {
+        this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
+    }
+    
+    await this.authorize();
+});
         
         // Обработка сообщений
         this.bot.on('message', async (json) => {

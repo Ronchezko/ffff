@@ -1,14 +1,13 @@
 -- ============================================
 -- RESISTANCE CITY PROJECT - ПОЛНАЯ СХЕМА БД
--- Версия: 6.0
--- Совместимость: SQLite
+-- Версия: 6.1 (без дублирования source)
 -- ============================================
 
 -- ============================================
 -- 1. ОСНОВНЫЕ ТАБЛИЦЫ (УЧАСТНИКИ И РОЛИ)
 -- ============================================
 
--- Участники клана (основная информация)
+-- Участники клана
 CREATE TABLE IF NOT EXISTS clan_members (
     minecraft_nick TEXT PRIMARY KEY,
     kills INTEGER DEFAULT 0,
@@ -27,12 +26,12 @@ CREATE TABLE IF NOT EXISTS clan_members (
     ban_expires DATETIME
 );
 
--- Ранги клана (система повышений)
+-- Ранги клана
 CREATE TABLE IF NOT EXISTS clan_ranks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    display_name TEXT NOT NULL,  -- Форматированный ранг с цветами
-    priority INTEGER NOT NULL,   -- 0-100, чем выше, тем больше прав
+    display_name TEXT NOT NULL,
+    priority INTEGER NOT NULL,
     min_points INTEGER DEFAULT 0,
     cooldown_days INTEGER DEFAULT 3,
     max_promotions_per_wipe INTEGER DEFAULT 3,
@@ -47,12 +46,11 @@ CREATE TABLE IF NOT EXISTS clan_ranks (
 -- 2. ROLEPLAY ПРОФИЛИ
 -- ============================================
 
--- RP профили игроков
 CREATE TABLE IF NOT EXISTS rp_players (
     minecraft_nick TEXT PRIMARY KEY,
     money REAL DEFAULT 1000.0,
     bank_balance REAL DEFAULT 0.0,
-    structure TEXT DEFAULT 'Гражданин',  -- police, army, hospital, academy, government
+    structure TEXT DEFAULT 'Гражданин',
     job_rank TEXT DEFAULT 'Нет',
     rp_points INTEGER DEFAULT 0,
     rp_joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -63,28 +61,27 @@ CREATE TABLE IF NOT EXISTS rp_players (
     has_education INTEGER DEFAULT 0,
     is_frozen INTEGER DEFAULT 0,
     last_pay_time DATETIME,
-    education_courses TEXT DEFAULT '[]',  -- JSON массив пройденных курсов
-    passport_data TEXT                     -- JSON с дополнительной информацией
+    education_courses TEXT DEFAULT '[]',
+    passport_data TEXT
 );
 
--- Образование (курсы академии)
+-- Образование
 CREATE TABLE IF NOT EXISTS education_courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_name TEXT NOT NULL,
     teacher_nick TEXT NOT NULL,
     student_nick TEXT NOT NULL,
     grade INTEGER CHECK(grade >= 2 AND grade <= 5),
-    passed INTEGER DEFAULT 0,  -- 0 - не сдан, 1 - сдан
+    passed INTEGER DEFAULT 0,
     completed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================
--- 3. ИМУЩЕСТВО И НЕДВИЖИМОСТЬ
+-- 3. ИМУЩЕСТВО
 -- ============================================
 
--- Основная таблица имущества
 CREATE TABLE IF NOT EXISTS property (
-    id TEXT PRIMARY KEY,  -- "1", "2", "145" и т.д.
+    id TEXT PRIMARY KEY,
     type TEXT NOT NULL CHECK(type IN ('apartment', 'house', 'business', 'office', 'port')),
     owner_nick TEXT,
     price INTEGER NOT NULL,
@@ -95,11 +92,10 @@ CREATE TABLE IF NOT EXISTS property (
     is_admin_issued INTEGER DEFAULT 0,
     issued_by TEXT,
     issued_at DATETIME,
-    region_name TEXT,  -- Название региона на сервере (TRTR1, TRTR2...)
-    is_available INTEGER DEFAULT 1  -- 1 - свободно, 0 - занято
+    region_name TEXT,
+    is_available INTEGER DEFAULT 1
 );
 
--- История владения имуществом
 CREATE TABLE IF NOT EXISTS property_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id TEXT NOT NULL,
@@ -107,10 +103,9 @@ CREATE TABLE IF NOT EXISTS property_history (
     action TEXT CHECK(action IN ('buy', 'sell', 'transfer', 'admin_give', 'admin_take')),
     amount REAL,
     transaction_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    performed_by TEXT  -- Кто совершил действие (админ или система)
+    performed_by TEXT
 );
 
--- Сожители имущества (для домов и квартир)
 CREATE TABLE IF NOT EXISTS property_residents (
     property_id TEXT NOT NULL,
     resident_nick TEXT NOT NULL,
@@ -122,10 +117,9 @@ CREATE TABLE IF NOT EXISTS property_residents (
 );
 
 -- ============================================
--- 4. БИЗНЕСЫ И ОФИСЫ (СПЕЦИАЛЬНАЯ ЛОГИКА)
+-- 4. БИЗНЕСЫ И ОФИСЫ
 -- ============================================
 
--- Бизнесы (дополнительная информация)
 CREATE TABLE IF NOT EXISTS businesses (
     property_id TEXT PRIMARY KEY,
     license_expiry DATETIME,
@@ -135,7 +129,6 @@ CREATE TABLE IF NOT EXISTS businesses (
     FOREIGN KEY (property_id) REFERENCES property(id)
 );
 
--- Офисы (с системой уровней)
 CREATE TABLE IF NOT EXISTS offices (
     property_id TEXT PRIMARY KEY,
     office_type TEXT CHECK(office_type IN ('crypto', 'it', 'marketing', 'finance', 'legal')),
@@ -150,19 +143,6 @@ CREATE TABLE IF NOT EXISTS offices (
     FOREIGN KEY (property_id) REFERENCES property(id)
 );
 
--- Вопросы для офисов (прокачка уровней)
-CREATE TABLE IF NOT EXISTS office_questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    office_type TEXT NOT NULL,
-    level INTEGER NOT NULL,
-    question TEXT NOT NULL,
-    correct_answer TEXT NOT NULL,
-    option_a TEXT,
-    option_b TEXT,
-    option_c TEXT,
-    option_d TEXT
-);
-
 -- ============================================
 -- 5. ЛИЦЕНЗИИ
 -- ============================================
@@ -175,16 +155,15 @@ CREATE TABLE IF NOT EXISTS licenses (
     expires_at DATETIME NOT NULL,
     is_active INTEGER DEFAULT 1,
     price_paid REAL NOT NULL,
-    last_reminded_at DATETIME  -- когда последний раз напоминали о продлении
+    last_reminded_at DATETIME
 );
 
 -- ============================================
--- 6. ОРГАНИЗАЦИИ (ГОСУДАРСТВЕННЫЕ СТРУКТУРЫ)
+-- 6. ОРГАНИЗАЦИИ
 -- ============================================
 
--- Организации
 CREATE TABLE IF NOT EXISTS organizations (
-    name TEXT PRIMARY KEY,  -- 'police', 'army', 'hospital', 'academy', 'government'
+    name TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     budget REAL DEFAULT 1000000.0,
     tax_rate REAL DEFAULT 0.01,
@@ -194,7 +173,6 @@ CREATE TABLE IF NOT EXISTS organizations (
     frozen_at DATETIME
 );
 
--- Члены организаций
 CREATE TABLE IF NOT EXISTS org_members (
     minecraft_nick TEXT,
     org_name TEXT,
@@ -203,14 +181,13 @@ CREATE TABLE IF NOT EXISTS org_members (
     on_duty INTEGER DEFAULT 0,
     duty_start_time DATETIME,
     total_duty_seconds INTEGER DEFAULT 0,
-    warnings INTEGER DEFAULT 0,  -- выговоры в организации
+    warnings INTEGER DEFAULT 0,
     is_on_vacation INTEGER DEFAULT 0,
     vacation_until DATETIME,
     PRIMARY KEY (minecraft_nick, org_name),
     FOREIGN KEY (org_name) REFERENCES organizations(name)
 );
 
--- Ранги организаций (с зарплатами)
 CREATE TABLE IF NOT EXISTS org_ranks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     org_name TEXT NOT NULL,
@@ -229,20 +206,18 @@ CREATE TABLE IF NOT EXISTS org_ranks (
 -- 7. ЭКОНОМИКА И ЛОГИ
 -- ============================================
 
--- Логи всех транзакций
 CREATE TABLE IF NOT EXISTS money_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player TEXT NOT NULL,
     amount REAL NOT NULL,
-    type TEXT NOT NULL,  -- 'salary', 'tax', 'transfer', 'fine', 'property_buy', 'license', 'donation'
+    type TEXT NOT NULL,
     description TEXT,
     balance_before REAL,
     balance_after REAL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    performed_by TEXT  -- кто совершил операцию (ник или 'system')
+    performed_by TEXT
 );
 
--- Ежечасный PayDay
 CREATE TABLE IF NOT EXISTS payday_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_nick TEXT NOT NULL,
@@ -254,7 +229,6 @@ CREATE TABLE IF NOT EXISTS payday_logs (
     was_online INTEGER DEFAULT 1
 );
 
--- Налоги (история)
 CREATE TABLE IF NOT EXISTS tax_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_nick TEXT NOT NULL,
@@ -269,7 +243,6 @@ CREATE TABLE IF NOT EXISTS tax_logs (
 -- 8. НАКАЗАНИЯ И МОДЕРАЦИЯ
 -- ============================================
 
--- Наказания (муты, чёрные списки, баны)
 CREATE TABLE IF NOT EXISTS punishments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player TEXT NOT NULL,
@@ -282,10 +255,10 @@ CREATE TABLE IF NOT EXISTS punishments (
     active INTEGER DEFAULT 1,
     lifted_by TEXT,
     lifted_at DATETIME,
-    lift_reason TEXT
+    lift_reason TEXT,
+    source TEXT DEFAULT 'clan'
 );
 
--- Чёрный список клана (отдельная таблица для быстрого доступа)
 CREATE TABLE IF NOT EXISTS clan_blacklist (
     minecraft_nick TEXT PRIMARY KEY,
     reason TEXT,
@@ -295,7 +268,6 @@ CREATE TABLE IF NOT EXISTS clan_blacklist (
     is_active INTEGER DEFAULT 1
 );
 
--- Предупреждения игроков (3 предупреждения = блок RP)
 CREATE TABLE IF NOT EXISTS player_warnings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_nick TEXT NOT NULL,
@@ -306,26 +278,20 @@ CREATE TABLE IF NOT EXISTS player_warnings (
     is_active INTEGER DEFAULT 1
 );
 
--- ============================================
--- 9. ПЕРСОНАЛ (МОДЕРАТОРЫ И АДМИНИСТРАТОРЫ)
--- ============================================
-
--- Статистика персонала
 CREATE TABLE IF NOT EXISTS staff_stats (
     minecraft_nick TEXT PRIMARY KEY,
-    rank_level INTEGER DEFAULT 0,  -- 1=Мл.мод, 2=Модератор, 3=Ст.мод, 4=Гл.мод, 5=Куратор, 6=Админ
+    rank_level INTEGER DEFAULT 0,
     rank_name TEXT,
     kicks_today INTEGER DEFAULT 0,
     mutes_today INTEGER DEFAULT 0,
     bl_today INTEGER DEFAULT 0,
     awarns INTEGER DEFAULT 0,
-    last_reset_date TEXT,  -- YYYY-MM-DD
+    last_reset_date TEXT,
     hired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     hired_by TEXT,
     is_active INTEGER DEFAULT 1
 );
 
--- Лимиты персонала (из ТЗ)
 CREATE TABLE IF NOT EXISTS staff_limits (
     rank_level INTEGER PRIMARY KEY,
     rank_name TEXT,
@@ -335,10 +301,9 @@ CREATE TABLE IF NOT EXISTS staff_limits (
 );
 
 -- ============================================
--- 10. ЧАТ И КОММУНИКАЦИИ
+-- 9. ЧАТ И ЛОГИ
 -- ============================================
 
--- Логи кланового чата
 CREATE TABLE IF NOT EXISTS clan_chat_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player TEXT NOT NULL,
@@ -347,7 +312,6 @@ CREATE TABLE IF NOT EXISTS clan_chat_logs (
     is_command INTEGER DEFAULT 0
 );
 
--- Логи личных сообщений
 CREATE TABLE IF NOT EXISTS private_messages_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     from_player TEXT NOT NULL,
@@ -357,10 +321,9 @@ CREATE TABLE IF NOT EXISTS private_messages_logs (
 );
 
 -- ============================================
--- 11. DISCORD ИНТЕГРАЦИЯ
+-- 10. DISCORD ИНТЕГРАЦИЯ
 -- ============================================
 
--- Коды верификации
 CREATE TABLE IF NOT EXISTS verification_codes (
     code TEXT PRIMARY KEY,
     minecraft_nick TEXT NOT NULL,
@@ -372,7 +335,6 @@ CREATE TABLE IF NOT EXISTS verification_codes (
     verified_at DATETIME
 );
 
--- Связанные аккаунты
 CREATE TABLE IF NOT EXISTS linked_accounts (
     minecraft_nick TEXT PRIMARY KEY,
     discord_id TEXT NOT NULL UNIQUE,
@@ -381,7 +343,7 @@ CREATE TABLE IF NOT EXISTS linked_accounts (
 );
 
 -- ============================================
--- 12. НАСТРОЙКИ СИСТЕМЫ
+-- 11. НАСТРОЙКИ
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -393,10 +355,9 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- ============================================
--- 13. СТАТИСТИКА И АНАЛИТИКА
+-- 12. СТАТИСТИКА
 -- ============================================
 
--- Статистика убийств/смертей
 CREATE TABLE IF NOT EXISTS pvp_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     killer TEXT NOT NULL,
@@ -406,19 +367,10 @@ CREATE TABLE IF NOT EXISTS pvp_stats (
     victim_was_in_clan INTEGER DEFAULT 0
 );
 
--- Онлайн статистика (для отслеживания PayDay)
-CREATE TABLE IF NOT EXISTS online_tracking (
-    player_nick TEXT NOT NULL,
-    check_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    was_online INTEGER DEFAULT 0,
-    PRIMARY KEY (player_nick, check_time)
-);
-
 -- ============================================
--- 14. DEEPSEEK / AI ИНТЕГРАЦИЯ (БУДУЩЕЕ)
+-- 13. DEEPSEEK КЭШ
 -- ============================================
 
--- Кэш ответов DeepSeek
 CREATE TABLE IF NOT EXISTS deepseek_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     prompt TEXT NOT NULL,
@@ -459,7 +411,7 @@ INSERT OR IGNORE INTO organizations (name, display_name, budget, tax_rate) VALUE
 ('academy', 'Академия', 1000000, 0.01),
 ('government', 'Мэрия и суд', 2000000, 0.01);
 
--- Вставка рангов организаций (полиция)
+-- Вставка рангов полиции
 INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
 ('police', 'Рядовой', 4500, 1, 0, 0, 0),
 ('police', 'Сержант', 5500, 2, 0, 0, 0),
@@ -469,75 +421,16 @@ INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can
 ('police', 'Подполковник', 11000, 6, 1, 1, 1),
 ('police', 'Полковник', 13000, 7, 1, 1, 1);
 
--- Вставка рангов организаций (армия)
-INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
-('army', 'Рядовой', 4300, 1, 0, 0, 0),
-('army', 'Сержант', 5000, 2, 0, 0, 0),
-('army', 'Старшина', 5200, 3, 0, 0, 0),
-('army', 'Прапорщик', 5800, 4, 0, 0, 0),
-('army', 'Лейтенант', 6500, 5, 1, 0, 0),
-('army', 'Капитан', 8000, 6, 1, 0, 0),
-('army', 'Майор', 9000, 7, 1, 1, 0),
-('army', 'Подполковник', 10500, 8, 1, 1, 1),
-('army', 'Полковник', 12000, 9, 1, 1, 1),
-('army', 'Маршал', 15000, 10, 1, 1, 1);
-
--- Вставка рангов организаций (больница)
-INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
-('hospital', 'Санитар(ка)', 4200, 1, 0, 0, 0),
-('hospital', 'Сестра-хозяйка', 4500, 2, 0, 0, 0),
-('hospital', 'Медсёстры/Брат', 5000, 3, 0, 0, 0),
-('hospital', 'Фельдшер', 5800, 4, 0, 0, 0),
-('hospital', 'Лаборант', 5500, 5, 0, 0, 0),
-('hospital', 'Акушерка', 6000, 6, 0, 0, 0),
-('hospital', 'Врач', 9000, 7, 1, 0, 0),
-('hospital', 'Главный врач', 14000, 8, 1, 1, 1);
-
--- Вставка рангов организаций (академия)
-INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
-('academy', 'Стажёр', 4200, 1, 0, 0, 0),
-('academy', 'Ассистент', 4800, 2, 0, 0, 0),
-('academy', 'Преподаватель', 6000, 3, 0, 0, 0),
-('academy', 'Зав. кафедрой', 7000, 4, 1, 0, 0),
-('academy', 'Проректор', 9000, 5, 1, 1, 0),
-('academy', 'Директор', 11000, 6, 1, 1, 1);
-
--- Вставка рангов организаций (правительство)
-INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
-('government', 'Адвокат', 7500, 1, 0, 0, 0),
-('government', 'Прокурор', 10500, 2, 0, 0, 0),
-('government', 'Помощник судьи', 6500, 3, 0, 0, 0),
-('government', 'Судья', 12000, 4, 0, 0, 0),
-('government', 'Министр', 15000, 5, 1, 1, 1),
-('government', 'Мэр', 17000, 6, 1, 1, 1);
-
--- Вставка начальных настроек
-INSERT OR IGNORE INTO settings (key, value, description) VALUES
-('auto_mod_enabled', 'true', 'Авто-модерация в клановом чате'),
-('clan_chat_ad_enabled', 'true', 'Реклама в клановом чате'),
-('payday_enabled', 'true', 'Ежечасный PayDay'),
-('proxy_enabled', 'false', 'Использовать прокси для бота'),
-('deepseek_enabled', 'false', 'Включить DeepSeek API'),
-('last_wipe_date', '2026-03-30', 'Дата последнего вайпа'),
-('property_tax_rate', '0.01', 'Налог на имущество (1%)');
-
--- Добавление первого администратора (из ТЗ)
+-- Добавление первого администратора
 INSERT OR IGNORE INTO clan_members (minecraft_nick, rank_name, rank_priority, invited_by) 
 VALUES ('Ronch_', 'Администратор', 100, 'system');
 
 INSERT OR IGNORE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by) 
 VALUES ('Ronch_', 6, 'Администратор', 'system');
 
--- Индексы для оптимизации производительности
+-- Индексы
 CREATE INDEX IF NOT EXISTS idx_punishments_player ON punishments(player);
 CREATE INDEX IF NOT EXISTS idx_punishments_active ON punishments(active);
 CREATE INDEX IF NOT EXISTS idx_property_owner ON property(owner_nick);
-CREATE INDEX IF NOT EXISTS idx_org_members_nick ON org_members(minecraft_nick);
-CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_name);
 CREATE INDEX IF NOT EXISTS idx_money_logs_player ON money_logs(player);
-CREATE INDEX IF NOT EXISTS idx_money_logs_date ON money_logs(created_at);
-CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);
-CREATE INDEX IF NOT EXISTS idx_verification_codes_active ON verification_codes(is_active);
-CREATE INDEX IF NOT EXISTS idx_pvp_stats_killer ON pvp_stats(killer);
-CREATE INDEX IF NOT EXISTS idx_pvp_stats_victim ON pvp_stats(victim);
-ALTER TABLE punishments ADD COLUMN source TEXT DEFAULT 'clan';
+CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);   
