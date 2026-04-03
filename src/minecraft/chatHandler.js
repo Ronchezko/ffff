@@ -185,19 +185,26 @@ async handlePrivateMessage(nickname, message) {
     // ============================================
     
     async handleRPVerification(nickname, code) {
-        if (global.pendingRegistrations && global.pendingRegistrations.has(nickname)) {
-            const pending = global.pendingRegistrations.get(nickname);
-            if (pending.code === code) {
-                await this.db.registerRP(nickname);
-                global.pendingRegistrations.delete(nickname);
-                
-                await sendDelayedMessage(this.bot, nickname, `&a✅ Вы успешно зарегистрированы в RolePlay!`);
-                this.parentBot.addLog(`🎭 ${nickname} верифицирован в RP`, 'success');
-            } else {
-                await sendDelayedMessage(this.bot, nickname, `&c❌ Неверный код!`);
-            }
+    if (global.pendingRegistrations && global.pendingRegistrations.has(nickname)) {
+        const pending = global.pendingRegistrations.get(nickname);
+        if (Date.now() > pending.expires) {
+            global.pendingRegistrations.delete(nickname);
+            this.bot.chat(`/msg ${nickname} &c⏰ Время действия кода истекло. Используйте /rp снова.`);
+            return;
+        }
+        
+        if (pending.code === code) {
+            await this.db.registerRP(nickname);
+            global.pendingRegistrations.delete(nickname);
+            
+            this.bot.chat(`/msg ${nickname} &a✅ Поздравляем! Вы успешно зарегистрированы в RolePlay!`);
+            this.bot.chat(`/cc &a🎭 &e${nickname} &aтеперь гражданин города Resistance!`);
+            this.parentBot.addLog(`🎭 ${nickname} зарегистрирован в RP`, 'success');
+        } else {
+            this.bot.chat(`/msg ${nickname} &c❌ Неверный код! Попробуйте снова через /rp`);
         }
     }
+}
     
     // ============================================
     // ОБРАБОТКА ЗАЯВОК И ВСТУПЛЕНИЙ

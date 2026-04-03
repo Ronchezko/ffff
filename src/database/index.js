@@ -209,10 +209,13 @@ async function transferMoney(from, to, amount, description) {
 
 async function addPunishment(player, type, reason, issuedBy, durationMinutes = null, source = 'clan') {
     const db = getDb();
-    const expiresAt = durationMinutes ? new Date(Date.now() + durationMinutes * 60000).toISOString() : null;
-    
-    // Сохраняем ник в нижнем регистре для единообразия
     const playerLower = player.toLowerCase();
+    
+    // ВАЖНО: правильно рассчитываем expires_at
+    let expiresAt = null;
+    if (durationMinutes && durationMinutes > 0) {
+        expiresAt = new Date(Date.now() + durationMinutes * 60000).toISOString();
+    }
     
     const result = await db.run(
         `INSERT INTO punishments (player, type, reason, issued_by, duration_minutes, expires_at, active, source)
@@ -230,7 +233,6 @@ async function addPunishment(player, type, reason, issuedBy, durationMinutes = n
     
     return result.lastID;
 }
-
 async function removePunishment(player, type, liftedBy, liftReason) {
     const db = getDb();
     const playerLower = player.toLowerCase();

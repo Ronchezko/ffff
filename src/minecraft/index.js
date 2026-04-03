@@ -17,8 +17,7 @@ class MinecraftBot extends EventEmitter {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 10;
         this.reconnectDelay = 5000;
-        this.lastCommandTime = new Map();
-        
+        this.isConnecting = false; // Флаг для предотвращения множественных подключений
         
         // Настройки из .env
         this.config = {
@@ -43,6 +42,13 @@ class MinecraftBot extends EventEmitter {
     // ============================================
     
     async connect() {
+        if (this.isConnecting) {
+            this.addLog(`⚠️ Уже выполняется подключение, пропускаю...`, 'debug');
+            return;
+        }
+        
+        this.isConnecting = true;
+        
         const options = {
             host: this.config.host,
             port: this.config.port,
@@ -61,15 +67,17 @@ class MinecraftBot extends EventEmitter {
         this.addLog(`🔌 Подключение к ${this.config.host}:${this.config.port} как ${this.config.username}`, 'info');
         
         return new Promise((resolve, reject) => {
-            this.bot = mineflayer.createBot(options);
-            
             const timeout = setTimeout(() => {
+                this.isConnecting = false;
                 reject(new Error('Таймаут подключения'));
             }, 30000);
+            
+            this.bot = mineflayer.createBot(options);
             
             this.bot.once('login', () => {
                 clearTimeout(timeout);
                 this.isConnected = true;
+                this.isConnecting = false;
                 this.reconnectAttempts = 0;
                 this.addLog(`✅ Подключен как ${this.bot.username}`, 'success');
                 resolve();
@@ -77,6 +85,7 @@ class MinecraftBot extends EventEmitter {
             
             this.bot.once('error', (err) => {
                 clearTimeout(timeout);
+                this.isConnecting = false;
                 reject(err);
             });
         });
@@ -87,17 +96,29 @@ class MinecraftBot extends EventEmitter {
     // ============================================
     
     async authorize() {
-        if (!this.bot) return;
+        if (!this.bot || !this.bot._client || !this.bot._client.socket) {
+            this.addLog(`⚠️ Бот не готов к отправке команд`, 'warn');
+            return;
+        }
         
         await utils.sleep(5000);
         
         if (this.config.loginCommand) {
-            this.bot.chat(this.config.loginCommand);
-            this.addLog(`📝 Отправлена команда: ${this.config.loginCommand}`, 'info');
+            try {
+                this.bot.chat(this.config.loginCommand);
+                this.addLog(`📝 Отправлена команда: ${this.config.loginCommand}`, 'info');
+            } catch (err) {
+                this.addLog(`❌ Ошибка отправки команды: ${err.message}`, 'error');
+            }
         }
         
         await utils.sleep(1000);
-        this.bot.chat(`/cc &6[Resistance Bot] &aБот запущен и готов к работе!`);
+        
+        try {
+            this.bot.chat(`/cc &6[Resistance Bot] &aБот запущен и готов к работе!`);
+        } catch (err) {
+            this.addLog(`❌ Ошибка отправки приветствия: ${err.message}`, 'error');
+        }
     }
     
     // ============================================
@@ -107,66 +128,58 @@ class MinecraftBot extends EventEmitter {
     setupEventHandlers() {
         if (!this.bot) return;
         
-        // ТОЛЬКО ПОСЛЕ ПОЛНОГО ПОЯВЛЕНИЯ В МИРЕ
-        // src/minecraft/index.js
-// В методе setupEventHandlers, внутри обработчика 'spawn':
-
-        // src/minecraft/index.js
-// В методе setupEventHandlers, внутри обработчика 'spawn':
-
-this.bot.once('spawn', async () => {
-    this.addLog('🎮 Бот появился в мире', 'success');
-    
-    // ========== ПРОВЕРКА И СНЯТИЕ МУТОВ ПОСЛЕ ЗАХОДА ==========
-    try {
-        const { getModerationSystem } = require('./moderation');
-        const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
+        this.bot.once('spawn', async () => {
+            this.addLog('🎮 Бот появился в мире', 'success');
+            
+            try {
+                const { getModerationSystem } = require('./moderation');
+                const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
+                
+                if (typeof moderation.checkAllPlayersPunishments === 'function') {
+                    await moderation.checkAllPlayersPunishments();
+                }
+                if (typeof moderation.checkActivePunishments === 'function') {
+                    await moderation.checkActivePunishments(this.bot.username);
+                }
+                if (typeof moderation.checkAllExpiredMutes === 'function') {
+                    await moderation.checkAllExpiredMutes();
+                }
+            } catch (err) {
+                this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
+            }
+            
+            await this.authorize();
+        });
         
-        // Проверяем всех игроков в клане
-        await moderation.checkAllPlayersPunishments();
-        
-        // Также проверяем самого бота (на случай если бот был в муте)
-        await moderation.checkActivePunishments(this.bot.username);
-        
-        // Дополнительная проверка истекших мутов
-        await moderation.checkAllExpiredMutes();
-        
-    } catch (err) {
-        this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
-    }
-    
-    await this.authorize();
-});
-        
-        // Обработка сообщений
         this.bot.on('message', async (json) => {
             const message = json.toString();
             const chatHandler = require('./chatHandler');
             await chatHandler.handleMessage(this.bot, message, this.db, this);
         });
         
-        // Обработка кика
         this.bot.on('kicked', async (reason) => {
             const reasonStr = reason.toString();
             this.addLog(`⚠️ Бот был кикнут: ${reasonStr}`, 'warn');
             this.isConnected = false;
             
-            if (reasonStr.includes('другого майнкрафта')) {
-                this.addLog('⚠️ Аккаунт уже используется! Жду 30 секунд...', 'warn');
-                await utils.sleep(30000);
+            // Закрываем текущее соединение принудительно
+            if (this.bot && this.bot._client) {
+                try {
+                    this.bot._client.end();
+                } catch (err) {}
             }
             
+            // Ждём 5 секунд перед переподключением
+            await utils.sleep(5000);
             await this.handleDisconnect();
         });
         
-        // Обработка разрыва соединения
         this.bot.on('end', async (reason) => {
             this.addLog(`🔌 Соединение разорвано: ${reason || 'неизвестно'}`, 'warn');
             this.isConnected = false;
             await this.handleDisconnect();
         });
         
-        // Обработка ошибок (кроме критических)
         this.bot.on('error', (err) => {
             if (err.message?.includes('ECONNRESET')) {
                 this.addLog(`⚠️ Сетевая ошибка: ${err.message}`, 'warn');
@@ -196,7 +209,9 @@ this.bot.once('spawn', async () => {
         
         try {
             if (this.bot) {
-                this.bot.end();
+                try {
+                    this.bot.end();
+                } catch (err) {}
                 this.bot = null;
             }
             await this.connect();
@@ -213,31 +228,23 @@ this.bot.once('spawn', async () => {
     
     async executeCommand(sender, command, args) {
         try {
-            const commands = require('./commands');
+            const { getModerationSystem } = require('./moderation');
+            const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
             
-            // Получаем команду из commandMap
+            const isMuted = await moderation.isClanMuted(sender);
+            if (isMuted) {
+                this.bot.chat(`/msg ${sender} &c🔇 Вы в клановом муте и не можете использовать команды.`);
+                return;
+            }
+            
+            const commands = require('./commands');
             const cmd = commands.commandMap?.get(command.toLowerCase());
-                    // ========== ПРОВЕРКА НА МУТ ==========
-                    try {
-                        const { getModerationSystem } = require('./moderation');
-                        const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
-                        const isMuted = await moderation.isMuted(sender);
-                        
-                        if (isMuted) {
-                            this.bot.chat(`/msg ${sender} &c🔇 Вы в муте и не можете использовать команды.`);
-                            return;
-                        }
-                    } catch (err) {
-                        this.addLog(`⚠️ Ошибка проверки мута: ${err.message}`, 'debug');
-                    }
-                
-    
+            
             if (!cmd || typeof cmd.handler !== 'function') {
                 this.bot.chat(`/msg ${sender} &cНеизвестная команда. Используйте /help`);
                 return;
             }
             
-            // Проверка прав
             if (cmd.requiredRank > 0) {
                 let staffRank = { rank_level: 0 };
                 try {
@@ -254,7 +261,9 @@ this.bot.once('spawn', async () => {
             
         } catch (err) {
             this.addLog(`❌ Ошибка команды ${command}: ${err.message}`, 'error');
-            this.bot.chat(`/msg ${sender} &cОшибка: ${err.message}`);
+            if (this.bot && this.bot.chat) {
+                this.bot.chat(`/msg ${sender} &cОшибка: ${err.message}`);
+            }
         }
     }
     
@@ -265,8 +274,10 @@ this.bot.once('spawn', async () => {
     async stop() {
         this.addLog('🛑 Остановка Minecraft бота...', 'info');
         if (this.bot) {
-            this.bot.quit();
-            this.bot.end();
+            try {
+                this.bot.quit();
+                this.bot.end();
+            } catch (err) {}
             this.bot = null;
         }
         this.isConnected = false;

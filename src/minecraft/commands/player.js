@@ -273,61 +273,50 @@ async function help(bot, sender, args, db, addLog) {
 // ============================================
 // /rp - Регистрация в RolePlay
 // /rp - Регистрация в RolePlay
+// /rp - Регистрация в RolePlay
+const rpCooldowns = new Map();
+
 async function rp(bot, sender, args, db, addLog) {
-    // Проверяем, не зарегистрирован ли уже
-    const existing = await db.getRPProfile(sender);
-    
-    // Если игрок уже в RP (не Гражданин) — запрещаем повторную регистрацию
-    if (existing && existing.structure !== 'Гражданин') {
-        await sendDelayedMessage(bot, sender, `&c❌ Вы уже зарегистрированы в RolePlay!`);
-        await utils.sleep(400);
-        await sendDelayedMessage(bot, sender, `&7Ваша структура: &e${existing.structure}`);
-        await utils.sleep(400);
-        await sendDelayedMessage(bot, sender, `&7Ваша должность: &e${existing.job_rank}`);
+    // Проверка кулдауна (5 минут)
+    const lastRpTime = rpCooldowns.get(sender) || 0;
+    if (Date.now() - lastRpTime < 300000) {
+        const remaining = Math.ceil((300000 - (Date.now() - lastRpTime)) / 1000);
+        bot.chat(`/msg ${sender} &c⏱️ Вы можете использовать /rp только раз в 5 минут. Подождите ${remaining} секунд.`);
         return;
     }
     
-    // Если игрок уже начал регистрацию (есть ожидающий код)
-    if (global.pendingRegistrations && global.pendingRegistrations.has(sender)) {
-        const pending = global.pendingRegistrations.get(sender);
-        if (Date.now() < pending.expires) {
-            await sendDelayedMessage(bot, sender, `&e⏳ У вас уже есть активный код регистрации!`);
-            await utils.sleep(400);
-            await sendDelayedMessage(bot, sender, `&7Ваш код: &e${pending.code}`);
-            await utils.sleep(400);
-            await sendDelayedMessage(bot, sender, `&7Отправьте его мне в ЛС для завершения регистрации.`);
-            return;
-        } else {
-            // Код истёк, удаляем
-            global.pendingRegistrations.delete(sender);
-        }
+    // Проверяем, не зарегистрирован ли уже
+    const existing = await db.getRPProfile(sender);
+    if (existing && existing.structure !== 'Гражданин') {
+        bot.chat(`/msg ${sender} &c❌ Вы уже зарегистрированы в RolePlay!`);
+        return;
     }
     
     // Проверяем, состоит ли в клане
     const clanMember = await db.getClanMember(sender);
     if (!clanMember) {
-        await sendDelayedMessage(bot, sender, `&c❌ Сначала вступите в клан Resistance!`);
-        await utils.sleep(400);
-        await sendDelayedMessage(bot, sender, `&7Подайте заявку в клан через меню или команду /c join`);
+        bot.chat(`/msg ${sender} &c❌ Сначала вступите в клан Resistance!`);
         return;
     }
     
-    // Генерируем код проверки
-    const code = utils.generateCode(6);
+    // Генерируем код (6 цифр)
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Сохраняем код в временное хранилище
+    // Сохраняем код
     if (!global.pendingRegistrations) global.pendingRegistrations = new Map();
     global.pendingRegistrations.set(sender, {
         code,
         expires: Date.now() + 5 * 60 * 1000
     });
     
-    // Отправляем сообщения с задержкой
-    await sendDelayedMessage(bot, sender, `&6📝 РЕГИСТРАЦИЯ В ROLEPLAY`);
-    await utils.sleep(500);
-    await sendDelayedMessage(bot, sender, `&7Для регистрации отправьте мне в ЛС код: &e${code}`);
-    await utils.sleep(500);
-    await sendDelayedMessage(bot, sender, `&7Код действителен 5 минут.`);
+    rpCooldowns.set(sender, Date.now());
+    
+    // Отправляем КРАСИВОЕ сообщение
+    bot.chat(`/msg ${sender} &6&l╔════════════════════════════════════════════════════╗`);
+    bot.chat(`/msg ${sender} &6&l║ &e&l📝 РЕГИСТРАЦИЯ В ROLEPLAY &6&l║`);
+    bot.chat(`/msg ${sender} &6&l╠════════════════════════════════════════════════════╣`);
+    bot.chat(`/msg ${sender} &6&l║ &7Для регистрации отправьте код в ЛС боту: &e&l${code} &7(5 минут) ║`);
+    bot.chat(`/msg ${sender} &6&l╚════════════════════════════════════════════════════╝`);
     
     if (addLog) addLog(`📝 Генерация кода RP для ${sender}: ${code}`, 'debug');
 }

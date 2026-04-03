@@ -278,39 +278,35 @@ class ModerationSystem {
     // ============================================
     
     async applyClanMute(nick, minutes, reasonType) {
-        const stats = this.getStats(nick);
-        const now = Date.now();
-        const muteUntil = now + minutes * 60 * 1000;
-        const cleanNick = this.cleanNickname(nick).toLowerCase();
-        const reason = MUTE_REASONS[reasonType] || reasonType;
-        
-        if (!cleanNick || cleanNick.length < 2) {
-            this.addLog(`❌ Невозможно выдать мут: ник "${cleanNick}" невалидный`, 'error');
-            return;
-        }
-        if (await this.isImmune(nick)) {
-            this.addLog(`⚠️ Попытка выдать мут неприкосновенному игроку ${nick}`, 'warn');
-            return;
-        }
-        
-        stats.clanMutedUntil = muteUntil;
-        stats.clanWarnings = 0;
-        
-        await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', minutes, 'clan');
-        
-        await utils.sleep(500);
-        this.bot.chat(`${process.env.MC_MUTE_COMMAND || '/c mute'} ${cleanNick} ${reason} (${minutes} минут by system)`);
-        this.addLog(`📤 Отправлена команда мута: ${process.env.MC_MUTE_COMMAND || '/c mute'} ${cleanNick}`, 'info');
-        
-        this.bot.chat(`/msg ${nick} &c🔇 Вы получили клановый мут на ${minutes} минут. Причина: ${reason}`);
-        this.bot.chat(`/cc ${this.config.messages.mute.replace('{player}', nick).replace('{minutes}', minutes).replace('{reason}', reason)}`);
-        
-        if (pendingUnmutes.has(`clan_${cleanNick}`)) clearTimeout(pendingUnmutes.get(`clan_${cleanNick}`));
-        const timeoutId = setTimeout(() => this.removeClanMute(nick), minutes * 60 * 1000);
-        pendingUnmutes.set(`clan_${cleanNick}`, timeoutId);
-        
-        this.addLog(`🔇 Клановый мут ${cleanNick} на ${minutes} мин: ${reason}`, 'warn');
-    }
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    const muteUntil = now + minutes * 60 * 1000;
+    const cleanNick = this.cleanNickname(nick).toLowerCase();
+    const reason = MUTE_REASONS[reasonType] || reasonType;
+    
+    if (!cleanNick || cleanNick.length < 2 || await this.isImmune(nick)) return;
+    
+    stats.clanMutedUntil = muteUntil;
+    stats.clanWarnings = 0;
+    
+    // ВАЖНО: передаём minutes, чтобы expires_at установился правильно
+    await this.db.addPunishment?.(cleanNick, 'mute', reason, 'system', minutes, 'clan');
+    
+    await utils.sleep(500);
+    this.bot.chat(`${process.env.MC_MUTE_COMMAND || '/c mute'} ${cleanNick} ${reason} (${minutes} минут)`);
+    
+    // Уведомление в ЛС (только один раз)
+    this.bot.chat(`/msg ${nick} &c🔇 Вы получили клановый мут на ${minutes} минут. Причина: ${reason}`);
+    
+    // Уведомление в клановый чат
+    this.bot.chat(`/cc &c🔇 [Модерация] &e${nick} &cполучил мут на ${minutes} минут. Причина: ${reason}`);
+    
+    if (pendingUnmutes.has(`clan_${cleanNick}`)) clearTimeout(pendingUnmutes.get(`clan_${cleanNick}`));
+    const timeoutId = setTimeout(() => this.removeClanMute(nick), minutes * 60 * 1000);
+    pendingUnmutes.set(`clan_${cleanNick}`, timeoutId);
+    
+    this.addLog(`🔇 Клановый мут ${cleanNick} на ${minutes} мин: ${reason}`, 'warn');
+}
     
     async removeClanMute(nick) {
         const stats = this.getStats(nick);
@@ -446,25 +442,21 @@ class ModerationSystem {
     }
     
     async handleClanViolation(nick, violation, stats) {
-        const warnThreshold = this.config.clanChat.warnCount;
-        stats.clanWarnings++;
-        
-        const warnMessage = this.config.messages.warning
-            .replace('{player}', nick)
-            .replace('{reason}', violation.reason)
-            .replace('{current}', stats.clanWarnings)
-            .replace('{max}', warnThreshold);
-        this.bot.chat(`/cc ${warnMessage}`);
-        
-        this.addLog(`⚠️ [CLAN] ${nick}: ${violation.reason} (${stats.clanWarnings}/${warnThreshold})`, 'debug');
-        
-        if (stats.clanWarnings >= warnThreshold) {
-            await this.applyClanMute(nick, this.config.clanChat.muteMinutes, violation.type);
-            return { allowed: false, reason: 'Клановый мут', isMuted: true };
-        }
-        
-        return { allowed: true, warned: true };
+    const warnThreshold = this.config.clanChat.warnCount;
+    stats.clanWarnings++;
+    
+    // Предупреждение ТОЛЬКО в клановый чат (не в ЛС)
+    this.bot.chat(`/cc &e⚠️ [Модерация] &c${nick} &7, ${violation.reason} &eПредупреждение ${stats.clanWarnings}/${warnThreshold}`);
+    
+    this.addLog(`⚠️ [CLAN] ${nick}: ${violation.reason} (${stats.clanWarnings}/${warnThreshold})`, 'debug');
+    
+    if (stats.clanWarnings >= warnThreshold) {
+        await this.applyClanMute(nick, this.config.clanChat.muteMinutes, violation.type);
+        return { allowed: false, reason: 'Клановый мут', isMuted: true };
     }
+    
+    return { allowed: true, warned: true };
+}
     
     // ============================================
     // ПРОВЕРКА ЛС КОМАНД
@@ -629,7 +621,20 @@ async checkAllExpiredMutes() {
         }
     }
     
-    if (clanUnmuted > 0) this.addLog(`🔊 Снято ${clanUnmuted} клановых мутов`, 'info');
+    // Также проверяем БД на случай, если игрок не в stats
+    try {
+        const expiredMutes = await this.db.all?.(
+            `SELECT * FROM punishments WHERE type = 'mute' AND active = 1 AND expires_at <= CURRENT_TIMESTAMP`
+        );
+        if (expiredMutes && expiredMutes.length > 0) {
+            for (const mute of expiredMutes) {
+                await this.removeMuteFromDB(mute.player);
+                clanUnmuted++;
+            }
+        }
+    } catch (err) {}
+    
+    if (clanUnmuted > 0) this.addLog(`🔊 Снято ${clanUnmuted} истекших мутов`, 'info');
     if (privateUnmuted > 0) this.addLog(`🔊 Снято ${privateUnmuted} блокировок ЛС`, 'info');
 }
     // ============================================
