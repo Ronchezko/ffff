@@ -3,24 +3,25 @@
 
 const utils = require('../../shared/utils');
 
-// Флаг остановки всех процессов
-let isStopped = false;
+function sendMessage(bot, target, message) {
+    bot.chat(`/msg ${target} ${message}`);
+}
 
 // ============================================
 // /admin [add/del] [ник] [роль] - Управление администраторами
 // ============================================
+
 async function admin(bot, sender, args, db, addLog) {
-    // Проверка, что отправитель - администратор
     const staffRank = await db.getStaffRank(sender);
     if (staffRank.rank_level < 6) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для использования этой команды!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для использования этой команды`);
         return;
     }
     
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /admin add [ник] [роль]`);
-        bot.chat(`/msg ${sender} &cИспользование: /admin del [ник]`);
-        bot.chat(`/msg ${sender} &7Роли: 1-Мл.мод, 2-Мод, 3-Ст.мод, 4-Гл.мод, 5-Куратор, 6-Админ`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/admin add [ник] [роль]`);
+        sendMessage(bot, sender, `&7&l|&f Использование: &e/admin del [ник]`);
+        sendMessage(bot, sender, `&7&l|&f Роли: &e1-Мл.мод, 2-Мод, 3-Ст.мод, 4-Гл.мод, 5-Куратор, 6-Админ`);
         return;
     }
     
@@ -28,36 +29,7 @@ async function admin(bot, sender, args, db, addLog) {
     const target = args[1];
     const role = parseInt(args[2]);
     
-    if (action === 'add') {
-        if (isNaN(role) || role < 1 || role > 6) {
-            bot.chat(`/msg ${sender} &cНеверная роль! Доступно: 1-6`);
-            return;
-        }
-        
-        // Добавляем в персонал
-        await db.updateStaffRank(target, role, permissions.STAFF_LEVELS[role], sender);
-        
-        // Обновляем ранг в клане
-        const rankName = getClanRankByStaffLevel(role);
-        await db.updateClanMemberRank(target, rankName, role * 10);
-        
-        bot.chat(`/cc &a👑 ${sender} назначил ${target} на должность ${permissions.STAFF_LEVELS[role]}`);
-        bot.chat(`/msg ${target} &a🎉 Поздравляем! Вы назначены на должность ${permissions.STAFF_LEVELS[role]}`);
-        
-        if (addLog) addLog(`👑 ${sender} назначил ${target} на ${permissions.STAFF_LEVELS[role]}`, 'success');
-        
-    } else if (action === 'del') {
-        await db.updateStaffRank(target, 0, null, sender);
-        
-        bot.chat(`/cc &c👑 ${sender} снял с должности ${target}`);
-        bot.chat(`/msg ${target} &cВы были сняты с должности ${sender}`);
-        
-        if (addLog) addLog(`👑 ${sender} снял ${target} с должности`, 'warn');
-    }
-}
-
-function getClanRankByStaffLevel(level) {
-    const ranks = {
+    const roleNames = {
         1: 'Мл.Модератор',
         2: 'Модератор',
         3: 'Ст.Модератор',
@@ -65,16 +37,44 @@ function getClanRankByStaffLevel(level) {
         5: 'Куратор',
         6: 'Администратор'
     };
-    return ranks[level] || 'Участник';
+    
+    if (action === 'add') {
+        if (isNaN(role) || role < 1 || role > 6) {
+            sendMessage(bot, sender, `&4&l|&c Неверная роль! Доступно: &e1-6`);
+            return;
+        }
+        
+        await db.run(`INSERT OR REPLACE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by) VALUES (?, ?, ?, ?)`, 
+            [target, role, roleNames[role], sender]);
+        
+        const clanRankName = roleNames[role];
+        await db.run(`UPDATE clan_members SET rank_name = ?, rank_priority = ? WHERE minecraft_nick = ?`, 
+            [clanRankName, role * 10, target]);
+        
+        bot.chat(`/cc &a👑 ${sender} назначил ${target} на должность ${roleNames[role]}`);
+        sendMessage(bot, target, `&a&l|&f Поздравляем! Вы назначены на должность ${roleNames[role]}`);
+        if (addLog) addLog(`👑 ${sender} назначил ${target} на ${roleNames[role]}`, 'success');
+        
+    } else if (action === 'del') {
+        await db.run(`UPDATE staff_stats SET rank_level = 0, rank_name = NULL WHERE minecraft_nick = ?`, [target]);
+        await db.run(`UPDATE clan_members SET rank_name = 'Участник', rank_priority = 10 WHERE minecraft_nick = ?`, [target]);
+        
+        bot.chat(`/cc &c👑 ${sender} снял с должности ${target}`);
+        sendMessage(bot, target, `&c&l|&f Вы были сняты с должности ${sender}`);
+        if (addLog) addLog(`👑 ${sender} снял ${target} с должности`, 'warn');
+    }
 }
 
 // ============================================
 // /stopall - Остановка всех RP процессов
 // ============================================
+
+let isStopped = false;
+
 async function stopall(bot, sender, args, db, addLog) {
     const staffRank = await db.getStaffRank(sender);
     if (staffRank.rank_level < 6) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для использования этой команды!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для использования этой команды`);
         return;
     }
     
@@ -92,60 +92,63 @@ async function stopall(bot, sender, args, db, addLog) {
     }
 }
 
+function isSystemStopped() {
+    return isStopped;
+}
+
 // ============================================
 // /reloadbd - Очистка БД (вайп)
 // ============================================
+
 async function reloadbd(bot, sender, args, db, addLog) {
     const staffRank = await db.getStaffRank(sender);
     if (staffRank.rank_level < 6) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для использования этой команды!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для использования этой команды`);
         return;
     }
     
     bot.chat(`/cc &c⚠️⚠️⚠️ ${sender} ЗАПУСКАЕТ ОЧИСТКУ БАЗЫ ДАННЫХ ⚠️⚠️⚠️`);
     
-    // Сохраняем дату вайпа
     await db.setSetting('last_wipe_date', new Date().toISOString(), sender);
     
-    // Очищаем таблицы (сохраняем структуру)
-    await db.run('DELETE FROM clan_members WHERE rank_priority < 100'); // Сохраняем админов
-    await db.run('DELETE FROM rp_players WHERE structure = "Гражданин"');
-    await db.run('DELETE FROM property WHERE is_available = 0');
-    await db.run('DELETE FROM punishments WHERE issued_at < datetime("now", "-30 days")');
-    await db.run('DELETE FROM clan_chat_logs WHERE sent_at < datetime("now", "-7 days")');
-    await db.run('DELETE FROM money_logs WHERE created_at < datetime("now", "-30 days")');
+    // Очищаем таблицы (сохраняем админов)
+    await db.run(`DELETE FROM clan_members WHERE rank_priority < 100`);
+    await db.run(`DELETE FROM rp_players WHERE structure = 'Гражданин'`);
+    await db.run(`DELETE FROM property WHERE is_available = 0`);
+    await db.run(`DELETE FROM punishments WHERE issued_at < datetime('now', '-30 days')`);
+    await db.run(`DELETE FROM clan_chat_logs WHERE sent_at < datetime('now', '-7 days')`);
+    await db.run(`DELETE FROM money_logs WHERE created_at < datetime('now', '-30 days')`);
     
     // Обновляем имущество (делаем свободным)
-    await db.run('UPDATE property SET is_available = 1, owner_nick = NULL, co_owner1 = NULL, co_owner2 = NULL');
+    await db.run(`UPDATE property SET is_available = 1, owner_nick = NULL, co_owner1 = NULL, co_owner2 = NULL`);
     
     // Сбрасываем счётчики персонала
-    await db.run('UPDATE staff_stats SET kicks_today = 0, mutes_today = 0, bl_today = 0, last_reset_date = date("now")');
+    await db.run(`UPDATE staff_stats SET kicks_today = 0, mutes_today = 0, bl_today = 0, last_reset_date = date('now')`);
     
     bot.chat(`/cc &a✅ Очистка базы данных завершена!`);
     bot.chat(`/cc &a📅 Дата вайпа: ${new Date().toLocaleString()}`);
-    
     if (addLog) addLog(`🗑️ ${sender} выполнил очистку БД (вайп)`, 'error');
 }
 
 // ============================================
 // /wipe - Полный вайп (только для консоли)
 // ============================================
+
 async function wipe(bot, sender, args, db, addLog) {
     const staffRank = await db.getStaffRank(sender);
     if (staffRank.rank_level < 6) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для использования этой команды!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для использования этой команды`);
         return;
     }
     
     if (args[0] !== 'CONFIRM') {
-        bot.chat(`/msg ${sender} &c⚠️ ОПАСНАЯ КОМАНДА! Это удалит ВСЕ данные!`);
-        bot.chat(`/msg ${sender} &cДля подтверждения введите: /wipe CONFIRM`);
+        sendMessage(bot, sender, `&4&l|&c ⚠️ ОПАСНАЯ КОМАНДА! Это удалит ВСЕ данные!`);
+        sendMessage(bot, sender, `&7&l|&c Для подтверждения введите: &e/wipe CONFIRM`);
         return;
     }
     
     bot.chat(`/cc &c💀💀💀 ${sender} ЗАПУСКАЕТ ПОЛНЫЙ ВАЙП СЕРВЕРА 💀💀💀`);
     
-    // Полный сброс всех таблиц
     const tables = [
         'clan_members', 'rp_players', 'property', 'property_residents',
         'businesses', 'offices', 'licenses', 'org_members',
@@ -163,21 +166,30 @@ async function wipe(bot, sender, args, db, addLog) {
     
     // Восстанавливаем администратора
     await db.addClanMember('Ronch_', 'system');
-    await db.updateStaffRank('Ronch_', 6, 'Администратор', 'system');
-    await db.updateClanMemberRank('Ronch_', 'Администратор', 100);
+    await db.run(`INSERT OR REPLACE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by) VALUES (?, 6, 'Администратор', 'system')`, ['Ronch_']);
+    await db.run(`UPDATE clan_members SET rank_name = 'Администратор', rank_priority = 100 WHERE minecraft_nick = 'Ronch_'`);
     
     bot.chat(`/cc &a✅ ПОЛНЫЙ ВАЙП ЗАВЕРШЁН! Сервер очищен.`);
-    
     if (addLog) addLog(`💀 ${sender} выполнил полный вайп сервера!`, 'error');
+}
+
+// ============================================
+// /admin a - Алиас для /admin
+// ============================================
+
+async function a(bot, sender, args, db, addLog) {
+    await admin(bot, sender, args, db, addLog);
 }
 
 // ============================================
 // ЭКСПОРТ
 // ============================================
+
 module.exports = {
     admin,
+    a,
     stopall,
     reloadbd,
     wipe,
-    isStopped: () => isStopped
+    isSystemStopped
 };

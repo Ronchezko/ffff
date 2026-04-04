@@ -44,12 +44,12 @@ async function checkAllRegions(bot, db, addLog) {
             
             // Для квартир и домов проверяем сожителей
             if (property.type === 'apartment' || property.type === 'house') {
-                const residents = await db.getPropertyResidents(property.id);
+                const residents = await db.all(`SELECT resident_nick FROM property_residents WHERE property_id = ? AND is_active = 1`, [property.id]);
                 
                 for (const resident of residents) {
-                    if (!regionInfo.members.includes(resident) && resident !== property.owner_nick) {
-                        addLog(`⚠️ Сожитель ${resident} не найден в регионе ${regionName}`, 'warn');
-                        bot.chat(`/rg addmember ${regionName} ${resident}`);
+                    if (!regionInfo.members.includes(resident.resident_nick) && resident.resident_nick !== property.owner_nick) {
+                        addLog(`⚠️ Сожитель ${resident.resident_nick} не найден в регионе ${regionName}`, 'warn');
+                        bot.chat(`/rg addmember ${regionName} ${resident.resident_nick}`);
                         await utils.sleep(500);
                         issuesFound++;
                     }
@@ -86,7 +86,6 @@ async function checkRegion(bot, regionName) {
             const msg = message.toString();
             
             // Парсим информацию о регионе
-            // Формат: "Участники: ник1, ник2, ник3"
             const membersMatch = msg.match(/Участники:\s*(.+)/i);
             
             if (membersMatch) {
@@ -142,7 +141,7 @@ async function restoreRegionOwner(bot, propertyId, owner, db, addLog) {
 async function checkPropertyTaxes(bot, db, addLog) {
     try {
         const properties = await db.all('SELECT id, owner_nick, price, tax_accumulated, last_tax_pay FROM property WHERE is_available = 0');
-        const taxRate = await db.getSetting('property_tax_rate') || 0.01;
+        const taxRate = parseFloat(await db.getSetting('property_tax_rate') || 0.01);
         const now = new Date();
         
         for (const property of properties) {
@@ -159,11 +158,11 @@ async function checkPropertyTaxes(bot, db, addLog) {
                 
                 // Если долг превышает 50% стоимости имущества, отправляем уведомление
                 if (newDebt > property.price * 0.5) {
-                    bot.chat(`/msg ${property.owner_nick} &c⚠️ ВНИМАНИЕ! Ваш долг по налогу за имущество #${property.id} составляет ${utils.formatMoney(newDebt)}!`);
+                    bot.chat(`/msg ${property.owner_nick} &c⚠️ ВНИМАНИЕ! Ваш долг по налогу за имущество #${property.id} составляет ${newDebt.toLocaleString()}₽!`);
                     bot.chat(`/msg ${property.owner_nick} &cОплатите налог командой &e/imnalog dep ${property.id} [сумма]`);
                 }
                 
-                if (addLog) addLog(`💰 Начислен налог ${utils.formatMoney(taxOwed)} на имущество #${property.id} (долг: ${utils.formatMoney(newDebt)})`, 'info');
+                if (addLog) addLog(`💰 Начислен налог ${taxOwed.toLocaleString()}₽ на имущество #${property.id} (долг: ${newDebt.toLocaleString()}₽)`, 'info');
             }
         }
         
@@ -215,24 +214,44 @@ async function checkLicenses(bot, db, addLog) {
 // ЗАПУСК ПЕРИОДИЧЕСКИХ ПРОВЕРОК
 // ============================================
 
+let regionInterval = null;
+let taxInterval = null;
+let licenseInterval = null;
+
 function startPeriodicChecks(bot, db, addLog) {
     // Проверка регионов каждые 10 минут
-    setInterval(() => {
+    if (regionInterval) clearInterval(regionInterval);
+    regionInterval = setInterval(() => {
         checkAllRegions(bot, db, addLog);
     }, 10 * 60 * 1000);
     
     // Проверка налогов каждые 30 минут
-    setInterval(() => {
+    if (taxInterval) clearInterval(taxInterval);
+    taxInterval = setInterval(() => {
         checkPropertyTaxes(bot, db, addLog);
     }, 30 * 60 * 1000);
     
     // Проверка лицензий каждый час
-    setInterval(() => {
+    if (licenseInterval) clearInterval(licenseInterval);
+    licenseInterval = setInterval(() => {
         checkLicenses(bot, db, addLog);
     }, 60 * 60 * 1000);
     
     addLog('🏠 Система периодических проверок запущена', 'success');
 }
+
+function stopPeriodicChecks() {
+    if (regionInterval) clearInterval(regionInterval);
+    if (taxInterval) clearInterval(taxInterval);
+    if (licenseInterval) clearInterval(licenseInterval);
+    regionInterval = null;
+    taxInterval = null;
+    licenseInterval = null;
+}
+
+// ============================================
+// ЭКСПОРТ
+// ============================================
 
 module.exports = {
     checkAllRegions,
@@ -240,5 +259,6 @@ module.exports = {
     restoreRegionOwner,
     checkPropertyTaxes,
     checkLicenses,
-    startPeriodicChecks
+    startPeriodicChecks,
+    stopPeriodicChecks
 };

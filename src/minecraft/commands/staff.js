@@ -1,50 +1,18 @@
 // src/minecraft/commands/staff.js
-// Команды для модераторов и администрации клана
+// Команды для персонала (ПОЛНАЯ ВЕРСИЯ)
 
-const utils = require('../../shared/utils');
-const permissions = require('../../shared/permissions');
-
-// ============================================
-// /mute [ник] [время] [причина] - Мут игрока в клановом чате
-// ============================================
-// /automod [on/off/config] - Управление авто-модерацией
-async function automod(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank?.(sender) || { rank_level: 0 };
-    if (staffRank.rank_level < 4) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для управления авто-модерацией!`);
-        return;
-    }
-    
-    const moderation = await getModerationSystem(bot, db, addLog);
-    
-    if (args.length === 0) {
-        const status = moderation.config.enabled ? '&aВКЛЮЧЕНА' : '&cВЫКЛЮЧЕНА';
-        bot.chat(`/msg ${sender} &6🤖 Авто-модерация: ${status}`);
-        return;
-    }
-    
-    if (args[0].toLowerCase() === 'on') {
-        moderation.config.enabled = true;
-        await moderation.saveConfig();
-        bot.chat(`/cc &a✅ Авто-модерация ВКЛЮЧЕНА ${sender}`);
-        addLog(`✅ ${sender} включил авто-модерацию`, 'info');
-    } 
-    else if (args[0].toLowerCase() === 'off') {
-        moderation.config.enabled = false;
-        await moderation.saveConfig();
-        bot.chat(`/cc &c❌ Авто-модерация ВЫКЛЮЧЕНА ${sender}`);
-        addLog(`❌ ${sender} выключил авто-модерацию`, 'warn');
-    }
-    else if (args[0].toLowerCase() === 'reset') {
-        moderation.reset();
-        bot.chat(`/msg ${sender} &a✅ Данные авто-модерации сброшены`);
-    }
+function sendMessage(bot, target, message) {
+    bot.chat(`/msg ${target} ${message}`);
 }
+
+// ============================================
+// /mute [ник] [время] [причина] - Мут игрока
+// ============================================
 
 async function mute(bot, sender, args, db, addLog) {
     if (args.length < 3) {
-        bot.chat(`/msg ${sender} &cИспользование: /mute [ник] [время] [причина]`);
-        bot.chat(`/msg ${sender} &7Время: 10m, 1h, 1d`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/mute [ник] [время] [причина]`);
+        sendMessage(bot, sender, `&7&l|&f Время: &e10m, 1h, 1d`);
         return;
     }
     
@@ -52,94 +20,86 @@ async function mute(bot, sender, args, db, addLog) {
     const timeStr = args[1];
     const reason = args.slice(2).join(' ');
     
-    // Проверка прав (нельзя замутить вышестоящего)
-    const canMod = await permissions.canModerate(sender, target);
-    if (!canMod) {
-        bot.chat(`/msg ${sender} &cВы не можете замутить этого игрока!`);
-        return;
-    }
-    
-    // Проверка лимитов персонала
-    const limitCheck = await db.checkStaffLimit(sender, 'mute');
-    if (!limitCheck.allowed) {
-        bot.chat(`/msg ${sender} &cВы исчерпали лимит мутов на сегодня (${limitCheck.current}/${limitCheck.max})!`);
-        return;
-    }
-    
     // Парсим время
-    const durationMs = utils.parseTimeString(timeStr);
-    if (!durationMs) {
-        bot.chat(`/msg ${sender} &cНеверный формат времени! Используйте: 10m, 1h, 1d`);
+    let minutes = 0;
+    if (timeStr.endsWith('m')) minutes = parseInt(timeStr);
+    else if (timeStr.endsWith('h')) minutes = parseInt(timeStr) * 60;
+    else if (timeStr.endsWith('d')) minutes = parseInt(timeStr) * 1440;
+    else minutes = parseInt(timeStr);
+    
+    if (isNaN(minutes) || minutes <= 0) {
+        sendMessage(bot, sender, `&4&l|&c Неверный формат времени! Используйте: &e10m, 1h, 1d`);
         return;
     }
     
-    const durationMinutes = Math.floor(durationMs / 60000);
+    // Проверяем лимиты персонала
+    const limits = await db.checkStaffLimit?.(sender, 'mute');
+    if (limits && !limits.allowed) {
+        sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит мутов на сегодня (${limits.current}/${limits.max})`);
+        return;
+    }
     
-    // Выдаём мут
-    await db.addPunishment(target, 'mute', reason, sender, durationMinutes);
-    await db.incrementStaffCounter(sender, 'mute');
-    
-    // Отправляем команду на сервер
+    await db.addPunishment(target, 'mute', reason, sender, minutes, 'clan');
+    if (limits) await db.incrementStaffCounter?.(sender, 'mute');
     bot.chat(`/c mute ${target} ${reason}`);
     
-    bot.chat(`/msg ${sender} &a✅ Игрок ${target} замучен на ${timeStr} Причина: ${reason}`);
-    bot.chat(`/cc &c🔇 &e${target} &cполучил мут на ${timeStr} от ${sender} Причина: ${reason}`);
+    sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aзамучен на &e${timeStr}`);
+    bot.chat(`/cc &c🔇 &e${target} &cполучил мут от &e${sender} &cна &e${timeStr}`);
     
-    if (addLog) addLog(`🔇 ${sender} замутил ${target} на ${timeStr} (${reason})`, 'warn');
+    // Авто-снятие мута
+    setTimeout(async () => {
+        await db.removePunishment(target, 'mute', 'system', 'Автоматическое снятие');
+        bot.chat(`/c unmute ${target}`);
+        bot.chat(`/cc &a🔊 &e${target} &aразмучен автоматически`);
+    }, minutes * 60 * 1000);
+    
+    if (addLog) addLog(`🔇 ${sender} замутил ${target} на ${timeStr}`, 'warn');
 }
 
 // ============================================
 // /kick [ник] [причина] - Кик из клана
 // ============================================
+
 async function kick(bot, sender, args, db, addLog) {
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /kick [ник] [причина]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/kick [ник] [причина]`);
         return;
     }
     
     const target = args[0];
     const reason = args.slice(1).join(' ');
     
-    // Проверка прав
-    const canMod = await permissions.canModerate(sender, target);
-    if (!canMod) {
-        bot.chat(`/msg ${sender} &cВы не можете кикнуть этого игрока!`);
-        return;
-    }
-    
-    // Проверка лимитов
-    const limitCheck = await db.checkStaffLimit(sender, 'kick');
-    if (!limitCheck.allowed) {
-        bot.chat(`/msg ${sender} &cВы исчерпали лимит киков на сегодня (${limitCheck.current}/${limitCheck.max})!`);
-        return;
-    }
-    
-    // Проверяем, состоит ли в клане
     const member = await db.getClanMember(target);
     if (!member) {
-        bot.chat(`/msg ${sender} &cИгрок ${target} не состоит в клане!`);
+        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в клане`);
         return;
     }
     
-    // Выполняем кик
-    await db.addPunishment(target, 'kick', reason, sender, null);
-    await db.incrementStaffCounter(sender, 'kick');
+    // Проверяем лимиты
+    const limits = await db.checkStaffLimit?.(sender, 'kick');
+    if (limits && !limits.allowed) {
+        sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит киков на сегодня (${limits.current}/${limits.max})`);
+        return;
+    }
+    
     await db.removeClanMember(target);
-    
+    if (limits) await db.incrementStaffCounter?.(sender, 'kick');
     bot.chat(`/c kick ${target}`);
-    bot.chat(`/msg ${target} &cВы были кикнуты из клана ${sender} Причина: ${reason}`);
-    bot.chat(`/cc &c👢 &e${target} &cбыл кикнут из клана ${sender} Причина: ${reason}`);
     
-    if (addLog) addLog(`👢 ${sender} кикнул ${target} (${reason})`, 'warn');
+    sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aкикнут из клана`);
+    bot.chat(`/cc &c👢 &e${target} &cкикнут из клана &e${sender}`);
+    
+    if (addLog) addLog(`👢 ${sender} кикнул ${target}`, 'warn');
 }
 
 // ============================================
-// /blacklist add/del [ник] [время] [причина] - Чёрный список клана
+// /blacklist add/del [ник] [время] [причина]
 // ============================================
+
 async function blacklist(bot, sender, args, db, addLog) {
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /blacklist add [ник] [время] [причина]`);
-        bot.chat(`/msg ${sender} &cИспользование: /blacklist del [ник]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/blacklist add [ник] [время] [причина]`);
+        sendMessage(bot, sender, `&7&l|&f Использование: &e/blacklist del [ник]`);
         return;
     }
     
@@ -148,175 +108,109 @@ async function blacklist(bot, sender, args, db, addLog) {
     
     if (action === 'add') {
         if (args.length < 4) {
-            bot.chat(`/msg ${sender} &cИспользование: /blacklist add [ник] [время] [причина]`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/blacklist add [ник] [время] [причина]`);
             return;
         }
         
         const timeStr = args[2];
         const reason = args.slice(3).join(' ');
         
-        // Проверка прав
-        const canMod = await permissions.canModerate(sender, target);
-        if (!canMod) {
-            bot.chat(`/msg ${sender} &cВы не можете добавить этого игрока в ЧС!`);
+        // Проверяем лимиты
+        const limits = await db.checkStaffLimit?.(sender, 'blacklist');
+        if (limits && !limits.allowed) {
+            sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит ЧС на сегодня (${limits.current}/${limits.max})`);
             return;
         }
         
-        // Проверка лимитов
-        const limitCheck = await db.checkStaffLimit(sender, 'blacklist');
-        if (!limitCheck.allowed) {
-            bot.chat(`/msg ${sender} &cВы исчерпали лимит ЧС на сегодня (${limitCheck.current}/${limitCheck.max})!`);
-            return;
-        }
+        let minutes = 0;
+        if (timeStr.endsWith('h')) minutes = parseInt(timeStr) * 60;
+        else if (timeStr.endsWith('d')) minutes = parseInt(timeStr) * 1440;
+        else minutes = parseInt(timeStr);
         
-        // Парсим время
-        const durationMs = utils.parseTimeString(timeStr);
-        const durationMinutes = durationMs ? Math.floor(durationMs / 60000) : null;
+        await db.addPunishment(target, 'blacklist', reason, sender, minutes);
+        if (limits) await db.incrementStaffCounter?.(sender, 'blacklist');
+        await db.removeClanMember(target);
         
-        await db.addPunishment(target, 'blacklist', reason, sender, durationMinutes);
-        await db.incrementStaffCounter(sender, 'blacklist');
+        sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aдобавлен в ЧС на &e${timeStr}`);
+        bot.chat(`/cc &c⛔ &e${target} &cдобавлен в чёрный список &e${sender}`);
         
-        // Кикаем из клана если состоит
-        const member = await db.getClanMember(target);
-        if (member) {
-            bot.chat(`/c kick ${target}`);
-            await db.removeClanMember(target);
-        }
-        
-        bot.chat(`/msg ${sender} &a✅ Игрок ${target} добавлен в ЧС на ${timeStr}`);
-        bot.chat(`/cc &c⛔ &e${target} &cдобавлен в чёрный список клана ${sender} Причина: ${reason}`);
-        
-        if (addLog) addLog(`⛔ ${sender} добавил ${target} в ЧС (${reason})`, 'warn');
+        if (addLog) addLog(`⛔ ${sender} добавил ${target} в ЧС`, 'warn');
         
     } else if (action === 'del') {
         await db.removePunishment(target, 'blacklist', sender, 'Снятие по запросу');
-        
-        bot.chat(`/msg ${sender} &a✅ Игрок ${target} удалён из ЧС`);
-        bot.chat(`/cc &a✅ &e${target} &aудалён из чёрного списка ${sender}`);
-        
+        sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aудалён из ЧС`);
         if (addLog) addLog(`✅ ${sender} удалил ${target} из ЧС`, 'info');
     } else {
-        bot.chat(`/msg ${sender} &cНеизвестное действие. Используйте add или del`);
+        sendMessage(bot, sender, `&4&l|&c Неизвестное действие. Используйте &eadd&c или &edel`);
     }
 }
 
 // ============================================
-// /awarn add/del [ник] [причина] - Выговор персоналу
+// /check [ник] - Проверить игрока
 // ============================================
-async function awarn(bot, sender, args, db, addLog) {
-    if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /awarn add [ник] [причина]`);
-        bot.chat(`/msg ${sender} &cИспользование: /awarn del [ник]`);
+
+async function check(bot, sender, args, db) {
+    if (args.length < 1) {
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/check [ник]`);
         return;
     }
     
-    const action = args[0].toLowerCase();
-    const target = args[1];
-    const reason = args.slice(2).join(' ');
+    const target = args[0];
+    const member = await db.getClanMember(target);
+    const rp = await db.getRPProfile(target);
+    const isMuted = await db.isMuted(target);
+    const isBlacklisted = await db.isBlacklisted?.(target) || false;
     
-    // Проверка прав (выговор может дать только Ст.Модератор+)
-    const actorRank = await db.getStaffRank(sender);
-    if (actorRank.rank_level < 3) {
-        bot.chat(`/msg ${sender} &cВыдавать выговоры могут только Ст.Модераторы и выше!`);
+    if (!member && !rp) {
+        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне найден`);
         return;
     }
     
-    // Проверка, что цель в персонале
-    const targetStaff = await db.getStaffRank(target);
-    if (targetStaff.rank_level === 0) {
-        bot.chat(`/msg ${sender} &cИгрок ${target} не состоит в персонале!`);
-        return;
-    }
-    
-    // Нельзя выдать выговор вышестоящему
-    if (targetStaff.rank_level >= actorRank.rank_level) {
-        bot.chat(`/msg ${sender} &cНельзя выдать выговор вышестоящему сотруднику!`);
-        return;
-    }
-    
-    if (action === 'add') {
-        if (!reason) {
-            bot.chat(`/msg ${sender} &cУкажите причину выговора!`);
-            return;
-        }
-        
-        // Получаем текущее количество выговоров
-        const staff = await db.getStaffStats(target);
-        const newWarnCount = (staff?.awarns || 0) + 1;
-        
-        // Обновляем
-        await db.updateStaffWarnings(target, newWarnCount);
-        await db.addPunishment(target, 'staff_warn', reason, sender, null);
-        
-        bot.chat(`/msg ${sender} &a✅ Выговор выдан ${target} (${newWarnCount}/3)`);
-        bot.chat(`/msg ${target} &c⚠️ Вы получили выговор от ${sender} Причина: ${reason}`);
-        bot.chat(`/cc &c⚠️ &e${target} &cполучил выговор (${newWarnCount}/3) от ${sender}`);
-        
-        // Если 3 выговора - снимаем с должности
-        if (newWarnCount >= 3) {
-            await db.updateStaffRank(target, 0, 'Снят');
-            bot.chat(`/cc &c🔻 &e${target} &cснят с должности за 3 выговора!`);
-            if (addLog) addLog(`🔻 ${target} снят с должности за 3 выговора`, 'error');
-        }
-        
-        if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} (${reason})`, 'warn');
-        
-    } else if (action === 'del') {
-        const staff = await db.getStaffStats(target);
-        const currentWarns = staff?.awarns || 0;
-        
-        if (currentWarns === 0) {
-            bot.chat(`/msg ${sender} &cУ ${target} нет выговоров!`);
-            return;
-        }
-        
-        await db.updateStaffWarnings(target, currentWarns - 1);
-        bot.chat(`/msg ${sender} &a✅ Выговор снят с ${target}`);
-        bot.chat(`/cc &a✅ &e${target} &a- выговор снят ${sender}`);
-        
-        if (addLog) addLog(`✅ ${sender} снял выговор с ${target}`, 'info');
-    }
+    sendMessage(bot, sender, `&a&l|&f ${target}`);
+    if (member) sendMessage(bot, sender, `&7&l|&f Ранг в клане: &e${member.rank_name} &7| Убийств/Смертей: &e${member.kills || 0}/${member.deaths || 0}`);
+    if (rp) sendMessage(bot, sender, `&7&l|&f Структура: &e${rp.structure} &7| Ранг: &e${rp.job_rank} &7| Баланс: &e${rp.money?.toLocaleString() || 0}₽`);
+    if (isMuted) sendMessage(bot, sender, `&7&l|&f Статус: &c🔇 В муте`);
+    if (isBlacklisted) sendMessage(bot, sender, `&7&l|&f Статус: &c⛔ В чёрном списке`);
 }
 
 // ============================================
 // /spam [on/off] - Включение/выключение авто-модерации
 // ============================================
+
 async function spam(bot, sender, args, db, addLog) {
-    // Доступно с Гл.Модератора (ранг 4+)
     const staffRank = await db.getStaffRank(sender);
     if (staffRank.rank_level < 4) {
-        bot.chat(`/msg ${sender} &cУ вас нет прав для управления авто-модерацией!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для управления авто-модерацией`);
         return;
     }
     
-    let newState;
     if (args.length === 0) {
         const current = await db.getSetting('auto_mod_enabled');
-        bot.chat(`/msg ${sender} &7Авто-модерация сейчас: &e${current === 'true' ? 'ВКЛЮЧЕНА' : 'ВЫКЛЮЧЕНА'}`);
+        sendMessage(bot, sender, `&a&l|&f Авто-модерация: &e${current === 'true' ? 'ВКЛЮЧЕНА' : 'ВЫКЛЮЧЕНА'}`);
         return;
     }
     
-    if (args[0].toLowerCase() === 'on') {
-        newState = 'true';
-        await db.setSetting('auto_mod_enabled', newState, sender);
-        bot.chat(`/cc &a✅ Авто-модерация ВКЛЮЧЕНА ${sender}`);
+    const state = args[0].toLowerCase();
+    if (state === 'on') {
+        await db.setSetting('auto_mod_enabled', 'true', sender);
+        bot.chat(`/cc &a&l|&f Авто-модерация &aВКЛЮЧЕНА &e${sender}`);
         if (addLog) addLog(`✅ ${sender} включил авто-модерацию`, 'info');
-    } else if (args[0].toLowerCase() === 'off') {
-        newState = 'false';
-        await db.setSetting('auto_mod_enabled', newState, sender);
-        bot.chat(`/cc &c❌ Авто-модерация ВЫКЛЮЧЕНА ${sender}`);
+    } else if (state === 'off') {
+        await db.setSetting('auto_mod_enabled', 'false', sender);
+        bot.chat(`/cc &c&l|&f Авто-модерация &cВЫКЛЮЧЕНА &e${sender}`);
         if (addLog) addLog(`❌ ${sender} выключил авто-модерацию`, 'warn');
     } else {
-        bot.chat(`/msg ${sender} &cИспользование: /spam [on/off]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/spam on/off`);
     }
 }
 
 // ============================================
 // /r clan/chat [on/off] - Реклама в клановом чате
 // ============================================
+
 async function r(bot, sender, args, db, addLog) {
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /r [clan/chat] [on/off]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/r [clan/chat] [on/off]`);
         return;
     }
     
@@ -324,156 +218,185 @@ async function r(bot, sender, args, db, addLog) {
     const action = args[1].toLowerCase();
     
     let settingKey;
-    if (target === 'clan') {
-        settingKey = 'clan_ad_enabled';
-    } else if (target === 'chat') {
-        settingKey = 'chat_ad_enabled';
-    } else {
-        bot.chat(`/msg ${sender} &cДоступные цели: clan, chat`);
+    if (target === 'clan') settingKey = 'clan_ad_enabled';
+    else if (target === 'chat') settingKey = 'chat_ad_enabled';
+    else {
+        sendMessage(bot, sender, `&4&l|&c Доступные цели: &eclan, chat`);
+        return;
+    }
+    
+    const staffRank = await db.getStaffRank(sender);
+    if (target === 'clan' && staffRank.rank_level < 4) {
+        sendMessage(bot, sender, `&4&l|&c Рекламу клана могут редактировать Гл.Модераторы+`);
+        return;
+    }
+    if (target === 'chat' && staffRank.rank_level < 3) {
+        sendMessage(bot, sender, `&4&l|&c Рекламу в чате могут редактировать Ст.Модераторы+`);
         return;
     }
     
     let newState;
-    if (action === 'on') {
-        newState = 'true';
-    } else if (action === 'off') {
-        newState = 'false';
-    } else {
-        bot.chat(`/msg ${sender} &cИспользование: on/off`);
+    if (action === 'on') newState = 'true';
+    else if (action === 'off') newState = 'false';
+    else {
+        sendMessage(bot, sender, `&4&l|&c Использование: &eon/off`);
         return;
     }
     
     await db.setSetting(settingKey, newState, sender);
-    bot.chat(`/cc &a✅ Реклама ${target === 'clan' ? 'клана' : 'в чате'} ${newState === 'true' ? 'ВКЛЮЧЕНА' : 'ВЫКЛЮЧЕНА'} ${sender}`);
+    bot.chat(`/cc &a&l|&f Реклама ${target === 'clan' ? 'клана' : 'в чате'} ${newState === 'true' ? 'ВКЛЮЧЕНА' : 'ВЫКЛЮЧЕНА'} &e${sender}`);
     if (addLog) addLog(`📢 ${sender} ${newState === 'true' ? 'включил' : 'выключил'} рекламу ${target}`, 'info');
 }
 
 // ============================================
-// /logs [ник] [тип] [страница] - Просмотр логов игрока
+// /logs [ник] [тип] [страница] - Просмотр логов
 // ============================================
+
 async function logs(bot, sender, args, db, addLog) {
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 1) {
+        sendMessage(bot, sender, `&4&l|&c У вас нет прав для просмотра логов`);
+        return;
+    }
+    
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /logs [ник] [тип] [страница]`);
-        bot.chat(`/msg ${sender} &7Типы: chat, money, punishments`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/logs [ник] [тип] [страница]`);
+        sendMessage(bot, sender, `&7&l|&f Типы: &echat, money, punishments`);
         return;
     }
     
     const target = args[0];
     const type = args[1] || 'chat';
     const page = parseInt(args[2]) || 1;
-    const limit = 10;
+    const limit = 5;
     const offset = (page - 1) * limit;
     
     let logs = [];
     let total = 0;
     
-    switch(type) {
-        case 'chat':
-            logs = await db.getChatLogsForPlayer(target, limit, offset);
-            total = await db.getChatLogsCount(target);
-            break;
-        case 'money':
-            logs = await db.getMoneyLogsForPlayer(target, limit, offset);
-            total = await db.getMoneyLogsCount(target);
-            break;
-        case 'punishments':
-            logs = await db.getPunishmentsForPlayer(target, limit, offset);
-            total = await db.getPunishmentsCount(target);
-            break;
-        default:
-            bot.chat(`/msg ${sender} &cНеизвестный тип логов. Доступно: chat, money, punishments`);
+    try {
+        if (type === 'chat') {
+            logs = await db.all(`SELECT * FROM clan_chat_logs WHERE player = ? ORDER BY sent_at DESC LIMIT ? OFFSET ?`, [target, limit, offset]);
+            total = (await db.get(`SELECT COUNT(*) as count FROM clan_chat_logs WHERE player = ?`, [target]))?.count || 0;
+        } else if (type === 'money') {
+            logs = await db.all(`SELECT * FROM money_logs WHERE player = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`, [target, limit, offset]);
+            total = (await db.get(`SELECT COUNT(*) as count FROM money_logs WHERE player = ?`, [target]))?.count || 0;
+        } else if (type === 'punishments') {
+            logs = await db.all(`SELECT * FROM punishments WHERE player = ? ORDER BY issued_at DESC LIMIT ? OFFSET ?`, [target, limit, offset]);
+            total = (await db.get(`SELECT COUNT(*) as count FROM punishments WHERE player = ?`, [target]))?.count || 0;
+        } else {
+            sendMessage(bot, sender, `&4&l|&c Неизвестный тип. Доступно: &echat, money, punishments`);
             return;
+        }
+    } catch (err) {
+        sendMessage(bot, sender, `&4&l|&c Ошибка получения логов: ${err.message}`);
+        return;
     }
     
     if (logs.length === 0) {
-        bot.chat(`/msg ${sender} &cЛоги для ${target} не найдены`);
+        sendMessage(bot, sender, `&4&l|&c Логи для &e${target} &cне найдены`);
         return;
     }
     
     const totalPages = Math.ceil(total / limit);
-    
-    bot.chat(`/msg ${sender} &6📋 ЛОГИ ${type.toUpperCase()} ДЛЯ ${target} (стр. ${page}/${totalPages})`);
+    sendMessage(bot, sender, `&a&l|&f Логи &e${type} &fдля &e${target} &7(стр. ${page}/${totalPages})`);
     
     for (const log of logs) {
         if (type === 'chat') {
-            bot.chat(`/msg ${sender} &7[${log.sent_at}] &e${log.player}: &f${log.message.substring(0, 50)}`);
+            sendMessage(bot, sender, `&7&l|&f [${log.sent_at?.slice(0, 16)}] &e${log.player}: &f${log.message?.substring(0, 50)}`);
         } else if (type === 'money') {
             const sign = log.amount > 0 ? '+' : '';
-            bot.chat(`/msg ${sender} &7[${log.created_at}] &e${sign}${log.amount}₽ &7- ${log.description}`);
+            sendMessage(bot, sender, `&7&l|&f [${log.created_at?.slice(0, 16)}] &e${sign}${log.amount}₽ &7- ${log.description}`);
         } else if (type === 'punishments') {
-            bot.chat(`/msg ${sender} &7[${log.issued_at}] &c${log.type} &7от ${log.issued_by}: ${log.reason}`);
+            sendMessage(bot, sender, `&7&l|&f [${log.issued_at?.slice(0, 16)}] &c${log.type} &7от &e${log.issued_by}: &f${log.reason}`);
         }
     }
     
     if (page < totalPages) {
-        bot.chat(`/msg ${sender} &7Для следующей страницы: /logs ${target} ${type} ${page + 1}`);
+        sendMessage(bot, sender, `&7&l|&f Следующая страница: &e/logs ${target} ${type} ${page + 1}`);
     }
 }
 
 // ============================================
-// /check [ник] - Проверить информацию об игроке
+// /awarn add/del [ник] [причина] - Выговор персоналу
 // ============================================
-async function check(bot, sender, args, db) {
-    if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /check [ник]`);
+
+async function awarn(bot, sender, args, db, addLog) {
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 3) {
+        sendMessage(bot, sender, `&4&l|&c Выдавать выговоры могут только Ст.Модераторы+`);
         return;
     }
     
-    const target = args[0];
-    
-    const clanMember = await db.getClanMember(target);
-    const rpProfile = await db.getRPProfile(target);
-    const staffRank = await db.getStaffRank(target);
-    const isMuted = await db.isMuted(target);
-    const isBlacklisted = await db.isBlacklisted(target);
-    
-    if (!clanMember && !rpProfile) {
-        bot.chat(`/msg ${sender} &cИгрок ${target} не найден в базе данных`);
+    if (args.length < 2) {
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/awarn add [ник] [причина]`);
+        sendMessage(bot, sender, `&7&l|&f Использование: &e/awarn del [ник]`);
         return;
     }
     
-    bot.chat(`/msg ${sender} &6╔══════════════════════════════════════╗`);
-    bot.chat(`/msg ${sender} &6║ &l📋 ИНФОРМАЦИЯ ОБ ИГРОКЕ &6║`);
-    bot.chat(`/msg ${sender} &6╠══════════════════════════════════════╣`);
-    bot.chat(`/msg ${sender} &6║ &7Ник: &e${target}`);
+    const action = args[0].toLowerCase();
+    const target = args[1];
+    const reason = args.slice(2).join(' ');
     
-    if (clanMember) {
-        bot.chat(`/msg ${sender} &6║ &7Ранг в клане: &e${clanMember.rank_name}`);
-        bot.chat(`/msg ${sender} &6║ &7Статистика: &e${clanMember.kills}🗡️ / ${clanMember.deaths}💀`);
+    const targetStaff = await db.getStaffRank(target);
+    if (targetStaff.rank_level === 0) {
+        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в персонале`);
+        return;
     }
     
-    if (rpProfile) {
-        bot.chat(`/msg ${sender} &6║ &7Структура: &e${rpProfile.structure}`);
-        bot.chat(`/msg ${sender} &6║ &7Должность: &e${rpProfile.job_rank}`);
-        bot.chat(`/msg ${sender} &6║ &7Баланс: &e${utils.formatMoney(rpProfile.money)}`);
+    if (targetStaff.rank_level >= staffRank.rank_level) {
+        sendMessage(bot, sender, `&4&l|&c Нельзя выдать выговор вышестоящему сотруднику`);
+        return;
     }
     
-    if (staffRank.rank_level > 0) {
-        bot.chat(`/msg ${sender} &6║ &7Персонал: &e${permissions.STAFF_LEVELS[staffRank.rank_level]}`);
+    if (action === 'add') {
+        if (!reason) {
+            sendMessage(bot, sender, `&4&l|&c Укажите причину выговора`);
+            return;
+        }
+        
+        const currentWarns = targetStaff.awarns || 0;
+        const newWarnCount = currentWarns + 1;
+        
+        await db.run(`UPDATE staff_stats SET awarns = ? WHERE minecraft_nick = ?`, [newWarnCount, target]);
+        await db.addPunishment(target, 'staff_warn', reason, sender, null);
+        
+        sendMessage(bot, sender, `&a&l|&f Выговор выдан &e${target} &7(${newWarnCount}/3)`);
+        bot.chat(`/cc &c⚠️ &e${target} &cполучил выговор от &e${sender} &7(${newWarnCount}/3)`);
+        
+        if (newWarnCount >= 3) {
+            await db.run(`UPDATE staff_stats SET rank_level = 0, rank_name = NULL WHERE minecraft_nick = ?`, [target]);
+            bot.chat(`/cc &c🔻 &e${target} &cснят с должности за 3 выговора`);
+            if (addLog) addLog(`🔻 ${target} снят с должности за 3 выговора`, 'error');
+        }
+        
+        if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} (${reason})`, 'warn');
+        
+    } else if (action === 'del') {
+        const currentWarns = targetStaff.awarns || 0;
+        if (currentWarns === 0) {
+            sendMessage(bot, sender, `&4&l|&c У &e${target} &cнет выговоров`);
+            return;
+        }
+        
+        await db.run(`UPDATE staff_stats SET awarns = ? WHERE minecraft_nick = ?`, [currentWarns - 1, target]);
+        sendMessage(bot, sender, `&a&l|&f Выговор снят с &e${target}`);
+        bot.chat(`/cc &a✅ &e${target} &a- выговор снят &e${sender}`);
+        if (addLog) addLog(`✅ ${sender} снял выговор с ${target}`, 'info');
     }
-    
-    if (isMuted) {
-        bot.chat(`/msg ${sender} &6║ &7Статус: &c🔇 В МУТЕ`);
-    }
-    
-    if (isBlacklisted) {
-        bot.chat(`/msg ${sender} &6║ &7Статус: &c⛔ В ЧЁРНОМ СПИСКЕ`);
-    }
-    
-    bot.chat(`/msg ${sender} &6╚══════════════════════════════════════╝`);
 }
 
 // ============================================
 // ЭКСПОРТ
 // ============================================
+
 module.exports = {
     mute,
     kick,
     blacklist,
-    awarn,
+    check,
     spam,
     r,
     logs,
-    check,
-    automod
+    awarn
 };

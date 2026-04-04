@@ -9,7 +9,8 @@
 
 -- Участники клана
 CREATE TABLE IF NOT EXISTS clan_members (
-    minecraft_nick TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    minecraft_nick TEXT UNIQUE,
     kills INTEGER DEFAULT 0,
     deaths INTEGER DEFAULT 0,
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -434,3 +435,24 @@ CREATE INDEX IF NOT EXISTS idx_punishments_active ON punishments(active);
 CREATE INDEX IF NOT EXISTS idx_property_owner ON property(owner_nick);
 CREATE INDEX IF NOT EXISTS idx_money_logs_player ON money_logs(player);
 CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);   
+-- ============================================
+-- НАЧАЛЬНЫЕ НАСТРОЙКИ
+-- ============================================
+
+INSERT OR IGNORE INTO settings (key, value, description) VALUES
+('auto_mod_enabled', 'true', 'Авто-модерация в клановом чате'),
+('payday_enabled', 'true', 'Ежечасный PayDay'),
+('clan_ad_enabled', 'true', 'Реклама клана в чате'),
+('chat_ad_enabled', 'true', 'Реклама в клановом чате'),
+('property_tax_rate', '0.01', 'Налог на имущество (1%)'),
+('business_tax_rate', '0.02', 'Налог на бизнес (2%)'),
+('office_tax_rate', '0.015', 'Налог на офис (1.5%)'),
+('alert_level', 'Бета', 'Уровень тревоги (Альфа/Бета/Омега)'),
+('redcode_active', 'false', 'Красный код в больнице'),
+('system_stopped', 'false', 'Остановка всех RP процессов'),
+('city_budget', '10000000', 'Бюджет города'),
+('defense_budget', '1000000', 'Бюджет обороны'),
+('mvd_budget', '1000000', 'Бюджет МВД'),
+('health_budget', '1000000', 'Бюджет здравоохранения'),
+('edu_budget', '1000000', 'Бюджет образования'),
+('salary_bonus', '0', 'Бонус к зарплатам (%)');

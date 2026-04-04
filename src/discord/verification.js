@@ -1,124 +1,192 @@
 // src/discord/verification.js
-const { EmbedBuilder } = require('discord.js');
-const logger = require('../shared/logger');
+// Система верификации Discord аккаунтов
 
-async function startVerification(interaction, db) {
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const utils = require('../shared/utils');
+
+const VERIFY_CHANNEL_ID = process.env.DISCORD_VERIFY_CHANNEL || '1466550097759174773';
+const VERIFY_ROLE_ID = process.env.DISCORD_VERIFY_ROLE || '1466550097218113794';
+const DEXLAND_ROLE_ID = '1489557345527660605';
+
+// ============================================
+// НАЧАЛО ВЕРИФИКАЦИИ
+// ============================================
+
+async function startVerification(interaction, db, client) {
+    const embed = new EmbedBuilder()
+        .setTitle('🔐 Верификация Minecraft аккаунта')
+        .setDescription('Для привязки аккаунта нажмите на кнопку ниже. Вам будет сгенерирован код, который нужно ввести в игре командой `/link [код]`')
+        .setColor(0x6343d4)
+        .addFields(
+            { name: '⏱️ Код действителен', value: '30 минут', inline: true },
+            { name: '🎁 Награда', value: 'Роль верифицированного', inline: true }
+        )
+        .setFooter({ text: 'Resistance City' });
+    
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('verify_confirm')
+                .setLabel('Получить код')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('🔑'),
+            new ButtonBuilder()
+                .setCustomId('verify_cancel')
+                .setLabel('Отмена')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('❌')
+        );
+    
+    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+}
+
+// ============================================
+// ГЕНЕРАЦИЯ КОДА
+// ============================================
+
+async function generateCode(interaction, db, client) {
     const discordId = interaction.user.id;
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
+    const discordUsername = interaction.user.username;
     
-    try {
-        const dbInstance = db.getDb();
+    // Проверяем, не привязан ли уже аккаунт
+    const existing = await db.get('SELECT minecraft_nick FROM linked_accounts WHERE discord_id = ?', [discordId]);
+    if (existing) {
+        await interaction.reply({
+            content: `❌ Ваш Discord уже привязан к аккаунту **${existing.minecraft_nick}**!`,
+            ephemeral: true
+        });
+        return;
+    }
+    
+    // Генерируем код
+    const code = utils.generateCode(6);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    
+    // Сохраняем в БД
+    await db.run(`
+        INSERT INTO verification_codes (code, discord_id, discord_username, expires_at, is_active)
+        VALUES (?, ?, ?, ?, 1)
+    `, [code, discordId, discordUsername, expiresAt.toISOString()]);
+    
+    // Отправляем вебхук в канал верификации
+    const verifyChannel = client.channels.cache.get(VERIFY_CHANNEL_ID);
+    if (verifyChannel) {
+        const webhookEmbed = new EmbedBuilder()
+            .setTitle('🔐 Новая верификация')
+            .setDescription(`Игрок **${discordUsername}** (<@${discordId}>) ожидает верификации`)
+            .addFields(
+                { name: '📝 Код', value: `\`${code}\``, inline: true },
+                { name: '⏱️ Действителен до', value: `<t:${Math.floor(expiresAt / 1000)}:R>`, inline: true }
+            )
+            .setColor(0x3498db)
+            .setTimestamp();
         
-        // Проверяем, не привязан ли уже аккаунт
-        const existing = dbInstance.prepare('SELECT * FROM clan_members WHERE discord_id = ?').get(discordId);
-        if (existing) {
-            const embed = new EmbedBuilder()
-                .setColor(0xffaa00)
-                .setTitle('⚠️ Уже привязан')
-                .setDescription(`Ваш Discord уже привязан к Minecraft аккаунту **${existing.minecraft_nick}**.\nЕсли хотите перепривязать, обратитесь к администратору.`);
-            return await interaction.editReply({ embeds: [embed] });
+        await verifyChannel.send({ embeds: [webhookEmbed] });
+    }
+    
+    const embed = new EmbedBuilder()
+        .setTitle('✅ Код верификации')
+        .setDescription(`Ваш код: **${code}**`)
+        .setColor(0x2ecc71)
+        .addFields(
+            { name: '⏱️ Действителен до', value: `<t:${Math.floor(expiresAt / 1000)}:R>`, inline: true },
+            { name: '🎮 Как использовать', value: 'Зайдите на сервер Minecraft и введите `/link ' + code + '`', inline: true }
+        )
+        .setFooter({ text: 'Никому не сообщайте этот код!' });
+    
+    await interaction.update({ embeds: [embed], components: [] });
+}
+
+// ============================================
+// ПРОВЕРКА И ПОДТВЕРЖДЕНИЕ
+// ============================================
+
+async function checkAndVerify(minecraftNick, code, db, client) {
+    const record = await db.get(`
+        SELECT * FROM verification_codes 
+        WHERE code = ? AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP
+    `, [code]);
+    
+    if (!record) {
+        return { success: false, reason: 'Неверный или просроченный код' };
+    }
+    
+    // Деактивируем код
+    await db.run('UPDATE verification_codes SET is_active = 0, verified_at = CURRENT_TIMESTAMP WHERE code = ?', [code]);
+    
+    // Привязываем аккаунты
+    await db.run(`
+        INSERT OR REPLACE INTO linked_accounts (minecraft_nick, discord_id, is_verified, linked_at)
+        VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+    `, [minecraftNick, record.discord_id]);
+    
+    await db.run(`
+        UPDATE clan_members SET is_discord_linked = 1, discord_id = ?, discord_username = ?
+        WHERE minecraft_nick = ?
+    `, [record.discord_id, record.discord_username, minecraftNick]);
+    
+    // Выдаём роль в Discord
+    const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID);
+    if (guild && VERIFY_ROLE_ID) {
+        const member = await guild.members.fetch(record.discord_id).catch(() => null);
+        if (member) {
+            await member.roles.add(VERIFY_ROLE_ID);
+            await member.roles.remove('1466550097218113793'); // Убираем роль неверифицированного
+            await member.roles.add(DEXLAND_ROLE_ID); // Выдаём роль dexland
         }
-        
-        // Деактивируем старые коды
-        dbInstance.prepare("UPDATE verification_codes SET status = ? WHERE discord_id = ? AND status = ?").run('expired', discordId, 'pending');
-        
-        // Создаём новый код
-        dbInstance.prepare('INSERT INTO verification_codes (discord_id, code, expires_at, status) VALUES (?, ?, ?, ?)').run(discordId, code, expiresAt, 'pending');
-        
+    }
+    
+    // Уведомляем в Discord
+    const user = await client.users.fetch(record.discord_id);
+    if (user) {
         const embed = new EmbedBuilder()
-            .setColor(0x6b46c1)
-            .setTitle('🔐 Верификация аккаунта')
-            .setDescription(`**Ваш код верификации:** \`${code}\`\n\nВведите в игре команду \`/link ${code}\` для привязки аккаунта.\n\nКод действителен **10 минут**.`)
-            .setFooter({ text: 'Resistance City' });
+            .setTitle('✅ Верификация успешна!')
+            .setDescription(`Ваш Minecraft аккаунт **${minecraftNick}** успешно привязан!`)
+            .setColor(0x2ecc71)
+            .addFields(
+                { name: '🎮 Игрок', value: minecraftNick, inline: true },
+                { name: '💬 Discord', value: user.tag, inline: true }
+            )
+            .setTimestamp();
         
-        await interaction.editReply({ embeds: [embed] });
-        
-    } catch (error) {
-        logger.error('Ошибка верификации:', error);
-        await interaction.editReply({ content: '❌ Ошибка создания кода верификации' });
+        await user.send({ embeds: [embed] });
     }
-}
-
-async function handleDirectMessage(message, db, client) {
-    const content = message.content.trim();
-    const discordId = message.author.id;
     
-    if (/^\d{6}$/.test(content)) {
-        try {
-            const dbInstance = db.getDb();
-            const code = dbInstance.prepare('SELECT * FROM verification_codes WHERE code = ? AND status = ? AND expires_at > datetime("now")').get(content, 'pending');
-            
-            if (!code) {
-                await message.author.send('❌ Неверный или просроченный код. Используйте `/verify` для получения нового кода.');
-                return;
-            }
-            
-            await message.author.send(`✅ Код подтверждён! Теперь введите команду \`/link ${content}\` в игре для завершения привязки.`);
-            
-        } catch (error) {
-            logger.error('Ошибка обработки DM:', error);
-            await message.author.send('❌ Ошибка проверки кода');
-        }
+    // Логируем в канал верификации
+    const verifyChannel = client.channels.cache.get(VERIFY_CHANNEL_ID);
+    if (verifyChannel) {
+        const logEmbed = new EmbedBuilder()
+            .setTitle('✅ Успешная верификация')
+            .setDescription(`**${minecraftNick}** успешно привязал Discord аккаунт **${record.discord_username}**`)
+            .setColor(0x2ecc71)
+            .setTimestamp();
+        
+        await verifyChannel.send({ embeds: [logEmbed] });
     }
+    
+    return { success: true, discordId: record.discord_id };
 }
 
-async function completeVerification(minecraftNick, code, db, client) {
-    try {
-        const dbInstance = db.getDb();
-        const verification = dbInstance.prepare('SELECT * FROM verification_codes WHERE code = ? AND status = ? AND expires_at > datetime("now")').get(code, 'pending');
-        
-        if (!verification) {
-            return { success: false, message: 'Неверный или просроченный код' };
-        }
-        
-        // Проверяем, не привязан ли уже этот Minecraft ник
-        const existing = dbInstance.prepare('SELECT * FROM clan_members WHERE minecraft_nick = ?').get(minecraftNick);
-        if (existing && existing.discord_id && existing.discord_id !== verification.discord_id) {
-            return { success: false, message: 'Этот Minecraft аккаунт уже привязан к другому Discord' };
-        }
-        
-        // Обновляем запись
-        dbInstance.prepare('UPDATE verification_codes SET minecraft_nick = ?, status = ? WHERE id = ?').run(minecraftNick, 'used', verification.id);
-        dbInstance.prepare('UPDATE clan_members SET discord_id = ? WHERE minecraft_nick = ?').run(verification.discord_id, minecraftNick);
-        
-        // Отправляем приветственное сообщение в ЛС
-        if (client) {
-            try {
-                const user = await client.users.fetch(verification.discord_id);
-                const embed = new EmbedBuilder()
-                    .setColor(0x00d25b)
-                    .setTitle('✅ Успешная верификация')
-                    .setDescription(`Привет, **${minecraftNick}**! 🎉\n\nТвой Minecraft аккаунт **${minecraftNick}** успешно привязан к Discord.`)
-                    .addFields(
-                        { name: '📋 Что теперь?', value: '• Используй команды из Discord\n• Получай уведомления о событиях\n• Участвуй в жизни клана', inline: false },
-                        { name: '🎮 Команды', value: '`/profile` - твой профиль\n`/balance` - баланс\n`/pass` - паспорт\n`/pay` - перевод денег\n`/org` - информация об организации\n`/fly` - полёт\n`/10t` - получить 10к\n`/id` - твой ID', inline: false }
-                    )
-                    .setFooter({ text: 'Resistance City' });
-                await user.send({ embeds: [embed] });
-                
-                // Выдаём роль на сервере
-                const guildId = process.env.DISCORD_GUILD_ID;
-                if (guildId) {
-                    const guild = await client.guilds.fetch(guildId);
-                    const member = await guild.members.fetch(verification.discord_id);
-                    const roleId = process.env.DISCORD_VERIFY_ROLE;
-                    if (roleId) await member.roles.add(roleId);
-                    if (member.nickname !== minecraftNick) await member.setNickname(minecraftNick).catch(() => {});
-                }
-            } catch (e) { logger.error('Ошибка отправки приветствия:', e); }
-        }
-        
-        return { success: true, message: 'Аккаунт успешно привязан!', discordId: verification.discord_id };
-        
-    } catch (error) {
-        logger.error('Ошибка completeVerification:', error);
-        return { success: false, message: 'Ошибка привязки аккаунта' };
-    }
+// ============================================
+// ОТПРАВКА ВЕБХУКА В КАНАЛ ВЕРИФИКАЦИИ
+// ============================================
+
+async function sendVerificationWebhook(client, minecraftNick, discordUsername) {
+    const channel = client.channels.cache.get(VERIFY_CHANNEL_ID);
+    if (!channel) return;
+    
+    const embed = new EmbedBuilder()
+        .setTitle('✅ Новый верифицированный игрок')
+        .setDescription(`**${minecraftNick}** успешно привязал Discord аккаунт **${discordUsername}**`)
+        .setColor(0x2ecc71)
+        .setTimestamp();
+    
+    await channel.send({ embeds: [embed] });
 }
 
 module.exports = {
     startVerification,
-    handleDirectMessage,
-    completeVerification
+    generateCode,
+    checkAndVerify,
+    sendVerificationWebhook
 };

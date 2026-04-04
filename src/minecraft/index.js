@@ -27,7 +27,7 @@ class MinecraftBot extends EventEmitter {
             password: process.env.MC_BOT_PASSWORD,
             auth: process.env.MC_AUTH || 'offline',
             version: process.env.MC_VERSION || '1.12.2',
-            loginCommand: process.env.MC_LOGIN_COMMAND || '/s3',
+            loginCommand: process.env.MC_LOGIN_COMMAND || '/s4',
             proxyEnabled: process.env.PROXY_ENABLED === 'true',
             proxyHost: process.env.PROXY_HOST,
             proxyPort: parseInt(process.env.PROXY_PORT),
@@ -129,27 +129,24 @@ class MinecraftBot extends EventEmitter {
         if (!this.bot) return;
         
         this.bot.once('spawn', async () => {
-            this.addLog('🎮 Бот появился в мире', 'success');
-            
-            try {
-                const { getModerationSystem } = require('./moderation');
-                const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
-                
-                if (typeof moderation.checkAllPlayersPunishments === 'function') {
-                    await moderation.checkAllPlayersPunishments();
-                }
-                if (typeof moderation.checkActivePunishments === 'function') {
-                    await moderation.checkActivePunishments(this.bot.username);
-                }
-                if (typeof moderation.checkAllExpiredMutes === 'function') {
-                    await moderation.checkAllExpiredMutes();
-                }
-            } catch (err) {
-                this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
-            }
-            
-            await this.authorize();
-        });
+    this.addLog('🎮 Бот появился в мире', 'success');
+    
+    try {
+        const { getModerationSystem } = require('./moderation');
+        const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
+        
+        if (typeof moderation.checkAllPlayersPunishments === 'function') {
+            await moderation.checkAllPlayersPunishments();
+        }
+        if (typeof moderation.checkActivePunishments === 'function') {
+            await moderation.checkActivePunishments(this.bot.username);
+        }
+    } catch (err) {
+        this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
+    }
+    
+    await this.authorize();
+});
         
         this.bot.on('message', async (json) => {
             const message = json.toString();

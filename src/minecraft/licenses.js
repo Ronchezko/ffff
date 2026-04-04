@@ -3,14 +3,19 @@
 
 const utils = require('../shared/utils');
 
-// Цены на лицензии
-const LICENSE_PRICES = {
+// Цены на лицензии (из config.js)
+let LICENSE_PRICES = {
     business: 800000,
     office: 900000
 };
 
 // Срок действия лицензии (7 дней)
 const LICENSE_DURATION_DAYS = 7;
+
+// Загрузка цен из конфига
+function loadLicensePrices(config) {
+    LICENSE_PRICES = config.licensePrices || LICENSE_PRICES;
+}
 
 // ============================================
 // ВЫДАЧА ЛИЦЕНЗИИ
@@ -29,7 +34,7 @@ async function issueLicense(bot, playerNick, type, db, addLog) {
     }
     
     if (profile.money < price) {
-        return { success: false, reason: `Недостаточно средств. Нужно ${utils.formatMoney(price)}` };
+        return { success: false, reason: `Недостаточно средств. Нужно ${price.toLocaleString()}₽` };
     }
     
     // Проверяем, нет ли уже активной лицензии
@@ -51,7 +56,7 @@ async function issueLicense(bot, playerNick, type, db, addLog) {
         [playerNick, type, expiresAt.toISOString(), price]
     );
     
-    bot.chat(`/msg ${playerNick} &a✅ Вы приобрели лицензию на ${getLicenseTypeName(type)} за ${utils.formatMoney(price)}!`);
+    bot.chat(`/msg ${playerNick} &a✅ Вы приобрели лицензию на ${getLicenseTypeName(type)} за ${price.toLocaleString()}₽!`);
     bot.chat(`/msg ${playerNick} &7Лицензия действует до ${expiresAt.toLocaleDateString()}`);
     
     if (addLog) addLog(`📜 Выдана лицензия ${playerNick} на ${type} за ${price}`, 'success');
@@ -118,7 +123,7 @@ async function renewLicense(playerNick, type, db, addLog) {
     // Проверяем баланс
     const profile = await db.getRPProfile(playerNick);
     if (!profile || profile.money < price) {
-        return { success: false, reason: `Недостаточно средств. Нужно ${utils.formatMoney(price)}` };
+        return { success: false, reason: `Недостаточно средств. Нужно ${price.toLocaleString()}₽` };
     }
     
     // Списываем деньги
@@ -162,7 +167,7 @@ module.exports = {
     hasActiveLicense,
     getLicenseInfo,
     renewLicense,
-    LICENSE_PRICES,
+    loadLicensePrices,
     LICENSE_DURATION_DAYS,
     getLicenseTypeName
 };

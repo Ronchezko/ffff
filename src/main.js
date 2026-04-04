@@ -14,7 +14,11 @@ global.botComponents = {
     discord: null,
     web: null
 };
-
+const originalConsoleWarn = console.warn;
+console.warn = function(...args) {
+    if (args[0]?.includes?.('Ignoring block entities')) return;
+    originalConsoleWarn.apply(console, args);
+};
 // Глобальные логи для веб-интерфейса
 global.botLogs = [];
 global.systemLogs = [];

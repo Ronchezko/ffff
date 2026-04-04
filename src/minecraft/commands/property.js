@@ -1,15 +1,21 @@
 // src/minecraft/commands/property.js
-// Команды для управления имуществом (покупка, продажа, налоги, сожители)
+// Команды для управления имуществом
 
 const utils = require('../../shared/utils');
+
+function sendMessage(bot, target, message) {
+    bot.chat(`/msg ${target} ${message}`);
+}
 
 // ============================================
 // /im [buy/info/sell] [id] - Управление имуществом
 // ============================================
+
+// /im [buy/in/sell] [id] - Управление имуществом
 async function im(bot, sender, args, db, addLog) {
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /im [buy/info/sell] [id]`);
-        bot.chat(`/msg ${sender} &7Также: /imflag, /imm, /imnalog`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/im [buy/in/sell] [id]`);
+        await sendMessage(bot, sender, `&7&l|&f Также: &e/imflag, /imm, /imnalog`);
         return;
     }
     
@@ -20,209 +26,158 @@ async function im(bot, sender, args, db, addLog) {
         case 'buy':
             await buyProperty(bot, sender, propertyId, db, addLog);
             break;
-        case 'info':
+        case 'in':
             await propertyInfo(bot, sender, propertyId, db);
             break;
         case 'sell':
             await sellProperty(bot, sender, propertyId, db, addLog);
             break;
         default:
-            bot.chat(`/msg ${sender} &cНеизвестное действие. Используйте: buy, info, sell`);
+            await sendMessage(bot, sender, `&4&l|&c Неизвестное действие. Используйте: &ebuy, in, sell`);
     }
 }
 
-// Покупка имущества
 async function buyProperty(bot, sender, propertyId, db, addLog) {
     if (!propertyId) {
-        bot.chat(`/msg ${sender} &cУкажите ID имущества! Используйте /idim для просмотра.`);
+        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества! Используйте &e/idim`);
         return;
     }
     
     const property = await db.getProperty(propertyId);
     if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
+        sendMessage(bot, sender, `&4&l|&c Имущество с ID &e${propertyId} &cне найдено`);
         return;
     }
     
     if (!property.is_available) {
-        bot.chat(`/msg ${sender} &cИмущество #${propertyId} уже занято!`);
+        sendMessage(bot, sender, `&4&l|&c Имущество #&e${propertyId} &cуже занято`);
         return;
     }
     
-    // Проверяем, зарегистрирован ли в RP
     const profile = await db.getRPProfile(sender);
     if (!profile) {
-        bot.chat(`/msg ${sender} &cСначала зарегистрируйтесь в RolePlay через /rp!`);
+        sendMessage(bot, sender, `&4&l|&c Сначала зарегистрируйтесь в RolePlay через &e/rp`);
         return;
     }
     
-    // Проверка для бизнеса/офиса (нужна лицензия)
+    // Проверка лицензии для бизнеса/офиса
     if (property.type === 'business') {
-        const hasLicense = await db.hasActiveLicense(sender, 'business');
-        if (!hasLicense) {
-            bot.chat(`/msg ${sender} &cДля покупки бизнеса нужна лицензия! Оформите в Discord.`);
+        const license = await db.get(`SELECT * FROM licenses WHERE owner_nick = ? AND type = 'business' AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP`, [sender]);
+        if (!license) {
+            sendMessage(bot, sender, `&4&l|&c Для покупки бизнеса нужна лицензия! Оформите в Discord`);
             return;
         }
     }
     
     if (property.type === 'office') {
-        const hasLicense = await db.hasActiveLicense(sender, 'office');
-        if (!hasLicense) {
-            bot.chat(`/msg ${sender} &cДля покупки офиса нужна лицензия! Оформите в Discord.`);
+        const license = await db.get(`SELECT * FROM licenses WHERE owner_nick = ? AND type = 'office' AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP`, [sender]);
+        if (!license) {
+            sendMessage(bot, sender, `&4&l|&c Для покупки офиса нужна лицензия! Оформите в Discord`);
             return;
         }
     }
     
-    // Проверяем баланс
     if (profile.money < property.price) {
-        bot.chat(`/msg ${sender} &cНедостаточно средств! Нужно ${utils.formatMoney(property.price)}`);
+        sendMessage(bot, sender, `&4&l|&c Недостаточно средств! Нужно &e${property.price.toLocaleString()}₽`);
         return;
     }
     
-    // Выполняем покупку
     const result = await db.buyProperty(propertyId, sender);
     
     if (result.success) {
-        // Добавляем в регион на сервере
         const regionName = `TRTR${propertyId}`;
         bot.chat(`/rg addmember ${regionName} ${sender}`);
         
-        bot.chat(`/msg ${sender} &a✅ Вы успешно приобрели ${getPropertyTypeName(property.type)} #${propertyId} за ${utils.formatMoney(property.price)}`);
-        bot.chat(`/cc &a🏠 ${sender} приобрёл ${getPropertyTypeName(property.type)} #${propertyId}!`);
-        
+        sendMessage(bot, sender, `&a&l|&f Вы приобрели ${property.type} #&e${propertyId} &aза &e${property.price.toLocaleString()}₽`);
+        bot.chat(`/cc &a🏠 ${sender} приобрёл ${property.type} #${propertyId}`);
         if (addLog) addLog(`🏠 ${sender} купил ${property.type} #${propertyId} за ${property.price}`, 'success');
     } else {
-        bot.chat(`/msg ${sender} &c❌ Ошибка покупки: ${result.reason}`);
+        sendMessage(bot, sender, `&4&l|&c Ошибка покупки: ${result.reason}`);
     }
 }
 
-// Информация об имуществе
 async function propertyInfo(bot, sender, propertyId, db) {
     if (!propertyId) {
-        bot.chat(`/msg ${sender} &cУкажите ID имущества!`);
+        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества`);
         return;
     }
     
     const property = await db.getProperty(propertyId);
     if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
+        sendMessage(bot, sender, `&4&l|&c Имущество с ID &e${propertyId} &cне найдено`);
         return;
     }
     
-    const residents = await db.getPropertyResidents(propertyId);
     const taxRate = await db.getSetting('property_tax_rate') || 0.01;
-    const yearlyTax = property.price * taxRate;
-    const monthlyTax = yearlyTax / 12;
+    const monthlyTax = property.price * taxRate / 12;
     
-    bot.chat(`/msg ${sender} &6╔══════════════════════════════════════════╗`);
-    bot.chat(`/msg ${sender} &6║ &l🏠 ИМУЩЕСТВО #${propertyId} &6║`);
-    bot.chat(`/msg ${sender} &6╠══════════════════════════════════════════╣`);
-    bot.chat(`/msg ${sender} &6║ &7Тип: &e${getPropertyTypeName(property.type)}`);
-    bot.chat(`/msg ${sender} &6║ &7Цена покупки: &e${utils.formatMoney(property.price)}`);
-    bot.chat(`/msg ${sender} &6║ &7Владелец: &e${property.owner_nick || 'Свободно'}`);
-    bot.chat(`/msg ${sender} &6║ &7Налог (мес): &e${utils.formatMoney(monthlyTax)}`);
-    
-    if (residents && residents.length > 0) {
-        bot.chat(`/msg ${sender} &6║ &7Сожители: &e${residents.join(', ')}`);
-    }
-    
-    if (property.type === 'business') {
-        const business = await db.getBusiness(propertyId);
-        if (business) {
-            bot.chat(`/msg ${sender} &6║ &7Доход (всего): &e${utils.formatMoney(business.total_income || 0)}`);
-        }
-    }
-    
-    if (property.type === 'office') {
-        const office = await db.getOffice(propertyId);
-        if (office) {
-            bot.chat(`/msg ${sender} &6║ &7Уровень: &e${office.level || 4}/10`);
-            bot.chat(`/msg ${sender} &6║ &7Тип офиса: &e${getOfficeTypeName(office.office_type)}`);
-        }
-    }
-    
-    bot.chat(`/msg ${sender} &6╚══════════════════════════════════════════╝`);
+    sendMessage(bot, sender, `&a&l|&f Имущество #&e${property.id} &7| ${property.type}`);
+    sendMessage(bot, sender, `&7&l|&f Цена: &e${property.price.toLocaleString()}₽ &7| Налог: &e${monthlyTax.toLocaleString()}₽/мес`);
+    sendMessage(bot, sender, `&7&l|&f Владелец: &e${property.owner_nick || 'Свободно'}`);
 }
 
-// Продажа имущества
 async function sellProperty(bot, sender, propertyId, db, addLog) {
     if (!propertyId) {
-        bot.chat(`/msg ${sender} &cУкажите ID имущества!`);
+        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества`);
         return;
     }
     
     const property = await db.getProperty(propertyId);
-    if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
+    if (!property || property.owner_nick !== sender) {
+        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
         return;
     }
     
-    if (property.owner_nick !== sender) {
-        bot.chat(`/msg ${sender} &cВы не являетесь владельцем этого имущества!`);
-        return;
-    }
-    
-    // Возвращаем 70% стоимости
     const refund = Math.floor(property.price * 0.7);
     await db.updateMoney(sender, refund, 'property_sell', `Продажа имущества #${propertyId}`, 'system');
-    
-    // Освобождаем имущество
     await db.run(`UPDATE property SET owner_nick = NULL, is_available = 1, co_owner1 = NULL, co_owner2 = NULL WHERE id = ?`, [propertyId]);
     
-    // Удаляем из региона
     const regionName = `TRTR${propertyId}`;
     bot.chat(`/rg removemember ${regionName} ${sender}`);
     
-    bot.chat(`/msg ${sender} &a✅ Вы продали ${getPropertyTypeName(property.type)} #${propertyId} за ${utils.formatMoney(refund)}`);
-    bot.chat(`/cc &a🏠 ${sender} продал ${getPropertyTypeName(property.type)} #${propertyId}`);
-    
+    sendMessage(bot, sender, `&a&l|&f Вы продали ${property.type} #&e${propertyId} &aза &e${refund.toLocaleString()}₽`);
+    bot.chat(`/cc &a🏠 ${sender} продал ${property.type} #${propertyId}`);
     if (addLog) addLog(`🏠 ${sender} продал ${property.type} #${propertyId} за ${refund}`, 'info');
 }
 
 // ============================================
-// /imflag [флаг] [on/off] - Управление флагами региона
+// /imflag [флаг] [on/off] - Управление флагами
 // ============================================
+
 async function imflag(bot, sender, args, db) {
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /imflag [флаг] [on/off]`);
-        bot.chat(`/msg ${sender} &7Доступные флаги: use, item-drop`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/imflag [флаг] [on/off]`);
+        sendMessage(bot, sender, `&7&l|&f Доступные флаги: &euse, item-drop`);
         return;
     }
     
-    const flag = args[0].toLowerCase();
-    const state = args[1].toLowerCase();
-    
-    // Получаем имущество игрока
     const properties = await db.getPlayerProperties(sender);
     if (!properties || properties.length === 0) {
-        bot.chat(`/msg ${sender} &cУ вас нет имущества!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет имущества`);
         return;
     }
     
-    // Для простоты используем первое имущество
     const property = properties[0];
     const regionName = `TRTR${property.id}`;
-    
+    const flag = args[0].toLowerCase();
+    const state = args[1].toLowerCase();
     const allowDeny = state === 'on' ? 'allow' : 'deny';
     
-    if (flag === 'use') {
-        bot.chat(`/rg f ${regionName} use ${allowDeny}`);
-        bot.chat(`/msg ${sender} &a✅ Флаг use установлен в ${state.toUpperCase()}`);
-    } else if (flag === 'item-drop') {
-        bot.chat(`/rg f ${regionName} item-drop ${allowDeny}`);
-        bot.chat(`/msg ${sender} &a✅ Флаг item-drop установлен в ${state.toUpperCase()}`);
+    if (flag === 'use' || flag === 'item-drop') {
+        bot.chat(`/rg f ${regionName} ${flag} ${allowDeny}`);
+        sendMessage(bot, sender, `&a&l|&f Флаг &e${flag} &aустановлен в &e${state.toUpperCase()}`);
     } else {
-        bot.chat(`/msg ${sender} &cНеизвестный флаг. Доступно: use, item-drop`);
+        sendMessage(bot, sender, `&4&l|&c Неизвестный флаг. Доступно: &euse, item-drop`);
     }
 }
 
 // ============================================
-// /imm [add/del] [id] [ник] - Добавить/удалить сожителя
+// /imm [add/del] [id] [ник] - Сожители
 // ============================================
+
 async function imm(bot, sender, args, db, addLog) {
     if (args.length < 3) {
-        bot.chat(`/msg ${sender} &cИспользование: /imm [add/del] [id] [ник]`);
-        bot.chat(`/msg ${sender} &7Добавлять сожителей можно только в квартиры и дома (макс 2)`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/imm [add/del] [id] [ник]`);
         return;
     }
     
@@ -231,77 +186,59 @@ async function imm(bot, sender, args, db, addLog) {
     const target = args[2];
     
     const property = await db.getProperty(propertyId);
-    if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
+    if (!property || property.owner_nick !== sender) {
+        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
         return;
     }
     
-    if (property.owner_nick !== sender) {
-        bot.chat(`/msg ${sender} &cВы не являетесь владельцем этого имущества!`);
-        return;
-    }
-    
-    // Проверяем тип имущества (только квартиры и дома)
     if (property.type !== 'apartment' && property.type !== 'house') {
-        bot.chat(`/msg ${sender} &cСожителей можно добавлять только в квартиры и дома!`);
+        sendMessage(bot, sender, `&4&l|&c Сожителей можно добавлять только в квартиры и дома`);
         return;
     }
     
     if (action === 'add') {
-        // Проверяем, что игрок в клане и в RP
         const clanMember = await db.getClanMember(target);
         const rpProfile = await db.getRPProfile(target);
         
         if (!clanMember) {
-            bot.chat(`/msg ${sender} &cИгрок ${target} не состоит в клане!`);
+            sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в клане`);
             return;
         }
-        
         if (!rpProfile) {
-            bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RolePlay!`);
+            sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay`);
             return;
         }
         
-        // Проверяем количество сожителей
-        const residents = await db.getPropertyResidents(propertyId);
+        const residents = await db.all(`SELECT resident_nick FROM property_residents WHERE property_id = ?`, [propertyId]);
         if (residents.length >= 2) {
-            bot.chat(`/msg ${sender} &cНельзя добавить более 2 сожителей!`);
+            sendMessage(bot, sender, `&4&l|&c Нельзя добавить более 2 сожителей`);
             return;
         }
         
-        // Добавляем в БД
-        await db.addPropertyResident(propertyId, target);
+        await db.run(`INSERT OR REPLACE INTO property_residents (property_id, resident_nick, added_by, is_active) VALUES (?, ?, ?, 1)`, [propertyId, target, sender]);
+        bot.chat(`/rg addmember TRTR${propertyId} ${target}`);
         
-        // Добавляем в регион
-        const regionName = `TRTR${propertyId}`;
-        bot.chat(`/rg addmember ${regionName} ${target}`);
-        
-        bot.chat(`/msg ${sender} &a✅ ${target} добавлен как сожитель в имущество #${propertyId}`);
-        bot.chat(`/msg ${target} &a✅ ${sender} добавил вас как сожителя в имущество #${propertyId}`);
-        
+        sendMessage(bot, sender, `&a&l|&f ${target} &aдобавлен как сожитель в имущество #&e${propertyId}`);
+        sendMessage(bot, target, `&a&l|&f ${sender} добавил вас как сожителя в имущество #&e${propertyId}`);
         if (addLog) addLog(`🏠 ${sender} добавил сожителя ${target} в #${propertyId}`, 'info');
         
     } else if (action === 'del') {
-        // Удаляем из БД
-        await db.removePropertyResident(propertyId, target);
+        await db.run(`DELETE FROM property_residents WHERE property_id = ? AND resident_nick = ?`, [propertyId, target]);
+        bot.chat(`/rg removemember TRTR${propertyId} ${target}`);
         
-        // Удаляем из региона
-        const regionName = `TRTR${propertyId}`;
-        bot.chat(`/rg removemember ${regionName} ${target}`);
-        
-        bot.chat(`/msg ${sender} &a✅ ${target} удалён из сожителей имущества #${propertyId}`);
-        bot.chat(`/msg ${target} &c❌ ${sender} удалил вас из сожителей имущества #${propertyId}`);
-        
+        sendMessage(bot, sender, `&a&l|&f ${target} &aудалён из сожителей имущества #&e${propertyId}`);
+        sendMessage(bot, target, `&c&l|&f ${sender} удалил вас из сожителей имущества #&e${propertyId}`);
         if (addLog) addLog(`🏠 ${sender} удалил сожителя ${target} из #${propertyId}`, 'info');
     }
 }
 
 // ============================================
-// /imnalog [info/dep] [id] [сумма] - Налог на имущество
+// /imnalog [info/dep] [id] [сумма] - Налог
 // ============================================
+
 async function imnalog(bot, sender, args, db, addLog) {
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /imnalog [info/dep] [id] [сумма]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/imnalog [info/dep] [id] [сумма]`);
         return;
     }
     
@@ -310,57 +247,38 @@ async function imnalog(bot, sender, args, db, addLog) {
     const amount = parseFloat(args[2]);
     
     const property = await db.getProperty(propertyId);
-    if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с ID ${propertyId} не найдено!`);
-        return;
-    }
-    
-    if (property.owner_nick !== sender) {
-        bot.chat(`/msg ${sender} &cВы не являетесь владельцем этого имущества!`);
+    if (!property || property.owner_nick !== sender) {
+        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
         return;
     }
     
     const taxRate = await db.getSetting('property_tax_rate') || 0.01;
-    const yearlyTax = property.price * taxRate;
-    const monthlyTax = yearlyTax / 12;
+    const monthlyTax = property.price * taxRate / 12;
     
     if (action === 'info') {
-        const lastPay = property.last_tax_pay ? new Date(property.last_tax_pay) : null;
-        const debt = property.tax_accumulated || 0;
-        
-        bot.chat(`/msg ${sender} &6🏠 НАЛОГ НА ИМУЩЕСТВО #${propertyId}`);
-        bot.chat(`/msg ${sender} &7Ставка: &e${(taxRate * 100)}%`);
-        bot.chat(`/msg ${sender} &7Налог в месяц: &e${utils.formatMoney(monthlyTax)}`);
-        bot.chat(`/msg ${sender} &7Накопленный долг: &e${utils.formatMoney(debt)}`);
-        if (lastPay) {
-            bot.chat(`/msg ${sender} &7Последняя оплата: &e${lastPay.toLocaleDateString()}`);
-        }
-        
+        sendMessage(bot, sender, `&a&l|&f Налог на имущество #&e${propertyId}`);
+        sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
+        sendMessage(bot, sender, `&7&l|&f Долг: &e${(property.tax_accumulated || 0).toLocaleString()}₽`);
     } else if (action === 'dep') {
         if (isNaN(amount) || amount <= 0) {
-            bot.chat(`/msg ${sender} &cУкажите сумму для оплаты!`);
+            sendMessage(bot, sender, `&4&l|&c Укажите сумму для оплаты`);
             return;
         }
         
         const profile = await db.getRPProfile(sender);
         if (!profile || profile.money < amount) {
-            bot.chat(`/msg ${sender} &cНедостаточно средств!`);
+            sendMessage(bot, sender, `&4&l|&c Недостаточно средств`);
             return;
         }
         
-        // Списываем деньги и обновляем налог
         await db.updateMoney(sender, -amount, 'tax', `Оплата налога за имущество #${propertyId}`, 'system');
         
-        // Обновляем накопленный налог
         const currentDebt = property.tax_accumulated || 0;
         const newDebt = Math.max(0, currentDebt - amount);
         await db.run(`UPDATE property SET tax_accumulated = ?, last_tax_pay = CURRENT_TIMESTAMP WHERE id = ?`, [newDebt, propertyId]);
         
-        bot.chat(`/msg ${sender} &a✅ Оплачено ${utils.formatMoney(amount)} в счёт налога за имущество #${propertyId}`);
-        if (newDebt === 0) {
-            bot.chat(`/msg ${sender} &a✅ Налог полностью погашен!`);
-        }
-        
+        sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aв счёт налога за имущество #&e${propertyId}`);
+        if (newDebt === 0) sendMessage(bot, sender, `&a&l|&f Налог полностью погашен`);
         if (addLog) addLog(`💰 ${sender} оплатил налог ${amount} за #${propertyId}`, 'info');
     }
 }
@@ -368,26 +286,26 @@ async function imnalog(bot, sender, args, db, addLog) {
 // ============================================
 // /biz - Команды для бизнеса
 // ============================================
+
 async function biz(bot, sender, args, db, addLog) {
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /biz [flag/nalog/fin] [параметры]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/biz [flag/nalog/fin] [параметры]`);
+        return;
+    }
+    
+    const properties = await db.getPlayerProperties(sender);
+    const business = properties?.find(p => p.type === 'business');
+    
+    if (!business) {
+        sendMessage(bot, sender, `&4&l|&c У вас нет бизнеса`);
         return;
     }
     
     const action = args[0].toLowerCase();
     
-    // Получаем бизнес игрока
-    const properties = await db.getPlayerProperties(sender);
-    const business = properties.find(p => p.type === 'business');
-    
-    if (!business) {
-        bot.chat(`/msg ${sender} &cУ вас нет бизнеса!`);
-        return;
-    }
-    
     if (action === 'flag') {
         if (args.length < 3) {
-            bot.chat(`/msg ${sender} &cИспользование: /biz flag [флаг] [on/off]`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz flag [флаг] [on/off]`);
             return;
         }
         const flag = args[1];
@@ -395,11 +313,11 @@ async function biz(bot, sender, args, db, addLog) {
         const regionName = `TRTR${business.id}`;
         const allowDeny = state === 'on' ? 'allow' : 'deny';
         bot.chat(`/rg f ${regionName} ${flag} ${allowDeny}`);
-        bot.chat(`/msg ${sender} &a✅ Флаг ${flag} установлен в ${state.toUpperCase()}`);
+        sendMessage(bot, sender, `&a&l|&f Флаг &e${flag} &aустановлен в &e${state.toUpperCase()}`);
         
     } else if (action === 'nalog') {
         if (args.length < 2) {
-            bot.chat(`/msg ${sender} &cИспользование: /biz nalog [info/dep] [сумма]`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz nalog [info/dep] [сумма]`);
             return;
         }
         const subAction = args[1];
@@ -407,55 +325,53 @@ async function biz(bot, sender, args, db, addLog) {
         
         if (subAction === 'info') {
             const taxRate = await db.getSetting('business_tax_rate') || 0.02;
-            const yearlyTax = business.price * taxRate;
-            bot.chat(`/msg ${sender} &6🏪 НАЛОГ НА БИЗНЕС #${business.id}`);
-            bot.chat(`/msg ${sender} &7Ставка: &e${(taxRate * 100)}%`);
-            bot.chat(`/msg ${sender} &7Налог в месяц: &e${utils.formatMoney(yearlyTax / 12)}`);
+            const monthlyTax = business.price * taxRate / 12;
+            sendMessage(bot, sender, `&a&l|&f Налог на бизнес #&e${business.id}`);
+            sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
         } else if (subAction === 'dep' && !isNaN(amount)) {
             await db.updateMoney(sender, -amount, 'tax', `Оплата налога за бизнес #${business.id}`, 'system');
-            bot.chat(`/msg ${sender} &a✅ Оплачено ${utils.formatMoney(amount)} налога за бизнес`);
+            sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aналога за бизнес`);
         }
         
     } else if (action === 'fin') {
         if (args.length < 3) {
-            bot.chat(`/msg ${sender} &cИспользование: /biz fin [id] [время]`);
-            bot.chat(`/msg ${sender} &7Время: 1h, 1d, 1w, all`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz fin [id] [время]`);
+            sendMessage(bot, sender, `&7&l|&f Время: &e1h, 1d, 1w, all`);
             return;
         }
         const bizId = args[1];
         const period = args[2];
         
-        const income = await db.getBusinessIncome(bizId, period);
-        bot.chat(`/msg ${sender} &6💰 ФИНАНСЫ БИЗНЕСА #${bizId} за ${period}`);
-        bot.chat(`/msg ${sender} &7Доход: &e${utils.formatMoney(income)}`);
+        const businessData = await db.get(`SELECT total_income FROM businesses WHERE property_id = ?`, [bizId]);
+        sendMessage(bot, sender, `&a&l|&f Финансы бизнеса #&e${bizId} &7(${period})`);
+        sendMessage(bot, sender, `&7&l|&f Доход: &e${businessData?.total_income?.toLocaleString() || 0}₽`);
     }
 }
 
 // ============================================
 // /office - Команды для офисов
 // ============================================
+
 async function office(bot, sender, args, db, addLog) {
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /office [nalog/fin/info] [параметры]`);
+        sendMessage(bot, sender, `&4&l|&c Использование: &e/office [nalog/fin/info] [параметры]`);
         return;
     }
     
-    const action = args[0].toLowerCase();
-    
-    // Получаем офис игрока
     const properties = await db.getPlayerProperties(sender);
-    const officeProp = properties.find(p => p.type === 'office');
+    const officeProp = properties?.find(p => p.type === 'office');
     
     if (!officeProp) {
-        bot.chat(`/msg ${sender} &cУ вас нет офиса!`);
+        sendMessage(bot, sender, `&4&l|&c У вас нет офиса`);
         return;
     }
     
-    const office = await db.getOffice(officeProp.id);
+    const officeData = await db.get(`SELECT * FROM offices WHERE property_id = ?`, [officeProp.id]);
+    const action = args[0].toLowerCase();
     
     if (action === 'nalog') {
         if (args.length < 2) {
-            bot.chat(`/msg ${sender} &cИспользование: /office nalog [info/dep] [сумма]`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/office nalog [info/dep] [сумма]`);
             return;
         }
         const subAction = args[1];
@@ -463,69 +379,41 @@ async function office(bot, sender, args, db, addLog) {
         
         if (subAction === 'info') {
             const taxRate = await db.getSetting('office_tax_rate') || 0.015;
-            const yearlyTax = officeProp.price * taxRate;
-            bot.chat(`/msg ${sender} &6🏛️ НАЛОГ НА ОФИС #${officeProp.id}`);
-            bot.chat(`/msg ${sender} &7Ставка: &e${(taxRate * 100)}%`);
-            bot.chat(`/msg ${sender} &7Налог в месяц: &e${utils.formatMoney(yearlyTax / 12)}`);
+            const monthlyTax = officeProp.price * taxRate / 12;
+            sendMessage(bot, sender, `&a&l|&f Налог на офис #&e${officeProp.id}`);
+            sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
         } else if (subAction === 'dep' && !isNaN(amount)) {
             await db.updateMoney(sender, -amount, 'tax', `Оплата налога за офис #${officeProp.id}`, 'system');
-            bot.chat(`/msg ${sender} &a✅ Оплачено ${utils.formatMoney(amount)} налога за офис`);
+            sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aналога за офис`);
         }
         
     } else if (action === 'fin') {
         if (args.length < 3) {
-            bot.chat(`/msg ${sender} &cИспользование: /office fin [id] [время]`);
+            sendMessage(bot, sender, `&4&l|&c Использование: &e/office fin [id] [время]`);
             return;
         }
         const officeId = args[1];
         const period = args[2];
         
-        const income = await db.getOfficeIncome(officeId, period);
-        bot.chat(`/msg ${sender} &6💰 ФИНАНСЫ ОФИСА #${officeId} за ${period}`);
-        bot.chat(`/msg ${sender} &7Доход: &e${utils.formatMoney(income)}`);
-        bot.chat(`/msg ${sender} &7Уровень: &e${office?.level || 4}/10`);
+        sendMessage(bot, sender, `&a&l|&f Финансы офиса #&e${officeId} &7(${period})`);
+        sendMessage(bot, sender, `&7&l|&f Доход: &e${officeData?.total_income?.toLocaleString() || 0}₽`);
+        sendMessage(bot, sender, `&7&l|&f Уровень: &e${officeData?.level || 4}/10`);
         
     } else if (action === 'info') {
-        bot.chat(`/msg ${sender} &6🏛️ ИНФОРМАЦИЯ О ОФИСЕ #${officeProp.id}`);
-        bot.chat(`/msg ${sender} &7Тип: &e${getOfficeTypeName(office?.office_type)}`);
-        bot.chat(`/msg ${sender} &7Уровень: &e${office?.level || 4}/10`);
-        bot.chat(`/msg ${sender} &7Доход всего: &e${utils.formatMoney(office?.total_income || 0)}`);
+        sendMessage(bot, sender, `&a&l|&f Офис #&e${officeProp.id}`);
+        sendMessage(bot, sender, `&7&l|&f Тип: &e${officeData?.office_type || 'Не выбран'} &7| Уровень: &e${officeData?.level || 4}/10`);
+        sendMessage(bot, sender, `&7&l|&f Доход всего: &e${officeData?.total_income?.toLocaleString() || 0}₽`);
         
-        const nextLevel = (office?.level || 4) + 1;
+        const nextLevel = (officeData?.level || 4) + 1;
         const questionsNeeded = nextLevel * 5;
-        bot.chat(`/msg ${sender} &7Для повышения до ${nextLevel} уровня нужно: &e${questionsNeeded} правильных ответов`);
+        sendMessage(bot, sender, `&7&l|&f Для повышения до ${nextLevel} уровня нужно: &e${questionsNeeded} &7правильных ответов`);
     }
-}
-
-// ============================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ============================================
-
-function getPropertyTypeName(type) {
-    const names = {
-        'apartment': 'Квартиру',
-        'house': 'Дом',
-        'business': 'Бизнес',
-        'office': 'Офис',
-        'port': 'Порт'
-    };
-    return names[type] || type;
-}
-
-function getOfficeTypeName(type) {
-    const names = {
-        'crypto': 'Крипто-майнинг',
-        'it': 'IT-разработка',
-        'marketing': 'Маркетинг',
-        'finance': 'Финансы',
-        'legal': 'Юридические услуги'
-    };
-    return names[type] || type || 'Не выбран';
 }
 
 // ============================================
 // ЭКСПОРТ
 // ============================================
+
 module.exports = {
     im,
     imflag,

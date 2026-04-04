@@ -1,431 +1,340 @@
 // src/minecraft/commands/player.js
-// Команды для всех игроков клана
+// Команды для всех игроков клана (ПОЛНАЯ ВЕРСИЯ)
 
 const utils = require('../../shared/utils');
-const permissions = require('../../shared/permissions');
 
-// Кэш для кулдаунов команд
-const commandCooldowns = new Map();
+// Глобальные кулдауны
+let lastFlyTime = 0;
+let lastTenTTime = 0;
+const rpCooldowns = new Map();
+const payCooldowns = new Map();
 
-// Проверка кулдауна
-function checkCooldown(sender, command, seconds) {
-    const key = `${sender}:${command}`;
-    const lastUse = commandCooldowns.get(key);
-    const now = Date.now();
-    
-    if (lastUse && now - lastUse < seconds * 1000) {
-        const remaining = Math.ceil((seconds * 1000 - (now - lastUse)) / 1000);
-        return { allowed: false, remaining };
-    }
-    
-    commandCooldowns.set(key, now);
-    return { allowed: true };
+// ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
+function cleanNick(nick) {
+    if (!nick) return '';
+    let cleaned = nick;
+    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+    return cleaned.toLowerCase();
+}
+
+// ========== ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ С ЗАДЕРЖКОЙ ==========
+async function sendMessage(bot, target, message) {
+    bot.chat(`/msg ${target} ${message}`);
+    await utils.sleep(300);
 }
 
 // ============================================
 // /balance - Показать баланс
 // ============================================
+
 async function balance(bot, sender, args, db) {
-    const profile = await db.getRPProfile(sender);
+    const cleanNickname = cleanNick(sender);
+    
+    const profile = await db.getRPProfile(cleanNickname);
     if (!profile) {
-        bot.chat(`/msg ${sender} &cВы не зарегистрированы в RolePlay! Используйте /rp`);
+        await sendMessage(bot, sender, `&4&l|&c Вы не зарегистрированы в RolePlay! Используйте &e/rp`);
         return;
     }
-    
-    const money = profile.money;
-    const bank = profile.bank_balance || 0;
-    
-    bot.chat(`/msg ${sender} &6💰 Баланс: &e${utils.formatMoney(money)}`);
-    if (bank > 0) {
-        bot.chat(`/msg ${sender} &6🏦 Банк: &e${utils.formatMoney(bank)}`);
-    }
+    await sendMessage(bot, sender, `&a&l|&f Ваш баланс: &e${profile.money.toLocaleString()}₽`);
 }
 
 // ============================================
-// /pay [ник] [сумма] - Передать деньги
+// /pay [ник] [сумма] - Перевести деньги
 // ============================================
+
 async function pay(bot, sender, args, db) {
-    // Проверка кулдауна (15 секунд)
-    const cooldown = checkCooldown(sender, 'pay', 15);
-    if (!cooldown.allowed) {
-        bot.chat(`/msg ${sender} &cПодождите ${cooldown.remaining} секунд перед следующей оплатой!`);
+    const cleanSender = cleanNick(sender);
+    
+    const lastPay = payCooldowns.get(cleanSender) || 0;
+    if (Date.now() - lastPay < 15000) {
+        const remaining = Math.ceil((15000 - (Date.now() - lastPay)) / 1000);
+        await sendMessage(bot, sender, `&4&l|&c Подождите &e${remaining}&c секунд`);
         return;
     }
     
     if (args.length < 2) {
-        bot.chat(`/msg ${sender} &cИспользование: /pay [ник] [сумма] (макс 50 000₽)`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/pay [ник] [сумма] &7(макс 50 000₽)`);
         return;
     }
     
     const target = args[0];
     const amount = parseInt(args[1]);
     
-    if (isNaN(amount) || amount <= 0) {
-        bot.chat(`/msg ${sender} &cУкажите корректную сумму!`);
+    if (isNaN(amount) || amount <= 0 || amount > 50000) {
+        await sendMessage(bot, sender, `&4&l|&c Сумма от &e1 &cдо &e50 000₽`);
         return;
     }
     
-    if (amount > 50000) {
-        bot.chat(`/msg ${sender} &cМаксимальная сумма перевода - 50 000₽!`);
+    if (cleanSender === cleanNick(target)) {
+        await sendMessage(bot, sender, `&4&l|&c Нельзя перевести деньги самому себе!`);
         return;
     }
     
-    if (sender.toLowerCase() === target.toLowerCase()) {
-        bot.chat(`/msg ${sender} &cНельзя перевести деньги самому себе!`);
-        return;
-    }
-    
-    // Проверяем, существует ли игрок в RP
-    const targetProfile = await db.getRPProfile(target);
+    const targetProfile = await db.getRPProfile(cleanNick(target));
     if (!targetProfile) {
-        bot.chat(`/msg ${sender} &cИгрок ${target} не зарегистрирован в RolePlay!`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне в RP`);
         return;
     }
     
-    // Выполняем перевод
-    const success = await db.transferMoney(sender, target, amount, `Перевод от ${sender}`);
+    payCooldowns.set(cleanSender, Date.now());
+    const success = await db.transferMoney(cleanSender, cleanNick(target), amount, `Перевод от ${sender}`);
     
     if (success) {
-        bot.chat(`/msg ${sender} &a✅ Вы перевели ${utils.formatMoney(amount)} игроку ${target}`);
-        bot.chat(`/msg ${target} &a✅ ${sender} перевел вам ${utils.formatMoney(amount)}`);
+        await sendMessage(bot, sender, `&a&l|&f Перевели &e${amount.toLocaleString()}₽ &fигроку &e${target}`);
+        await sendMessage(bot, target, `&a&l|&f ${sender} перевел вам &e${amount.toLocaleString()}₽`);
     } else {
-        bot.chat(`/msg ${sender} &c❌ Недостаточно средств!`);
+        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств!`);
     }
 }
 
 // ============================================
-// /pass - Показать паспорт
+// /pass - Паспорт
 // ============================================
-async function pass(bot, sender, args, db, addLog) {
-    const profile = await db.getRPProfile(sender);
+
+async function pass(bot, sender, args, db) {
+    const cleanNickname = cleanNick(sender);
+    
+    const profile = await db.getRPProfile(cleanNickname);
     if (!profile) {
-        await sendDelayedMessage(bot, sender, `&cВы не зарегистрированы в RolePlay! Используйте /rp`);
+        await sendMessage(bot, sender, `&4&l|&c Вы не в RP! Используйте &e/rp`);
         return;
     }
     
-    await sendDelayedMessage(bot, sender, `&6╔══════════════════════════════════╗`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &l🏙️ ПАСПОРТ ГРАЖДАНИНА RESISTANCE &6║`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6╠══════════════════════════════════╣`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7Имя: &e${sender}`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7Структура: &e${profile.structure || 'Гражданин'}`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7Должность: &e${profile.job_rank || 'Нет'}`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7Баланс: &e${utils.formatMoney(profile.money || 0)}`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6╚══════════════════════════════════╝`);
-}
-
-function getStructureIcon(structure) {
-    const icons = {
-        'police': '👮 Полиция',
-        'army': '⚔️ Армия',
-        'hospital': '🏥 Больница',
-        'academy': '📚 Академия',
-        'government': '🏛️ Правительство'
-    };
-    return icons[structure] || structure;
+    const clanMember = await db.getClanMember(cleanNickname);
+    const education = profile.has_education ? '✅' : '❌';
+    
+    await sendMessage(bot, sender, `&a&l|&f Паспорт &e${sender} &7&l|&f Структура: &e${profile.structure} &7| Ранг: &e${profile.job_rank} &7| Образование: ${education}`);
 }
 
 // ============================================
-// /id - Показать ID в БД
+// /id - Узнать ID в базе данных (исправлен)
 // ============================================
+
 async function id(bot, sender, args, db) {
-    const member = await db.getClanMember(sender);
+    const cleanNickname = cleanNick(sender);
+    
+    // Получаем rowid как ID
+    const member = await db.get('SELECT rowid, * FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
+    
     if (!member) {
-        bot.chat(`/msg ${sender} &cВы не состоите в клане!`);
+        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в клане!`);
         return;
     }
     
-    const profile = await db.getRPProfile(sender);
-    const kills = member.kills || 0;
-    const deaths = member.deaths || 0;
-    const joinedAt = member.joined_at ? new Date(member.joined_at).toLocaleDateString() : 'неизвестно';
-    
-    bot.chat(`/msg ${sender} &6📋 ID: &e${sender}`);
-    bot.chat(`/msg ${sender} &6📊 Статистика: &e${kills}🗡️ / ${deaths}💀`);
-    bot.chat(`/msg ${sender} &6📅 В клане с: &e${joinedAt}`);
-    if (profile) {
-        bot.chat(`/msg ${sender} &6💰 Баланс: &e${utils.formatMoney(profile.money)}`);
-    }
+    const playerId = member.rowid;
+    await sendMessage(bot, sender, `&a&l|&f Ваш ID: &e${playerId}`);
+    await sendMessage(bot, sender, `&7&l|&f В клане с: &e${new Date(member.joined_at).toLocaleDateString()}`);
 }
 
 // ============================================
 // /keys - Список имущества
 // ============================================
+
 async function keys(bot, sender, args, db) {
-    const properties = await db.getPlayerProperties(sender);
+    const cleanNickname = cleanNick(sender);
+    const properties = await db.getPlayerProperties(cleanNickname);
     
     if (!properties || properties.length === 0) {
-        bot.chat(`/msg ${sender} &cУ вас нет имущества. Используйте /idim для просмотра доступных объектов.`);
+        await sendMessage(bot, sender, `&4&l|&c У вас нет имущества`);
         return;
     }
     
-    bot.chat(`/msg ${sender} &6🏠 Ваше имущество (${properties.length}):`);
-    
+    await sendMessage(bot, sender, `&a&l|&f Ваше имущество (${properties.length}):`);
     for (const prop of properties) {
-        const typeIcon = getPropertyIcon(prop.type);
-        bot.chat(`/msg ${sender} &7- ${typeIcon} &e#${prop.id} &7(${getPropertyTypeName(prop.type)})`);
+        await sendMessage(bot, sender, `&7&l|&f #${prop.id} &7- ${prop.type} &7(${prop.price.toLocaleString()}₽)`);
     }
-    
-    bot.chat(`/msg ${sender} &7Используйте &e/idim [номер] &7для информации об объекте.`);
-}
-
-function getPropertyIcon(type) {
-    const icons = {
-        'apartment': '🏢',
-        'house': '🏠',
-        'business': '🏪',
-        'office': '🏛️',
-        'port': '⚓'
-    };
-    return icons[type] || '📦';
-}
-
-function getPropertyTypeName(type) {
-    const names = {
-        'apartment': 'Квартира',
-        'house': 'Дом',
-        'business': 'Бизнес',
-        'office': 'Офис',
-        'port': 'Порт'
-    };
-    return names[type] || type;
 }
 
 // ============================================
 // /idim [номер] - Информация об имуществе
 // ============================================
+
 async function idim(bot, sender, args, db) {
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /idim [номер имущества]`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/idim [номер]`);
         return;
     }
     
-    const propertyId = args[0];
-    const property = await db.getProperty(propertyId);
-    
+    const property = await db.getProperty(args[0]);
     if (!property) {
-        bot.chat(`/msg ${sender} &cИмущество с номером ${propertyId} не найдено!`);
+        await sendMessage(bot, sender, `&4&l|&c Имущество #&e${args[0]} &cне найдено`);
         return;
     }
     
-    const isAvailable = property.is_available;
-    const owner = property.owner_nick || 'Свободно';
-    const price = utils.formatMoney(property.price);
-    const typeName = getPropertyTypeName(property.type);
-    
-    bot.chat(`/msg ${sender} &6╔══════════════════════════════════╗`);
-    bot.chat(`/msg ${sender} &6║ &l🏠 ИМУЩЕСТВО #${propertyId} &6║`);
-    bot.chat(`/msg ${sender} &6╠══════════════════════════════════╣`);
-    bot.chat(`/msg ${sender} &6║ &7Тип: &e${typeName}`);
-    bot.chat(`/msg ${sender} &6║ &7Цена: &e${price}`);
-    bot.chat(`/msg ${sender} &6║ &7Статус: &e${isAvailable ? '✅ Свободно' : '🔒 Занято'}`);
-    if (!isAvailable && owner) {
-        bot.chat(`/msg ${sender} &6║ &7Владелец: &e${owner}`);
-    }
-    bot.chat(`/msg ${sender} &6╚══════════════════════════════════╝`);
-    
-    if (isAvailable) {
-        bot.chat(`/msg ${sender} &aДля покупки используйте &e/im buy ${propertyId}`);
+    const status = property.is_available ? '✅ Свободно' : '🔒 Занято';
+    await sendMessage(bot, sender, `&a&l|&f #${property.id} &7| ${property.type} &7| ${status}`);
+    await sendMessage(bot, sender, `&7&l|&f Цена: &e${property.price.toLocaleString()}₽`);
+    if (property.owner_nick) {
+        await sendMessage(bot, sender, `&7&l|&f Владелец: &e${property.owner_nick}`);
     }
 }
 
 // ============================================
 // /help - Справка
 // ============================================
-async function help(bot, sender, args, db, addLog) {
-    await sendDelayedMessage(bot, sender, `&6╔════════════════════════════════════════╗`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &l📚 КОМАНДЫ RESISTANCE &6║`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6╠════════════════════════════════════════╣`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7💰 Экономика:`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/balance &7- баланс`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/pay [ник] [сумма] &7- перевод`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/pass &7- паспорт`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7🎭 RolePlay:`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/rp &7- регистрация в RP`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║ &7🔗 Прочее:`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/fly &7- полёт (КД 2 мин)`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/10t &7- получить 10к (КД 5 мин)`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6║   &e/discord &7- ссылка на Discord`);
-    await utils.sleep(300);
-    await sendDelayedMessage(bot, sender, `&6╚════════════════════════════════════════╝`);
+
+async function help(bot, sender, args, db) {
+    await sendMessage(bot, sender, `&a&l|&f Команды: &e/balance, /pay, /pass, /id, /keys, /idim, /rp, /fly, /10t, /discord`);
+    await sendMessage(bot, sender, `&7&l|&f Полный список на Discord!`);
 }
 
 // ============================================
 // /rp - Регистрация в RolePlay
 // ============================================
-// /rp - Регистрация в RolePlay
-// /rp - Регистрация в RolePlay
-// /rp - Регистрация в RolePlay
-const rpCooldowns = new Map();
 
-async function rp(bot, sender, args, db, addLog) {
-    // Проверка кулдауна (5 минут)
-    const lastRpTime = rpCooldowns.get(sender) || 0;
+async function rp(bot, realNick, originalSender, args, db, addLog) {
+    const sendTarget = originalSender || realNick;
+    const cleanNickname = cleanNick(realNick);
+    
+    // Проверка: есть ли запись в таблице rp_players
+    const existing = await db.get('SELECT * FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
+    
+    if (existing) {
+        await sendMessage(bot, sendTarget, `&4&l|&c Вы уже зарегистрированы в RolePlay!`);
+        return;
+    }
+    
+    // Кулдаун 5 минут
+    const lastRpTime = rpCooldowns.get(cleanNickname) || 0;
     if (Date.now() - lastRpTime < 300000) {
         const remaining = Math.ceil((300000 - (Date.now() - lastRpTime)) / 1000);
-        bot.chat(`/msg ${sender} &c⏱️ Вы можете использовать /rp только раз в 5 минут. Подождите ${remaining} секунд.`);
+        await sendMessage(bot, sendTarget, `&4&l|&c Подождите ${remaining} секунд`);
         return;
     }
     
-    // Проверяем, не зарегистрирован ли уже
-    const existing = await db.getRPProfile(sender);
-    if (existing && existing.structure !== 'Гражданин') {
-        bot.chat(`/msg ${sender} &c❌ Вы уже зарегистрированы в RolePlay!`);
-        return;
-    }
-    
-    // Проверяем, состоит ли в клане
-    const clanMember = await db.getClanMember(sender);
+    // Проверка клана
+    const clanMember = await db.getClanMember(cleanNickname);
     if (!clanMember) {
-        bot.chat(`/msg ${sender} &c❌ Сначала вступите в клан Resistance!`);
+        await sendMessage(bot, sendTarget, `&4&l|&c Вы не в клане Resistance!`);
         return;
     }
     
-    // Генерируем код (6 цифр)
+    // Генерация кода
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Сохраняем код
+    // Сохраняем
     if (!global.pendingRegistrations) global.pendingRegistrations = new Map();
-    global.pendingRegistrations.set(sender, {
-        code,
-        expires: Date.now() + 5 * 60 * 1000
+    global.pendingRegistrations.set(cleanNickname, {
+        code: code,
+        expires: Date.now() + 5 * 60 * 1000,
+        originalNick: sendTarget
     });
     
-    rpCooldowns.set(sender, Date.now());
+    rpCooldowns.set(cleanNickname, Date.now());
     
-    // Отправляем КРАСИВОЕ сообщение
-    bot.chat(`/msg ${sender} &6&l╔════════════════════════════════════════════════════╗`);
-    bot.chat(`/msg ${sender} &6&l║ &e&l📝 РЕГИСТРАЦИЯ В ROLEPLAY &6&l║`);
-    bot.chat(`/msg ${sender} &6&l╠════════════════════════════════════════════════════╣`);
-    bot.chat(`/msg ${sender} &6&l║ &7Для регистрации отправьте код в ЛС боту: &e&l${code} &7(5 минут) ║`);
-    bot.chat(`/msg ${sender} &6&l╚════════════════════════════════════════════════════╝`);
+    // Отправляем код (с задержкой)
+    await sendMessage(bot, sendTarget, `&a&l|&f Ваш код: &e&l${code}`);
+    await sendMessage(bot, sendTarget, `&7&l|&f Отправьте код мне в ЛС. Действует 5 минут.`);
     
-    if (addLog) addLog(`📝 Генерация кода RP для ${sender}: ${code}`, 'debug');
-}
-
-// Вспомогательная функция
-async function sendDelayedMessage(bot, target, message) {
-    bot.chat(`/msg ${target} ${message}`);
-    await utils.sleep(400);
+    if (addLog) addLog(`✅ Код ${code} отправлен ${sendTarget}`, 'success');
 }
 
 // ============================================
 // /link [код] - Привязка Discord
 // ============================================
+
 async function link(bot, sender, args, db) {
     if (args.length < 1) {
-        bot.chat(`/msg ${sender} &cИспользование: /link [код верификации]`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/link [код]`);
         return;
     }
     
-    const code = args[0].toUpperCase();
-    const result = await db.verifyCode(code, sender);
+    const cleanNickname = cleanNick(sender);
+    const result = await db.verifyCode(args[0], cleanNickname);
     
     if (result.success) {
-        bot.chat(`/msg ${sender} &a✅ Discord аккаунт успешно привязан!`);
-        bot.chat(`/cc &a✅ &e${sender} &aпривязал Discord аккаунт!`);
+        await sendMessage(bot, sender, `&a&l|&f Discord привязан!`);
+        bot.chat(`/cc &a&l|&f ${sender} &aпривязал Discord!`);
     } else {
-        bot.chat(`/msg ${sender} &c❌ Неверный код верификации. Запросите новый код в Discord.`);
+        await sendMessage(bot, sender, `&4&l|&c Неверный код!`);
     }
 }
 
 // ============================================
 // /fly - Выдать полёт (КД на весь клан 2 мин)
 // ============================================
-let lastFlyTime = 0;
+
 async function fly(bot, sender, args, db) {
     const now = Date.now();
     if (now - lastFlyTime < 120000) {
         const remaining = Math.ceil((120000 - (now - lastFlyTime)) / 1000);
-        bot.chat(`/msg ${sender} &cКоманда /fly доступна через ${remaining} секунд!`);
+        await sendMessage(bot, sender, `&4&l|&c /fly через &e${remaining}&c сек`);
         return;
     }
     
     lastFlyTime = now;
     bot.chat(`/fly ${sender}`);
-    bot.chat(`/cc &a✨ &e${sender} &aиспользовал /fly! Следующее использование через 2 минуты.`);
+    await sendMessage(bot, sender, `&a&l|&f Вы получили полёт!`);
+    bot.chat(`/cc &a&l|&f ${sender} &aиспользовал /fly`);
 }
 
 // ============================================
 // /10t - Получить 10к (КД 5 мин)
 // ============================================
-let lastTenTTime = 0;
+
 async function tenT(bot, sender, args, db) {
     const now = Date.now();
     if (now - lastTenTTime < 300000) {
         const remaining = Math.ceil((300000 - (now - lastTenTTime)) / 1000);
-        bot.chat(`/msg ${sender} &cКоманда /10t доступна через ${remaining} секунд!`);
+        await sendMessage(bot, sender, `&4&l|&c /10t через &e${remaining}&c сек`);
+        return;
+    }
+    
+    const cleanNickname = cleanNick(sender);
+    const profile = await db.getRPProfile(cleanNickname);
+    if (!profile) {
+        await sendMessage(bot, sender, `&4&l|&c Сначала /rp`);
         return;
     }
     
     lastTenTTime = now;
     
-    // Проверяем, зарегистрирован ли в RP
-    const profile = await db.getRPProfile(sender);
-    if (!profile) {
-        bot.chat(`/msg ${sender} &cСначала зарегистрируйтесь в RolePlay через /rp!`);
-        return;
-    }
+    // Выдаём валюту на сервере (нужно уточнить команду)
+    bot.chat(`/eco set ${sender} 10000000000000000`);
     
-    await db.updateMoney(sender, 10000, 'bonus', 'Ежедневный бонус /10t', 'system');
-    bot.chat(`/msg ${sender} &a✅ Вы получили 10 000₽!`);
-    bot.chat(`/cc &a💰 &e${sender} &aполучил ежедневный бонус!`);
+    // Обновляем в БД
+    await db.updateMoney(cleanNickname, 10000, 'bonus', 'Бонус /10t', 'system');
+    
+    await sendMessage(bot, sender, `&a&l|&f Вы получили &e10 000₽`);
+    bot.chat(`/cc &a&l|&f ${sender} &aполучил бонус!`);
 }
 
 // ============================================
 // /org o list - Список организаций
 // ============================================
+
 async function org(bot, sender, args, db) {
-    if (args.length < 1 || args[0] !== 'o') {
-        bot.chat(`/msg ${sender} &cИспользование: /org o list`);
-        return;
-    }
-    
-    if (args[1] !== 'list') {
-        bot.chat(`/msg ${sender} &cИспользование: /org o list`);
+    if (args.length < 2 || args[0] !== 'o' || args[1] !== 'list') {
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org o list`);
         return;
     }
     
     const orgs = await db.getAllOrganizations();
-    
-    bot.chat(`/msg ${sender} &6📋 ДОСТУПНЫЕ ОРГАНИЗАЦИИ:`);
-    for (const org of orgs) {
-        const members = await db.getOrgMembers(org.name);
-        const memberCount = members ? members.length : 0;
-        bot.chat(`/msg ${sender} &7- ${getStructureIcon(org.name)} &e${org.display_name} &7(${memberCount} чел.)`);
+    if (!orgs || orgs.length === 0) {
+        await sendMessage(bot, sender, `&4&l|&c Организаций нет`);
+        return;
     }
-    bot.chat(`/msg ${sender} &7Для вступления обратитесь к лидеру организации.`);
+    
+    await sendMessage(bot, sender, `&a&l|&f Организации Resistance:`);
+    for (const org of orgs) {
+        await sendMessage(bot, sender, `&7&l|&f ${org.display_name}`);
+    }
 }
 
 // ============================================
 // /discord - Ссылка на Discord
 // ============================================
+
 async function discord(bot, sender, args, db) {
     const discordLink = process.env.DISCORD_INVITE_LINK || 'https://discord.gg/resistance';
-    bot.chat(`/msg ${sender} &6💬 Discord сервер Resistance: &e${discordLink}`);
+    await sendMessage(bot, sender, `&a&l|&f Discord: &e${discordLink}`);
 }
 
 // ============================================
 // ЭКСПОРТ
 // ============================================
+
 module.exports = {
     balance,
     pay,

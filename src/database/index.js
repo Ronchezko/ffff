@@ -22,12 +22,13 @@ async function initialize() {
         }
 
         db = await open({
-            filename: path.join(dataDir, 'hohols.db'),
+            filename: path.join(dataDir, 'hoholss.db'),
             driver: sqlite3.Database
         });
 
         await db.exec('PRAGMA foreign_keys = ON');
         await db.exec('PRAGMA journal_mode = WAL');
+        await ensureIdColumn();
         
         const schemaPath = path.join(__dirname, 'schema.sql');
         if (fs.existsSync(schemaPath)) {
@@ -82,16 +83,20 @@ async function run(sql, params = []) {
 // УЧАСТНИКИ КЛАНА
 // ============================================
 
+// src/database/index.js - исправленный метод addClanMember
 async function addClanMember(nick, invitedBy = null) {
-    const existing = await get('SELECT minecraft_nick FROM clan_members WHERE minecraft_nick = ?', [nick]);
+    const db = getDb();
+    // Проверяем существование без учёта регистра
+    const existing = await db.get('SELECT minecraft_nick FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [nick]);
     if (existing) return false;
     
-    await run(
+    // Сохраняем оригинальный ник, но для поиска используем LOWER
+    await db.run(
         `INSERT INTO clan_members (minecraft_nick, invited_by, rank_name, rank_priority)
          VALUES (?, ?, 'Новичок', 0)`,
         [nick, invitedBy]
     );
-    await run(`INSERT OR IGNORE INTO rp_players (minecraft_nick) VALUES (?)`, [nick]);
+    await db.run(`INSERT OR IGNORE INTO rp_players (minecraft_nick) VALUES (?)`, [nick]);
     logger.info(`➕ Игрок ${nick} добавлен в клан`);
     return true;
 }
@@ -103,7 +108,8 @@ async function removeClanMember(nick) {
 }
 
 async function getClanMember(nick) {
-    return await get('SELECT * FROM clan_members WHERE minecraft_nick = ?', [nick]);
+    const db = getDb();
+    return await db.get('SELECT * FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [nick]);
 }
 
 async function getAllClanMembers() {
@@ -153,11 +159,15 @@ async function getPlayerStats(nick) {
 // ROLEPLAY
 // ============================================
 
+// src/database/index.js - исправленный метод registerRP
+
 async function registerRP(nick) {
-    const existing = await get('SELECT minecraft_nick FROM rp_players WHERE minecraft_nick = ?', [nick]);
+    const db = getDb();
+    // Проверяем существование без учёта регистра
+    const existing = await db.get('SELECT minecraft_nick FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [nick]);
     if (existing) return false;
     
-    await run(`INSERT INTO rp_players (minecraft_nick, money, structure, job_rank) VALUES (?, 1000, 'Гражданин', 'Нет')`, [nick]);
+    await db.run(`INSERT INTO rp_players (minecraft_nick, money, structure, job_rank) VALUES (?, 1000, 'Гражданин', 'Нет')`, [nick]);
     logger.info(`🎭 Игрок ${nick} зарегистрирован в RolePlay`);
     return true;
 }
@@ -249,6 +259,38 @@ async function removePunishment(player, type, liftedBy, liftReason) {
     return true;
 }
 
+async function checkStaffLimit(nick, action) {
+    const staff = await getStaffRank(nick);
+    if (staff.rank_level < 1) return { allowed: false, reason: 'Вы не в персонале' };
+    
+    const limits = {
+        1: { kicks: 2, mutes: 20, blacklists: 20 },
+        2: { kicks: 5, mutes: 30, blacklists: 30 },
+        3: { kicks: 10, mutes: 40, blacklists: 40 },
+        4: { kicks: 25, mutes: 50, blacklists: 70 },
+        5: { kicks: 9999, mutes: 9999, blacklists: 9999 },
+        6: { kicks: 9999, mutes: 9999, blacklists: 9999 }
+    };
+    
+    const limit = limits[staff.rank_level];
+    if (!limit) return { allowed: true };
+    
+    const today = new Date().toISOString().split('T')[0];
+    let current = 0;
+    
+    if (action === 'kick') current = staff.kicks_today || 0;
+    else if (action === 'mute') current = staff.mutes_today || 0;
+    else if (action === 'blacklist') current = staff.bl_today || 0;
+    
+    const max = limit[action === 'blacklist' ? 'blacklists' : action + 's'];
+    
+    return { allowed: current < max, current, max };
+}
+
+async function incrementStaffCounter(nick, action) {
+    const field = action === 'kick' ? 'kicks_today' : (action === 'mute' ? 'mutes_today' : 'bl_today');
+    await run(`UPDATE staff_stats SET ${field} = ${field} + 1 WHERE minecraft_nick = ?`, [nick]);
+}
 async function isMuted(nick) {
     const db = getDb();
     // Поиск без учёта регистра
@@ -302,7 +344,21 @@ async function logPrivateMessage(from, to, message) {
 // ============================================
 // DISCORD ВЕРИФИКАЦИЯ
 // ============================================
-
+async function ensureIdColumn() {
+    try {
+        // Проверяем, есть ли колонка id
+        const tableInfo = await db.all(`PRAGMA table_info(clan_members)`);
+        const hasIdColumn = tableInfo.some(col => col.name === 'id');
+        
+        if (!hasIdColumn) {
+            await db.exec(`ALTER TABLE clan_members ADD COLUMN id INTEGER`);
+            await db.exec(`UPDATE clan_members SET id = rowid`);
+            logger.info('✅ Колонка id добавлена в clan_members');
+        }
+    } catch (err) {
+        logger.warn(`⚠️ Ошибка при добавлении id: ${err.message}`);
+    }
+}
 async function generateVerificationCode(minecraftNick, discordId, discordUsername) {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
@@ -337,7 +393,25 @@ async function getDiscordId(minecraftNick) {
 // ============================================
 // НАСТРОЙКИ
 // ============================================
-
+async function isBlacklisted(nick) {
+    const db = getDb();
+    const cleanNick = nick.toLowerCase().replace(/[^a-zA-Z0-9_]/g, '');
+    
+    // ОТЛАДКА: выводим все активные записи из ЧС
+    const allBlacklisted = await db.all(`SELECT * FROM clan_blacklist WHERE is_active = 1`);
+    console.log(`[DEBUG] Все активные ЧС: ${JSON.stringify(allBlacklisted)}`);
+    
+    const result = await db.get(
+        `SELECT * FROM clan_blacklist 
+         WHERE LOWER(minecraft_nick) = LOWER(?) 
+         AND is_active = 1 
+         AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)`,
+        [cleanNick]
+    );
+    
+    console.log(`[DEBUG] isBlacklisted для ${cleanNick}: ${!!result}`);
+    return !!result;
+}
 async function getSetting(key) {
     const setting = await get('SELECT value FROM settings WHERE key = ?', [key]);
     return setting ? setting.value : null;
@@ -352,12 +426,14 @@ async function setSetting(key, value, updatedBy = 'system') {
 // ============================================
 
 module.exports = {
+    ensureIdColumn,
     initialize,
     getDb,
     all,
     get,
     run,
-    
+    isBlacklisted,
+
     addClanMember,
     removeClanMember,
     getClanMember,
@@ -404,5 +480,7 @@ module.exports = {
     logClanChat,
     logPrivateMessage,
     
-    createTablesProgrammatically: async () => {}
+    createTablesProgrammatically: async () => {},
+    checkStaffLimit,
+    incrementStaffCounter
 };
