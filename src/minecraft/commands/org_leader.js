@@ -1,10 +1,54 @@
 // src/minecraft/commands/org_leader.js
-// Команды для лидеров организаций
+// Команды лидеров организаций (с Discord интеграцией)
 
 const utils = require('../../shared/utils');
 
-function sendMessage(bot, target, message) {
+// ============================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================
+
+function cleanNick(nick) {
+    if (!nick) return '';
+    let cleaned = nick;
+    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+    return cleaned.toLowerCase();
+}
+
+async function sendMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
+    await utils.sleep(400);
+}
+
+async function sendClanMessage(bot, message) {
+    bot.chat(`/cc ${message}`);
+    await utils.sleep(300);
+}
+
+// Отправка сообщения о необходимости использовать Discord
+async function sendDiscordRedirect(bot, sender, commandName) {
+    const discordLink = process.env.DISCORD_INVITE_LINK || 'https://discord.gg/resistance';
+    await sendMessage(bot, sender, `&e&l|&f Для использования команды &e/${commandName} &fперейдите в Discord сервер Resistance`);
+    await sendMessage(bot, sender, `&7&l|&f Ссылка: &e${discordLink}`);
+    await sendMessage(bot, sender, `&7&l|&f В Discord доступна полная информация и статистика`);
+}
+
+// Проверка, является ли игрок лидером организации
+async function isLeader(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    if (!profile || profile.structure === 'Гражданин') return false;
+    
+    const org = await db.getOrganization(profile.structure);
+    return org && org.leader_nick === cleanNickname;
+}
+
+// Получение организации игрока
+async function getPlayerOrg(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    if (!profile || profile.structure === 'Гражданин') return null;
+    return profile.structure;
 }
 
 // ============================================
@@ -12,177 +56,179 @@ function sendMessage(bot, target, message) {
 // ============================================
 
 async function invite(bot, sender, args, db, addLog) {
+    const cleanSender = cleanNick(sender);
+    
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер организации может приглашать игроков!`);
+        return;
+    }
+    
     if (args.length < 1) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o invite [ник]`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    if (org.leader_nick !== sender) {
-        sendMessage(bot, sender, `&4&l|&c Только лидер организации может приглашать игроков`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o invite [ник]`);
         return;
     }
     
     const target = args[0];
-    const targetProfile = await db.getRPProfile(target);
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
+    
+    const targetProfile = await db.getRPProfile(cleanTarget);
     if (!targetProfile) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay!`);
         return;
     }
     
     if (targetProfile.structure !== 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cуже состоит в организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cуже состоит в организации!`);
         return;
     }
     
-    // Проверка чёрного списка
-    const isBlacklisted = await db.getSetting(`org_blacklist_${profile.structure}_${target}`) === 'true';
+    const isBlacklisted = await db.getSetting(`org_blacklist_${orgName}_${cleanTarget}`) === 'true';
     if (isBlacklisted) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cнаходится в чёрном списке организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cнаходится в чёрном списке организации!`);
         return;
     }
     
-    // Сохраняем приглашение
-    await db.run(`INSERT OR REPLACE INTO org_invites (player, org_name, invited_by, expires_at) VALUES (?, ?, ?, datetime('now', '+1 hour'))`, 
-        [target, profile.structure, sender]);
+    await db.run(`INSERT OR REPLACE INTO org_invites (player, org_name, invited_by, expires_at) 
+        VALUES (?, ?, ?, datetime('now', '+1 hour'))`, [cleanTarget, orgName, cleanSender]);
     
-    sendMessage(bot, sender, `&a&l|&f Приглашение отправлено игроку &e${target}`);
-    sendMessage(bot, target, `&a&l|&f ${sender} приглашает вас в организацию &e${profile.structure}`);
-    sendMessage(bot, target, `&7&l|&f Для принятия используйте &e/org/o accept`);
-    if (addLog) addLog(`📋 ${sender} пригласил ${target} в ${profile.structure}`, 'info');
+    await sendMessage(bot, sender, `&a&l|&f Приглашение отправлено игроку &e${target}`);
+    await sendMessage(bot, target, `&a&l|&f Лидер &e${sender} &aприглашает вас в организацию &e${orgName}`);
+    await sendMessage(bot, target, `&7&l|&f Для принятия используйте &e/org/o accept`);
+    
+    if (addLog) addLog(`📋 ${sender} пригласил ${target} в ${orgName}`, 'info');
+}
+
+// ============================================
+// /org/o accept - Принять приглашение
+// ============================================
+
+async function accept(bot, sender, args, db, addLog) {
+    const cleanSender = cleanNick(sender);
+    
+    const invite = await db.get(`SELECT * FROM org_invites WHERE player = ? AND expires_at > CURRENT_TIMESTAMP`, [cleanSender]);
+    
+    if (!invite) {
+        await sendMessage(bot, sender, `&4&l|&c У вас нет активных приглашений!`);
+        return;
+    }
+    
+    const profile = await db.getRPProfile(cleanSender);
+    if (profile && profile.structure !== 'Гражданин') {
+        await sendMessage(bot, sender, `&4&l|&c Вы уже состоите в организации!`);
+        return;
+    }
+    
+    await db.addOrgMember(cleanSender, invite.org_name, 'Стажёр');
+    await db.run(`DELETE FROM org_invites WHERE player = ?`, [cleanSender]);
+    
+    await sendMessage(bot, sender, `&a&l|&f Вы вступили в организацию &e${invite.org_name}`);
+    await sendClanMessage(bot, `&a&l|&f ${sender} &aвступил в организацию &e${invite.org_name}`);
+    
+    if (addLog) addLog(`➕ ${sender} вступил в ${invite.org_name}`, 'success');
 }
 
 // ============================================
 // /org/o kick [ник] [причина] - Исключить из организации
 // ============================================
 
-async function kickOrg(bot, sender, args, db, addLog) {
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o kick [ник] [причина]`);
+async function kick(bot, sender, args, db, addLog) {
+    const cleanSender = cleanNick(sender);
+    
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может исключать игроков!`);
         return;
     }
     
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
-    
-    // Проверка прав (лидер или сотрудник с правом кика)
-    const member = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [sender, profile.structure]);
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, member?.rank_name]);
-    const canKick = isLeader || (rank?.can_kick === 1);
-    
-    if (!canKick) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для исключения игроков`);
+    if (args.length < 1) {
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o kick [ник] [причина]`);
         return;
     }
     
     const target = args[0];
-    const reason = args.slice(1).join(' ');
+    const reason = args.slice(1).join(' ') || 'Не указана';
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
     
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
-    await db.removeOrgMember(target, profile.structure);
+    if (cleanSender === cleanTarget) {
+        await sendMessage(bot, sender, `&4&l|&c Нельзя исключить самого себя!`);
+        return;
+    }
     
-    sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aисключён из организации`);
-    sendMessage(bot, target, `&c&l|&f Вы исключены из организации &e${profile.structure}&f. Причина: &e${reason}`);
-    bot.chat(`/cc &c👢 ${target} исключён из ${profile.structure} (${sender})`);
-    if (addLog) addLog(`👢 ${sender} исключил ${target} из ${profile.structure}`, 'warn');
+    await db.removeOrgMember(cleanTarget, orgName);
+    
+    await sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aисключён из организации`);
+    await sendMessage(bot, target, `&c&l|&f Вы исключены из организации &e${orgName}&f. Причина: &e${reason}`);
+    await sendClanMessage(bot, `&c👢 &e${target} &cисключён из &e${orgName} &cлидером ${sender}`);
+    
+    if (addLog) addLog(`👢 ${sender} исключил ${target} из ${orgName}`, 'warn');
 }
-
 // ============================================
 // /org/o rank set [ник] [звание] - Выдать звание
 // ============================================
 
 async function rankSet(bot, sender, args, db, addLog) {
-    if (args.length < 3) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rank set [ник] [звание]`);
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать звания!`);
         return;
     }
     
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
+    if (args.length < 2) {
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rank set [ник] [звание]`);
         return;
     }
     
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
+    const target = args[0];
+    const newRank = args[1];
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
     
-    const member = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [sender, profile.structure]);
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, member?.rank_name]);
-    const canPromote = isLeader || (rank?.can_promote === 1);
-    
-    if (!canPromote) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для выдачи званий`);
-        return;
-    }
-    
-    const target = args[1];
-    const newRank = args[2];
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
-    const rankExists = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, newRank]);
+    const rankExists = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, newRank]);
     if (!rankExists) {
-        sendMessage(bot, sender, `&4&l|&c Звание &e${newRank} &cне найдено в организации`);
+        await sendMessage(bot, sender, `&4&l|&c Звание &e${newRank} &cне найдено в организации!`);
         return;
     }
     
-    await db.run(`UPDATE org_members SET rank_name = ? WHERE minecraft_nick = ? AND org_name = ?`, [newRank, target, profile.structure]);
-    await db.run(`UPDATE rp_players SET job_rank = ? WHERE minecraft_nick = ?`, [newRank, target]);
+    await db.run(`UPDATE org_members SET rank_name = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newRank, cleanTarget, orgName]);
+    await db.run(`UPDATE rp_players SET job_rank = ? WHERE LOWER(minecraft_nick) = LOWER(?)`, [newRank, cleanTarget]);
     
-    sendMessage(bot, sender, `&a&l|&f Игроку &e${target} &aвыдано звание &e${newRank}`);
-    sendMessage(bot, target, `&a&l|&f Вам выдано звание &e${newRank} &aв организации &e${profile.structure}`);
-    if (addLog) addLog(`📋 ${sender} выдал звание ${newRank} ${target} в ${profile.structure}`, 'info');
+    await sendMessage(bot, sender, `&a&l|&f Игроку &e${target} &aвыдано звание &e${newRank}`);
+    await sendMessage(bot, target, `&a&l|&f Лидер &e${sender} &aповысил вас до звания &e${newRank} &aв организации &e${orgName}`);
+    await sendClanMessage(bot, `&a⭐ &e${target} &aповышен до звания &e${newRank} &aв &e${orgName}`);
+    
+    if (addLog) addLog(`⭐ ${sender} повысил ${target} до ${newRank} в ${orgName}`, 'info');
 }
 
 // ============================================
-// /org/o rankinfo [ранг] - Информация о ранге
+// /org/o rankinfo [ранг] - Информация о звании (→ Discord)
 // ============================================
 
-async function rankinfo(bot, sender, args, db) {
+async function rankinfo(bot, sender, args, db, addLog) {
+    const orgName = await getPlayerOrg(sender, db);
+    if (!orgName) {
+        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
+        return;
+    }
+    
     if (args.length < 1) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rankinfo [ранг]`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rankinfo [ранг]`);
         return;
     }
     
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const rankName = args[0];
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, rankName]);
-    
-    if (!rank) {
-        sendMessage(bot, sender, `&4&l|&c Звание &e${rankName} &cне найдено`);
-        return;
-    }
-    
-    const membersCount = await db.get(`SELECT COUNT(*) as count FROM org_members WHERE org_name = ? AND rank_name = ?`, [profile.structure, rankName]);
-    
-    sendMessage(bot, sender, `&a&l|&f Звание &e${rank.rank_name}`);
-    sendMessage(bot, sender, `&7&l|&f Зарплата: &e${rank.base_salary.toLocaleString()}₽/час &7| Сотрудников: &e${membersCount?.count || 0}`);
+    // Отправляем в Discord
+    await sendDiscordRedirect(bot, sender, 'org/o rankinfo');
 }
 
 // ============================================
@@ -190,158 +236,146 @@ async function rankinfo(bot, sender, args, db) {
 // ============================================
 
 async function setsalary(bot, sender, args, db, addLog) {
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может изменять зарплаты!`);
+        return;
+    }
+    
     if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o setsalary [ранг] [сумма]`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    if (org.leader_nick !== sender) {
-        sendMessage(bot, sender, `&4&l|&c Только лидер организации может изменять зарплаты`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o setsalary [ранг] [сумма]`);
         return;
     }
     
     const rankName = args[0];
     const salary = parseInt(args[1]);
+    const orgName = await getPlayerOrg(sender, db);
     
     if (isNaN(salary) || salary < 0) {
-        sendMessage(bot, sender, `&4&l|&c Укажите корректную сумму`);
+        await sendMessage(bot, sender, `&4&l|&c Укажите корректную сумму!`);
         return;
     }
     
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, rankName]);
+    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, rankName]);
     if (!rank) {
-        sendMessage(bot, sender, `&4&l|&c Звание &e${rankName} &cне найдено`);
+        await sendMessage(bot, sender, `&4&l|&c Звание &e${rankName} &cне найдено!`);
         return;
     }
     
-    await db.run(`UPDATE org_ranks SET base_salary = ? WHERE org_name = ? AND rank_name = ?`, [salary, profile.structure, rankName]);
+    const org = await db.getOrganization(orgName);
+    const membersCount = await db.get(`SELECT COUNT(*) as count FROM org_members WHERE org_name = ? AND rank_name = ?`, [orgName, rankName]);
+    const totalSalaryIncrease = (salary - rank.base_salary) * (membersCount?.count || 0);
     
-    sendMessage(bot, sender, `&a&l|&f Зарплата для звания &e${rankName} &aустановлена на &e${salary.toLocaleString()}₽/час`);
-    if (addLog) addLog(`💰 ${sender} изменил зарплату для ${rankName} на ${salary} в ${profile.structure}`, 'info');
+    if (totalSalaryIncrease > 0 && org.budget < totalSalaryIncrease * 4) {
+        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете организации для повышения зарплаты!`);
+        return;
+    }
+    
+    await db.run(`UPDATE org_ranks SET base_salary = ? WHERE org_name = ? AND rank_name = ?`, [salary, orgName, rankName]);
+    
+    await sendMessage(bot, sender, `&a&l|&f Зарплата для звания &e${rankName} &aустановлена на &e${salary.toLocaleString()}₽/час`);
+    await sendClanMessage(bot, `&a💰 Лидер ${sender} изменил зарплату для звания ${rankName} на ${salary.toLocaleString()}₽/час`);
+    
+    if (addLog) addLog(`💰 ${sender} изменил зарплату для ${rankName} на ${salary} в ${orgName}`, 'info');
 }
 
 // ============================================
 // /org/o paybonus [ник] [сумма] [причина] - Премия
 // ============================================
 
-let lastBonusTime = new Map();
+const bonusCooldowns = new Map();
 
 async function paybonus(bot, sender, args, db, addLog) {
-    if (args.length < 3) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o paybonus [ник] [сумма] [причина]`);
+    const cleanSender = cleanNick(sender);
+    const orgName = await getPlayerOrg(sender, db);
+    
+    if (!orgName) {
+        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
         return;
     }
     
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
-    
-    const member = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [sender, profile.structure]);
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [profile.structure, member?.rank_name]);
-    const canPayBonus = isLeader || (rank?.can_promote === 1);
+    const isLeaderFlag = await isLeader(sender, db);
+    const member = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanSender, orgName]);
+    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, member?.rank_name]);
+    const canPayBonus = isLeaderFlag || (rank?.can_promote === 1);
     
     if (!canPayBonus) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для выдачи премий`);
+        await sendMessage(bot, sender, `&4&l|&c У вас нет прав для выдачи премий!`);
         return;
     }
     
-    // Кулдаун 15 секунд
-    const lastBonus = lastBonusTime.get(sender) || 0;
+    const lastBonus = bonusCooldowns.get(cleanSender) || 0;
     if (Date.now() - lastBonus < 15000) {
         const remaining = Math.ceil((15000 - (Date.now() - lastBonus)) / 1000);
-        sendMessage(bot, sender, `&4&l|&c Подождите &e${remaining}&c секунд перед следующей премией`);
+        await sendMessage(bot, sender, `&4&l|&c Подождите &e${remaining}&c секунд перед следующей премией`);
+        return;
+    }
+    
+    if (args.length < 3) {
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o paybonus [ник] [сумма] [причина]`);
         return;
     }
     
     const target = args[0];
     const amount = parseInt(args[1]);
     const reason = args.slice(2).join(' ');
+    const cleanTarget = cleanNick(target);
     
     if (isNaN(amount) || amount <= 0 || amount > 50000) {
-        sendMessage(bot, sender, `&4&l|&c Сумма премии должна быть от 1 до 50 000₽`);
+        await sendMessage(bot, sender, `&4&l|&c Сумма премии должна быть от 1 до 50 000₽!`);
         return;
     }
     
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
-    const orgBudget = org.budget || 0;
-    if (orgBudget < amount) {
-        sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете организации`);
+    const org = await db.getOrganization(orgName);
+    if (org.budget < amount) {
+        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете организации!`);
         return;
     }
     
-    lastBonusTime.set(sender, Date.now());
+    bonusCooldowns.set(cleanSender, Date.now());
     
-    await db.run(`UPDATE organizations SET budget = budget - ? WHERE name = ?`, [amount, profile.structure]);
-    await db.updateMoney(target, amount, 'bonus', `Премия от ${sender}: ${reason}`, sender);
+    await db.run(`UPDATE organizations SET budget = budget - ? WHERE name = ?`, [amount, orgName]);
+    await db.updateMoney(cleanTarget, amount, 'bonus', `Премия от ${sender}: ${reason}`, sender);
     
-    sendMessage(bot, sender, `&a&l|&f Выдана премия &e${amount.toLocaleString()}₽ &aигроку &e${target}`);
-    sendMessage(bot, target, `&a&l|&f Вы получили премию &e${amount.toLocaleString()}₽ &aот &e${sender}&f. Причина: &e${reason}`);
-    bot.chat(`/cc &a💰 ${target} получил премию ${amount.toLocaleString()}₽ от ${sender}`);
+    await sendMessage(bot, sender, `&a&l|&f Выдана премия &e${amount.toLocaleString()}₽ &aигроку &e${target}`);
+    await sendMessage(bot, target, `&a&l|&f Вы получили премию &e${amount.toLocaleString()}₽ &aот &e${sender}&f. Причина: &e${reason}`);
+    await sendClanMessage(bot, `&a💰 &e${target} &aполучил премию ${amount.toLocaleString()}₽ от ${sender}`);
+    
     if (addLog) addLog(`💰 ${sender} выдал премию ${amount} ${target} (${reason})`, 'info');
 }
-
 // ============================================
-// /org/o vacation list - Список в отпуске
+// /org/o vacation list - Список в отпуске (→ Discord)
 // ============================================
 
-async function vacationList(bot, sender, args, db) {
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
+async function vacationList(bot, sender, args, db, addLog) {
+    const orgName = await getPlayerOrg(sender, db);
+    if (!orgName) {
+        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
         return;
     }
     
-    const members = await db.all(`SELECT minecraft_nick, vacation_until FROM org_members WHERE org_name = ? AND is_on_vacation = 1`, [profile.structure]);
-    
-    if (!members || members.length === 0) {
-        sendMessage(bot, sender, `&4&l|&c Нет сотрудников в отпуске`);
-        return;
-    }
-    
-    sendMessage(bot, sender, `&a&l|&f Сотрудники в отпуске (&e${members.length}&f):`);
-    for (const member of members) {
-        const until = new Date(member.vacation_until).toLocaleDateString();
-        sendMessage(bot, sender, `&7&l|&f ${member.minecraft_nick} &7- до &e${until}`);
-    }
+    // Отправляем в Discord
+    await sendDiscordRedirect(bot, sender, 'org/o vacation list');
 }
 
 // ============================================
-// /org/o duty list - Список на дежурстве
+// /org/o duty list - Список на дежурстве (→ Discord)
 // ============================================
 
-async function dutyList(bot, sender, args, db) {
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
+async function dutyList(bot, sender, args, db, addLog) {
+    const orgName = await getPlayerOrg(sender, db);
+    if (!orgName) {
+        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
         return;
     }
     
-    const members = await db.all(`SELECT minecraft_nick FROM org_members WHERE org_name = ? AND on_duty = 1`, [profile.structure]);
-    
-    if (!members || members.length === 0) {
-        sendMessage(bot, sender, `&4&l|&c Нет сотрудников на дежурстве`);
-        return;
-    }
-    
-    const list = members.map(m => m.minecraft_nick).join(', ');
-    sendMessage(bot, sender, `&a&l|&f На дежурстве (&e${members.length}&f): &e${list}`);
+    // Отправляем в Discord
+    await sendDiscordRedirect(bot, sender, 'org/o duty list');
 }
 
 // ============================================
@@ -349,48 +383,42 @@ async function dutyList(bot, sender, args, db) {
 // ============================================
 
 async function warn(bot, sender, args, db, addLog) {
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать выговоры!`);
+        return;
+    }
+    
     if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o warn [ник] [причина]`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
-    
-    if (!isLeader) {
-        sendMessage(bot, sender, `&4&l|&c Только лидер организации может выдавать выговоры`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o warn [ник] [причина]`);
         return;
     }
     
     const target = args[0];
     const reason = args.slice(1).join(' ');
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
     
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
     const newWarnings = (targetMember.warnings || 0) + 1;
-    await db.run(`UPDATE org_members SET warnings = ? WHERE minecraft_nick = ? AND org_name = ?`, [newWarnings, target, profile.structure]);
+    await db.run(`UPDATE org_members SET warnings = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newWarnings, cleanTarget, orgName]);
     
-    sendMessage(bot, sender, `&a&l|&f Выговор выдан &e${target} &7(${newWarnings}/3)`);
-    sendMessage(bot, target, `&c&l|&f Вы получили выговор от &e${sender}&f. Причина: &e${reason}`);
-    bot.chat(`/cc &c⚠️ ${target} получил выговор в ${profile.structure} (${newWarnings}/3)`);
+    await sendMessage(bot, sender, `&a&l|&f Выговор выдан &e${target} &7(${newWarnings}/3)`);
+    await sendMessage(bot, target, `&c&l|&f Вы получили выговор от &e${sender}&f. Причина: &e${reason}`);
+    await sendClanMessage(bot, `&c⚠️ &e${target} &cполучил выговор в ${orgName} (${newWarnings}/3)`);
     
     if (newWarnings >= 3) {
-        await db.removeOrgMember(target, profile.structure);
-        sendMessage(bot, target, `&c&l|&f Вы уволены из организации за 3 выговора`);
-        bot.chat(`/cc &c🔻 ${target} уволен из ${profile.structure} за 3 выговора`);
+        await db.removeOrgMember(cleanTarget, orgName);
+        await sendMessage(bot, target, `&c&l|&f Вы уволены из организации за 3 выговора!`);
+        await sendClanMessage(bot, `&c🔻 &e${target} &cуволен из ${orgName} за 3 выговора`);
+        if (addLog) addLog(`🔻 ${target} уволен из ${orgName} за 3 выговора`, 'warn');
     }
     
-    if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} в ${profile.structure} (${reason})`, 'warn');
+    if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} в ${orgName} (${reason})`, 'warn');
 }
 
 // ============================================
@@ -398,107 +426,106 @@ async function warn(bot, sender, args, db, addLog) {
 // ============================================
 
 async function unwarn(bot, sender, args, db, addLog) {
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может снимать выговоры!`);
+        return;
+    }
+    
     if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o unwarn [ник] [причина]`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
-    
-    if (!isLeader) {
-        sendMessage(bot, sender, `&4&l|&c Только лидер организации может снимать выговоры`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o unwarn [ник] [причина]`);
         return;
     }
     
     const target = args[0];
     const reason = args.slice(1).join(' ');
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
     
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
     const newWarnings = Math.max(0, (targetMember.warnings || 0) - 1);
-    await db.run(`UPDATE org_members SET warnings = ? WHERE minecraft_nick = ? AND org_name = ?`, [newWarnings, target, profile.structure]);
+    await db.run(`UPDATE org_members SET warnings = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newWarnings, cleanTarget, orgName]);
     
-    sendMessage(bot, sender, `&a&l|&f Выговор снят с &e${target}`);
-    sendMessage(bot, target, `&a&l|&f С вас снят выговор &e${sender}&f. Причина: &e${reason}`);
-    if (addLog) addLog(`✅ ${sender} снял выговор с ${target} в ${profile.structure}`, 'info');
+    await sendMessage(bot, sender, `&a&l|&f Выговор снят с &e${target}`);
+    await sendMessage(bot, target, `&a&l|&f С вас снят выговор &e${sender}&f. Причина: &e${reason}`);
+    
+    if (addLog) addLog(`✅ ${sender} снял выговор с ${target} в ${orgName}`, 'info');
 }
 
 // ============================================
 // /org/o fine [ник] [сумма] [причина] - Штраф сотруднику
 // ============================================
 
-async function fineOrg(bot, sender, args, db, addLog) {
+async function fine(bot, sender, args, db, addLog) {
+    if (!await isLeader(sender, db)) {
+        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать штрафы!`);
+        return;
+    }
+    
     if (args.length < 3) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o fine [ник] [сумма] [причина]`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile || profile.structure === 'Гражданин') {
-        sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации`);
-        return;
-    }
-    
-    const org = await db.getOrganization(profile.structure);
-    const isLeader = org.leader_nick === sender;
-    
-    if (!isLeader) {
-        sendMessage(bot, sender, `&4&l|&c Только лидер организации может выдавать штрафы`);
+        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o fine [ник] [сумма] [причина]`);
         return;
     }
     
     const target = args[0];
     const amount = parseInt(args[1]);
     const reason = args.slice(2).join(' ');
+    const cleanTarget = cleanNick(target);
+    const orgName = await getPlayerOrg(sender, db);
     
     if (isNaN(amount) || amount <= 0 || amount > 50000) {
-        sendMessage(bot, sender, `&4&l|&c Сумма штрафа должна быть от 1 до 50 000₽`);
+        await sendMessage(bot, sender, `&4&l|&c Сумма штрафа должна быть от 1 до 50 000₽!`);
         return;
     }
     
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE minecraft_nick = ? AND org_name = ?`, [target, profile.structure]);
+    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
     if (!targetMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации`);
+        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
         return;
     }
     
-    const success = await db.updateMoney(target, -amount, 'fine', reason, sender);
+    const success = await db.updateMoney(cleanTarget, -amount, 'fine', reason, sender);
     
     if (success) {
-        sendMessage(bot, sender, `&a&l|&f Штраф &e${amount.toLocaleString()}₽ &aвыписан &e${target}`);
-        sendMessage(bot, target, `&c&l|&f Вам выписан штраф &e${amount.toLocaleString()}₽ &cот &e${sender}&f. Причина: &e${reason}`);
-        bot.chat(`/cc &c💰 ${target} оштрафован на ${amount.toLocaleString()}₽ (${profile.structure})`);
-        if (addLog) addLog(`💰 ${sender} оштрафовал ${target} на ${amount} в ${profile.structure}`, 'info');
+        await db.run(`UPDATE organizations SET budget = budget + ? WHERE name = ?`, [amount, orgName]);
+        
+        await sendMessage(bot, sender, `&a&l|&f Штраф &e${amount.toLocaleString()}₽ &aвыписан &e${target}`);
+        await sendMessage(bot, target, `&c&l|&f Вам выписан штраф &e${amount.toLocaleString()}₽ &cот &e${sender}&f. Причина: &e${reason}`);
+        await sendClanMessage(bot, `&c💰 &e${target} &cоштрафован на ${amount.toLocaleString()}₽ в ${orgName}`);
+        
+        if (addLog) addLog(`💰 ${sender} оштрафовал ${target} на ${amount} в ${orgName}`, 'info');
     } else {
-        sendMessage(bot, sender, `&4&l|&c У игрока &e${target} &cнедостаточно средств`);
+        await sendMessage(bot, sender, `&4&l|&c У игрока &e${target} &cнедостаточно средств!`);
     }
 }
-
 // ============================================
-// ЭКСПОРТ
+// ЭКСПОРТ ВСЕХ КОМАНД
 // ============================================
 
 module.exports = {
+    // Основные команды
     invite,
-    kick: kickOrg,
+    accept,
+    kick,
+    
+    // Управление рангами
     rankSet,
-    rankinfo,
+    rankinfo,      // → Discord
     setsalary,
+    
+    // Финансы
     paybonus,
-    vacationList,
-    dutyList,
+    
+    // Списки (→ Discord)
+    vacationList,  // → Discord
+    dutyList,      // → Discord
+    
+    // Дисциплина
     warn,
     unwarn,
-    fine: fineOrg
+    fine
 };

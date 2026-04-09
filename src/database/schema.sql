@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS rp_players (
     warnings INTEGER DEFAULT 0,
     has_education INTEGER DEFAULT 0,
     is_frozen INTEGER DEFAULT 0,
+    frozen_reason TEXT,        -- Добавлено
+    frozen_by TEXT,            -- Добавлено
+    frozen_at DATETIME,        -- Добавлено
     last_pay_time DATETIME,
     education_courses TEXT DEFAULT '[]',
     passport_data TEXT
@@ -247,7 +250,7 @@ CREATE TABLE IF NOT EXISTS tax_logs (
 CREATE TABLE IF NOT EXISTS punishments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('mute', 'blacklist', 'ban', 'kick')),
+    type TEXT NOT NULL CHECK(type IN ('mute', 'blacklist', 'ban', 'kick', 'rp_warn', 'warning')),
     reason TEXT NOT NULL,
     issued_by TEXT NOT NULL,
     duration_minutes INTEGER,
@@ -260,6 +263,19 @@ CREATE TABLE IF NOT EXISTS punishments (
     source TEXT DEFAULT 'clan'
 );
 
+CREATE TABLE IF NOT EXISTS rp_warnings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    issued_by TEXT NOT NULL,
+    issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    active BOOLEAN DEFAULT 1,
+    FOREIGN KEY (player) REFERENCES rp_players(minecraft_nick) ON DELETE CASCADE
+);
+
+-- ИСПРАВЛЕНО: Добавлен IF NOT EXISTS
+CREATE INDEX IF NOT EXISTS idx_rp_warnings_player ON rp_warnings(player);
+
 CREATE TABLE IF NOT EXISTS clan_blacklist (
     minecraft_nick TEXT PRIMARY KEY,
     reason TEXT,
@@ -268,7 +284,6 @@ CREATE TABLE IF NOT EXISTS clan_blacklist (
     expires_at DATETIME,
     is_active INTEGER DEFAULT 1
 );
-
 CREATE TABLE IF NOT EXISTS player_warnings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_nick TEXT NOT NULL,

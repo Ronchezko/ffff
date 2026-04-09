@@ -16,6 +16,7 @@ const PATTERNS = {
     kill: /^(\S+)\s+убил\s+игрока\s+(\S+)'$/i,
     lobbyMove: /Ты перемещен в лобби/i
 };
+const rpCommands = ['/balance', '/pay', '/pass', '/id', '/org', '/arp', '/rp', '/im', '/biz', '/office'];
 
 global.realnameCache = global.realnameCache || new Map();
 
@@ -135,6 +136,16 @@ class ChatHandler {
     }
     
     async processMessage(nickname, message, originalSender) {
+        const isRPCommand = rpCommands.some(cmd => message.startsWith(cmd));
+
+        if (isRPCommand) {
+            const isFrozen = await this.db.isRPFrozen(nickname);
+            if (isFrozen) {
+                this.bot.chat(`/msg ${nickname} &4&l|&c Ваш RP профиль заморожен!`);
+                this.bot.chat(`/msg ${nickname} &4&l|&c Вы не можете использовать RP команды`);
+                return;
+            }
+        }
         if (!this.moderation) {
             const { getModerationSystem } = require('./moderation');
             this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot);

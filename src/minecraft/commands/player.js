@@ -2,7 +2,7 @@
 // Команды для всех игроков клана (ПОЛНАЯ ВЕРСИЯ)
 
 const utils = require('../../shared/utils');
-
+const { checkRPFrozen } = require('../../shared/utils');
 // Глобальные кулдауны
 let lastFlyTime = 0;
 let lastTenTTime = 0;
@@ -30,7 +30,7 @@ async function sendMessage(bot, target, message) {
 
 async function balance(bot, sender, args, db) {
     const cleanNickname = cleanNick(sender);
-    
+    if (await checkRPFrozen(sender, bot, db)) return;
     const profile = await db.getRPProfile(cleanNickname);
     if (!profile) {
         await sendMessage(bot, sender, `&4&l|&c Вы не зарегистрированы в RolePlay! Используйте &e/rp`);
@@ -45,7 +45,7 @@ async function balance(bot, sender, args, db) {
 
 async function pay(bot, sender, args, db) {
     const cleanSender = cleanNick(sender);
-    
+    if (await checkRPFrozen(sender, bot, db)) return;
     const lastPay = payCooldowns.get(cleanSender) || 0;
     if (Date.now() - lastPay < 15000) {
         const remaining = Math.ceil((15000 - (Date.now() - lastPay)) / 1000);
@@ -54,7 +54,7 @@ async function pay(bot, sender, args, db) {
     }
     
     if (args.length < 2) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/pay [ник] [сумма] &7(макс 50 000₽)`);
+        await sendMessage(bot, sender, `     &e/pay [ник] [сумма] &7(макс 50 000₽)`);
         return;
     }
     
@@ -94,7 +94,7 @@ async function pay(bot, sender, args, db) {
 
 async function pass(bot, sender, args, db) {
     const cleanNickname = cleanNick(sender);
-    
+    if (await checkRPFrozen(sender, bot, db)) return;
     const profile = await db.getRPProfile(cleanNickname);
     if (!profile) {
         await sendMessage(bot, sender, `&4&l|&c Вы не в RP! Используйте &e/rp`);
@@ -113,7 +113,7 @@ async function pass(bot, sender, args, db) {
 
 async function id(bot, sender, args, db) {
     const cleanNickname = cleanNick(sender);
-    
+    if (await checkRPFrozen(sender, bot, db)) return;
     // Получаем rowid как ID
     const member = await db.get('SELECT rowid, * FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     
@@ -134,7 +134,7 @@ async function id(bot, sender, args, db) {
 async function keys(bot, sender, args, db) {
     const cleanNickname = cleanNick(sender);
     const properties = await db.getPlayerProperties(cleanNickname);
-    
+    if (await checkRPFrozen(sender, bot, db)) return;
     if (!properties || properties.length === 0) {
         await sendMessage(bot, sender, `&4&l|&c У вас нет имущества`);
         return;
@@ -151,6 +151,7 @@ async function keys(bot, sender, args, db) {
 // ============================================
 
 async function idim(bot, sender, args, db) {
+    if (await checkRPFrozen(sender, bot, db)) return;
     if (args.length < 1) {
         await sendMessage(bot, sender, `&4&l|&c Использование: &e/idim [номер]`);
         return;
@@ -184,6 +185,7 @@ async function help(bot, sender, args, db) {
 // ============================================
 
 async function rp(bot, realNick, originalSender, args, db, addLog) {
+    if (await checkRPFrozen(sender, bot, db)) return;
     const sendTarget = originalSender || realNick;
     const cleanNickname = cleanNick(realNick);
     
@@ -305,6 +307,7 @@ async function tenT(bot, sender, args, db) {
 // ============================================
 
 async function org(bot, sender, args, db) {
+    if (await checkRPFrozen(sender, bot, db)) return;
     if (args.length < 2 || args[0] !== 'o' || args[1] !== 'list') {
         await sendMessage(bot, sender, `&4&l|&c Использование: &e/org o list`);
         return;

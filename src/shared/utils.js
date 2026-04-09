@@ -71,6 +71,27 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
+// Проверка заблокирован ли игрок в RP
+async function isRPFrozen(nick, db) {
+    const player = await db.get(
+        `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
+        [nick]
+    );
+    return player ? player.is_frozen === 1 : false;
+}
+
+// Проверка с отправкой сообщения
+async function checkRPFrozen(sender, bot, db) {
+    const isFrozen = await isRPFrozen(sender, db);
+    if (isFrozen) {
+        bot.chat(`/msg ${sender} &4&l|&c Ваш RP профиль заморожен!`);
+        bot.chat(`/msg ${sender} &4&l|&c Вы не можете использовать RP команды`);
+        bot.chat(`/msg ${sender} &7&l|&f Обратитесь к администрации для разморозки`);
+        return true;
+    }
+    return false;
+}
+
 
 // Ограничение частоты вызовов (throttle)
 function throttle(func, limit) {
@@ -226,5 +247,7 @@ module.exports = {
     getPlayerStructure,
     colorize,
     parseCommand,
-    SpamDetector
+    SpamDetector,
+    isRPFrozen,
+    checkRPFrozen
 };

@@ -184,6 +184,50 @@ async function a(bot, sender, args, db, addLog) {
 // ============================================
 // ЭКСПОРТ
 // ============================================
+// src/minecraft/commands/admin.js
+// Административные команды клана
+
+async function clanKick(bot, sender, args, db, addLog) {
+    if (args.length < 2) {
+        bot.chat(`/msg ${sender} &7&l|&f Использование: &e/kick [ник] [время] [причина]`);
+        return;
+    }
+    
+    // Проверка прав (только персонал)
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 1) {
+        bot.chat(`/msg ${sender} &4&l|&c У вас нет прав для кика игроков`);
+        return;
+    }
+    
+    const target = args[0];
+    const timeStr = args[1];
+    const reason = args.slice(2).join(' ') || 'Не указана';
+    
+    // Парсим время (31d = 31 день)
+    let days = 31;
+    if (timeStr.endsWith('d')) {
+        days = parseInt(timeStr);
+    } else if (timeStr.endsWith('h')) {
+        days = parseInt(timeStr) / 24;
+    }
+    
+    const durationMinutes = days * 24 * 60;
+    
+    // Кикаем из клана
+    bot.chat(`/c kick ${target}`);
+    await utils.sleep(500);
+    
+    // Добавляем в ЧС
+    await db.addPunishment(target, 'blacklist', reason, sender, durationMinutes, 'clan');
+    await db.removeClanMember(target);
+    
+    bot.chat(`/msg ${sender} &a&l|&f Игрок &e${target} &aкикнут из клана на &e${days} &aдней`);
+    bot.chat(`/msg ${target} &4&l|&c Вы кикнуты из клана Resistance на &4${days} &cдней по причине: &4${reason}`);
+    bot.chat(`/cc &c👢 &e${target} &cкикнут из клана на ${days} дней (${reason})`);
+    
+    if (addLog) addLog(`👢 ${sender} кикнул ${target} из клана на ${days} дней`, 'warn');
+}
 
 module.exports = {
     admin,
@@ -191,5 +235,6 @@ module.exports = {
     stopall,
     reloadbd,
     wipe,
-    isSystemStopped
+    isSystemStopped,
+    clanKick
 };

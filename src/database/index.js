@@ -216,12 +216,20 @@ async function transferMoney(from, to, amount, description) {
 // ============================================
 // НАКАЗАНИЯ (С ПОДДЕРЖКОЙ source)
 // ============================================
+// Добавьте в src/database/index.js если нет
+async function isRPFrozen(nick) {
+    const db = getDb();
+    const player = await db.get(
+        `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
+        [nick]
+    );
+    return player ? player.is_frozen === 1 : false;
+}
 
 async function addPunishment(player, type, reason, issuedBy, durationMinutes = null, source = 'clan') {
     const db = getDb();
     const playerLower = player.toLowerCase();
     
-    // ВАЖНО: правильно рассчитываем expires_at
     let expiresAt = null;
     if (durationMinutes && durationMinutes > 0) {
         expiresAt = new Date(Date.now() + durationMinutes * 60000).toISOString();
@@ -482,5 +490,6 @@ module.exports = {
     
     createTablesProgrammatically: async () => {},
     checkStaffLimit,
-    incrementStaffCounter
+    incrementStaffCounter,
+    isRPFrozen
 };

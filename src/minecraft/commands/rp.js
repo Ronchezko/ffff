@@ -57,7 +57,7 @@ async function arp(bot, sender, args, db, addLog) {
             await arpPayday(bot, sender, subArgs, db, addLog);
             break;
         case 'warn':
-            await arpWarn(bot, sender, subArgs, db, addLog);
+            await arpWarn(sender, args, bot, db, addLog);
             break;
         case 'stats':
             await arpStats(bot, sender, subArgs, db);
@@ -236,49 +236,128 @@ async function arpPayday(bot, sender, args, db, addLog) {
 }
 
 // /arp warn add/del [ник] [причина]
-async function arpWarn(bot, sender, args, db, addLog) {
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/arp warn [add/del] [ник] [причина]`);
+async function arpWarn(sender, args, bot, db, addBotLog) {
+    if (!Array.isArray(args)) {
+        bot.chat(`/msg ${sender} &4&l|&c Ошибка: неверный формат аргументов`);
         return;
     }
     
-    const action = args[0].toLowerCase();
-    const target = args[1];
-    const reason = args.slice(2).join(' ');
+    const action = args[1];
+    const target = args[2];
+    const reason = args.slice(3).join(' ');
     
-    const profile = await db.getRPProfile(target);
-    if (!profile) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RP`);
+    if (!target) {
+        bot.chat(`/msg ${sender} &7&l|&f Использование: &e/arp warn add <ник> <причина>`);
+        bot.chat(`/msg ${sender} &7&l|&f Использование: &e/arp warn del <ник>`);
         return;
     }
     
-    if (action === 'add') {
-        if (!reason) {
-            sendMessage(bot, sender, `&4&l|&c Укажите причину предупреждения`);
-            return;
+    // Проверяем права (минимум модератор)
+    const staffRank = await db.getStaffRank(sender);
+    if (staffRank.rank_level < 1) {
+        bot.chat(`/msg ${sender} &4&l|&c У вас нет прав для выдачи предупреждений`);
+        return;
+    }
+    
+    try {
+        if (action === 'add') {
+            if (!reason) {
+                bot.chat(`/msg ${sender} &7&l|&f Использование: &e/arp warn add ${target} <причина>`);
+                return;
+            }
+            
+            // Добавляем предупреждение
+            await db.run(
+                `INSERT INTO rp_warnings (player, reason, issued_by) VALUES (?, ?, ?)`,
+                [target.toLowerCase(), reason, sender]
+            );
+            
+            // Проверяем количество предупреждений
+            const warnings = await db.get(
+                `SELECT COUNT(*) as count FROM rp_warnings WHERE player = ? AND active = 1`,
+                [target.toLowerCase()]
+            );
+            
+            bot.chat(`/msg ${sender} &a&l|&f Вы &2успешно&f выдали предупреждение игроку &e${target}`);
+            bot.chat(`/msg ${target} &4&l|&c Вы получили предупреждение от &e${sender}&c: ${reason}`);
+            bot.chat(`/msg ${target} &7&l|&f У вас &e${warnings.count}/3 &fпредупреждений`);
+            
+            if (warnings.count >= 3) {
+                // Полная блокировка RP
+                await db.run(
+                    `UPDATE rp_players SET is_frozen = 1 WHERE LOWER(minecraft_nick) = LOWER(?)`,
+                    [target]
+                );
+                
+                // Очищаем данные игрока (опционально)
+                await db.run(
+                    `UPDATE rp_players SET 
+                        on_duty = 0, 
+                        duty_start_time = NULL,
+                        structure = 'Заморожен',
+                        job_rank = 'Заблокирован'
+                    WHERE LOWER(minecraft_nick) = LOWER(?)`,
+                    [target]
+                );
+                
+
+                bot.chat(`/msg ${target} &7&l|&f Вы достигнли &43&f предупреждений. Ваш профиль &3заморожен&f.`);
+                
+                bot.chat(`/msg ${sender} &a&l|&f Игрок &e${target} &cзаблокирован &fв RP (3 предупреждения)`);
+                
+                // Оповещаем всех в клановом чате
+                bot.chat(`/cc &4&l| Игрок &e${target} &cзаблокирован в RP за 3 предупреждения!`);
+            }
+            
+            // Логируем в Discord
+            const discord = global.botComponents.discord;
+            if (discord && discord.client) {
+                const channel = discord.client.channels.cache.get('1474633679442804798');
+                if (channel) {
+                    channel.send(`⚠️ **RP Предупреждение**\nИгрок: ${target}\nВыдал: ${sender}\nПричина: ${reason}\nВсего: ${warnings.count}/3`);
+                }
+            }
+            
+        } else if (action === 'del') {
+            // Снимаем последнее предупреждение
+            const lastWarn = await db.get(
+                `SELECT id FROM rp_warnings WHERE player = ? AND active = 1 ORDER BY issued_at DESC LIMIT 1`,
+                [target.toLowerCase()]
+            );
+            
+            if (lastWarn) {
+                await db.run(
+                    `UPDATE rp_warnings SET active = 0 WHERE id = ?`,
+                    [lastWarn.id]
+                );
+                
+                // Проверяем, можно ли разблокировать RP
+                const remainingWarns = await db.get(
+                    `SELECT COUNT(*) as count FROM rp_warnings WHERE player = ? AND active = 1`,
+                    [target.toLowerCase()]
+                );
+                
+                if (remainingWarns.count < 3) {
+                    await db.run(
+                        `UPDATE rp_players SET is_frozen = 0 WHERE minecraft_nick = ?`,
+                        [target.toLowerCase()]
+                    );
+                }
+                
+                bot.chat(`/msg ${sender} &a&l|&f Вы &2успешно&f сняли предупреждение с &e${target}`);
+                bot.chat(`/msg ${target} &a&l|&f С вас снято предупреждение от &e${sender}`);
+            } else {
+                bot.chat(`/msg ${sender} &4&l|&c У игрока &e${target} &cнет активных предупреждений`);
+            }
+        } else {
+            bot.chat(`/msg ${sender} &7&l|&f Использование: &e/arp warn add/del <ник> [причина]`);
         }
-        const newWarnings = profile.warnings + 1;
-        await db.run('UPDATE rp_players SET warnings = ? WHERE minecraft_nick = ?', [newWarnings, target]);
-        await db.addPunishment(target, 'rp_warn', reason, sender, null);
         
-        sendMessage(bot, sender, `&a&l|&f Выдано предупреждение &e${target} &7(${newWarnings}/3)`);
-        sendMessage(bot, target, `&c&l|&f Вы получили предупреждение от &e${sender}&f. Причина: &e${reason}`);
-        
-        if (newWarnings >= 3) {
-            await db.run('UPDATE rp_players SET is_frozen = 1 WHERE minecraft_nick = ?', [target]);
-            bot.chat(`/cc &c🔒 ${target} заморожен в RP за 3 предупреждения`);
-        }
-        if (addLog) addLog(`⚠️ ${sender} выдал предупреждение ${target} (${reason})`, 'warn');
-        
-    } else if (action === 'del') {
-        const newWarnings = Math.max(0, profile.warnings - 1);
-        await db.run('UPDATE rp_players SET warnings = ? WHERE minecraft_nick = ?', [newWarnings, target]);
-        if (newWarnings < 3) await db.run('UPDATE rp_players SET is_frozen = 0 WHERE minecraft_nick = ?', [target]);
-        sendMessage(bot, sender, `&a&l|&f Снято предупреждение с &e${target}`);
-        if (addLog) addLog(`✅ ${sender} снял предупреждение с ${target}`, 'info');
+    } catch (error) {
+        console.error('Ошибка в arpWarn:', error);
+        bot.chat(`/msg ${sender} &4&l|&c Ошибка: ${error.message}`);
     }
 }
-
 // /arp stats [ник] - Показать статистику игрока
 async function arpStats(bot, sender, args, db) {
     if (args.length < 1) {

@@ -1,14 +1,15 @@
 // src/minecraft/commands/index.js
-// Центральный модуль для всех команд Minecraft бота
+// ПОЛНАЯ РЕГИСТРАЦИЯ ВСЕХ КОМАНД
 
 const playerCommands = require('./player');
 const staffCommands = require('./staff');
-const orgCommands = require('./org');
-const adminCommands = require('./admin');
 const rpCommands = require('./rp');
-const propertyCommands = require('./property');
+const orgCommands = require('./org');
 const orgLeaderCommands = require('./org_leader');
 const ministryCommands = require('./ministry');
+const adminCommands = require('./admin');
+const propertyCommands = require('./property');
+const { checkCooldown, setCooldown } = require('./cooldown');
 
 const commandMap = new Map();
 
@@ -23,13 +24,23 @@ function registerAlias(commandName, alias) {
     }
 }
 
+// Вспомогательная функция для выполнения с кулдауном
+async function executeWithCooldown(bot, sender, commandKey, handler, ...args) {
+    const cooldownCheck = checkCooldown(sender, commandKey);
+    if (!cooldownCheck.allowed) {
+        bot.chat(`/msg ${sender} &4&l|&c Подождите &e${cooldownCheck.remaining}&c сек перед повторным использованием`);
+        return false;
+    }
+    
+    await handler(...args);
+    setCooldown(sender, commandKey);
+    return true;
+}
+
 function initialize() {
-    // ============================================
-    // ИГРОВЫЕ КОМАНДЫ (ДЛЯ ВСЕХ)
-    // ============================================
+    // ========== ИГРОВЫЕ КОМАНДЫ ==========
     registerCommand('player', 'balance', playerCommands.balance);
     registerCommand('player', 'bal', playerCommands.balance);
-    registerCommand('player', 'money', playerCommands.balance);
     registerCommand('player', 'pay', playerCommands.pay);
     registerCommand('player', 'pass', playerCommands.pass);
     registerCommand('player', 'id', playerCommands.id);
@@ -40,59 +51,37 @@ function initialize() {
     registerCommand('player', 'link', playerCommands.link);
     registerCommand('player', 'fly', playerCommands.fly);
     registerCommand('player', '10t', playerCommands.tenT);
-    registerCommand('player', 'org', playerCommands.org);
     registerCommand('player', 'discord', playerCommands.discord);
     registerCommand('player', 'ds', playerCommands.discord);
     
-    // ============================================
-    // КОМАНДЫ ПЕРСОНАЛА
-    // ============================================
+    // ========== КОМАНДЫ ПЕРСОНАЛА ==========
     registerCommand('staff', 'mute', staffCommands.mute, 1);
     registerCommand('staff', 'kick', staffCommands.kick, 1);
     registerCommand('staff', 'blacklist', staffCommands.blacklist, 1);
     registerCommand('staff', 'bl', staffCommands.blacklist, 1);
+    registerCommand('staff', 'check', staffCommands.check, 1);
     registerCommand('staff', 'awarn', staffCommands.awarn, 3);
     registerCommand('staff', 'spam', staffCommands.spam, 4);
     registerCommand('staff', 'r', staffCommands.r, 3);
     registerCommand('staff', 'logs', staffCommands.logs, 1);
-    registerCommand('staff', 'check', staffCommands.check, 1);
     
-    // ============================================
-    // АДМИНИСТРАТИВНЫЕ КОМАНДЫ
-    // ============================================
-    registerCommand('admin', 'admin', adminCommands.admin, 6);
-    registerCommand('admin', 'a', adminCommands.admin, 6);
-    registerCommand('admin', 'stopall', adminCommands.stopall, 6);
-    registerCommand('admin', 'reloadbd', adminCommands.reloadbd, 6);
-    registerCommand('admin', 'wipe', adminCommands.wipe, 6);
-    
-    // ============================================
-    // ROLEPLAY КОМАНДЫ
-    // ============================================
-    registerCommand('rp', 'arp', rpCommands.arp, 2);
+    // ========== ROLEPLAY КОМАНДЫ ==========
     registerCommand('rp', 'duty', rpCommands.duty, 0);
     registerCommand('rp', 'status', rpCommands.status, 0);
+    registerCommand('rp', 'tr', rpCommands.tr, 0);
+    registerCommand('rp', 'border', rpCommands.border, 0);
+    registerCommand('rp', 'search', rpCommands.search, 0);
+    registerCommand('rp', 'fine', rpCommands.fine, 0);
+    registerCommand('rp', 'order', rpCommands.order, 0);
+    registerCommand('rp', 'redcode', rpCommands.redcode, 0);
+    registerCommand('rp', 'rc', rpCommands.redcode, 0);
+    registerCommand('rp', 'grade', rpCommands.grade, 0);
+    registerCommand('rp', 'arp', rpCommands.arp, 2);
     
-    // ============================================
-    // КОМАНДЫ ОРГАНИЗАЦИЙ
-    // ============================================
-    // Полиция
-    registerCommand('org', 'search', orgCommands.search, 1);
-    registerCommand('org', 'check', orgCommands.check, 1);
-    registerCommand('org', 'fine', orgCommands.fine, 2);
-    registerCommand('org', 'order', orgCommands.order, 4);
-    // Армия
-    registerCommand('org', 'tr', orgCommands.tr, 1);
-    registerCommand('org', 'border', orgCommands.border, 1);
-    // Больница
-    registerCommand('org', 'redcode', orgCommands.redcode, 1);
-    registerCommand('org', 'rc', orgCommands.redcode, 1);
-    // Академия
-    registerCommand('org', 'grade', orgCommands.grade, 3);
+    // ========== ГЛАВНАЯ КОМАНДА ОРГАНИЗАЦИЙ ==========
+    registerCommand('org', 'org', handleOrgCommand, 0);
     
-    // ============================================
-    // КОМАНДЫ ИМУЩЕСТВА
-    // ============================================
+    // ========== КОМАНДЫ ИМУЩЕСТВА ==========
     registerCommand('property', 'im', propertyCommands.im, 0);
     registerCommand('property', 'imflag', propertyCommands.imflag, 0);
     registerCommand('property', 'imm', propertyCommands.imm, 0);
@@ -100,9 +89,7 @@ function initialize() {
     registerCommand('property', 'biz', propertyCommands.biz, 0);
     registerCommand('property', 'office', propertyCommands.office, 0);
     
-    // ============================================
-    // КОМАНДЫ ЛИДЕРОВ ОРГАНИЗАЦИЙ
-    // ============================================
+    // ========== КОМАНДЫ ЛИДЕРОВ ОРГАНИЗАЦИЙ ==========
     registerCommand('org_leader', 'invite', orgLeaderCommands.invite, 0);
     registerCommand('org_leader', 'kick', orgLeaderCommands.kick, 0);
     registerCommand('org_leader', 'rank', orgLeaderCommands.rankSet, 0);
@@ -116,10 +103,7 @@ function initialize() {
     registerCommand('org_leader', 'unwarn', orgLeaderCommands.unwarn, 0);
     registerCommand('org_leader', 'fine', orgLeaderCommands.fine, 0);
     
-    // ============================================
-    // КОМАНДЫ МИНИСТРОВ
-    // ============================================
-    // Министр экономики
+    // ========== КОМАНДЫ МИНИСТРОВ ==========
     registerCommand('ministry', 'tax', ministryCommands.taxSet, 0);
     registerCommand('ministry', 'taxlist', ministryCommands.taxList, 0);
     registerCommand('ministry', 'budget', ministryCommands.budget, 0);
@@ -127,34 +111,243 @@ function initialize() {
     registerCommand('ministry', 'grant', ministryCommands.grant, 0);
     registerCommand('ministry', 'idset', ministryCommands.idSet, 0);
     registerCommand('ministry', 'imtake', ministryCommands.imTake, 0);
-    // Министр обороны
     registerCommand('ministry', 'defense', ministryCommands.defenseBudget, 0);
     registerCommand('ministry', 'armystatus', ministryCommands.armyStatus, 0);
-    // Министр МВД
     registerCommand('ministry', 'mvdbudget', ministryCommands.mvdBudget, 0);
     registerCommand('ministry', 'mvdstatus', ministryCommands.mvdStatus, 0);
     registerCommand('ministry', 'crimelist', ministryCommands.crimeList, 0);
-    // Министр здравоохранения
     registerCommand('ministry', 'healthbudget', ministryCommands.healthBudget, 0);
     registerCommand('ministry', 'hospitalstatus', ministryCommands.hospitalStatus, 0);
-    // Министр образования
     registerCommand('ministry', 'edubudget', ministryCommands.eduBudget, 0);
     registerCommand('ministry', 'academystatus', ministryCommands.academyStatus, 0);
-    // Мэр
     registerCommand('ministry', 'mayorkick', ministryCommands.mayorKick, 0);
     
-    // ============================================
-    // АЛИАСЫ (СОКРАЩЕНИЯ)
-    // ============================================
+    // ========== АДМИНИСТРАТИВНЫЕ КОМАНДЫ ==========
+    registerCommand('admin', 'admin', adminCommands.admin, 6);
+    registerCommand('admin', 'a', adminCommands.admin, 6);
+    registerCommand('admin', 'stopall', adminCommands.stopall, 6);
+    registerCommand('admin', 'reloadbd', adminCommands.reloadbd, 6);
+    registerCommand('admin', 'wipe', adminCommands.wipe, 6);
+    
+    // ========== АЛИАСЫ ==========
     registerAlias('balance', 'баланс');
     registerAlias('help', 'помощь');
-    registerAlias('org', 'организация');
     registerAlias('discord', 'дс');
-    registerAlias('paybonus', 'pb');
-    registerAlias('redcode', 'rc');
 }
 
-// Выполнение команды
+// ============================================
+// ОБРАБОТЧИК /org С КУЛДАУНАМИ ДЛЯ КАЖДОЙ ПОДКОМАНДЫ
+// ============================================
+
+async function handleOrgCommand(bot, sender, args, db, addLog) {
+    if (!args || args.length === 0) {
+        bot.chat(`/msg ${sender} &7&l|&f Использование: &e/org [подкоманда]`);
+        bot.chat(`/msg ${sender} &7&l|&f Подкоманды: &epolice, army, hospital, academy, o, ministry`);
+        return;
+    }
+    
+    const subCommand = args[0].toLowerCase();
+    const restArgs = args.slice(1);
+    
+    // ========== ПОЛИЦИЯ ==========
+    if (subCommand === 'police') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'search':
+                await executeWithCooldown(bot, sender, 'org_police_search', orgCommands.search, bot, sender, actionArgs, db);
+                break;
+            case 'check':
+                await executeWithCooldown(bot, sender, 'org_police_check', orgCommands.check, bot, sender, actionArgs, db);
+                break;
+            case 'fine':
+                await executeWithCooldown(bot, sender, 'org_police_fine', orgCommands.fine, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'order':
+                await executeWithCooldown(bot, sender, 'org_police_order', orgCommands.order, bot, sender, actionArgs, db);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org police [search/check/fine/order]`);
+        }
+        return;
+    }
+    
+    // ========== АРМИЯ ==========
+    if (subCommand === 'army') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'tr':
+                await executeWithCooldown(bot, sender, 'org_army_tr', orgCommands.tr, bot, sender, actionArgs, db);
+                break;
+            case 'border':
+                await executeWithCooldown(bot, sender, 'org_army_border', orgCommands.border, bot, sender, actionArgs, db);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org army [tr/border]`);
+        }
+        return;
+    }
+    
+    // ========== БОЛЬНИЦА ==========
+    if (subCommand === 'hospital') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'redcode':
+                await executeWithCooldown(bot, sender, 'org_hospital_redcode', orgCommands.redcode, bot, sender, actionArgs, db);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org hospital [redcode]`);
+        }
+        return;
+    }
+    
+    // ========== АКАДЕМИЯ ==========
+    if (subCommand === 'academy') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'grade':
+                await executeWithCooldown(bot, sender, 'org_academy_grade', orgCommands.grade, bot, sender, actionArgs, db, addLog);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org academy [grade]`);
+        }
+        return;
+    }
+    
+    // ========== ЛИДЕРЫ (/org o) ==========
+    if (subCommand === 'o') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'invite':
+                await executeWithCooldown(bot, sender, 'org_o_invite', orgLeaderCommands.invite, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'accept':
+                await executeWithCooldown(bot, sender, 'org_o_accept', orgLeaderCommands.accept, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'kick':
+                await executeWithCooldown(bot, sender, 'org_o_kick', orgLeaderCommands.kick, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'rank':
+                if (actionArgs[0] === 'set') {
+                    await executeWithCooldown(bot, sender, 'org_o_rank_set', orgLeaderCommands.rankSet, bot, sender, actionArgs.slice(1), db, addLog);
+                } else {
+                    await executeWithCooldown(bot, sender, 'org_o_rankinfo', orgLeaderCommands.rankinfo, bot, sender, actionArgs, db, addLog);
+                }
+                break;
+            case 'setsalary':
+                await executeWithCooldown(bot, sender, 'org_o_setsalary', orgLeaderCommands.setsalary, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'paybonus':
+                await executeWithCooldown(bot, sender, 'org_o_paybonus', orgLeaderCommands.paybonus, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'vacation':
+                await executeWithCooldown(bot, sender, 'org_o_vacation', orgLeaderCommands.vacationList, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'duty':
+                await executeWithCooldown(bot, sender, 'org_o_duty', orgLeaderCommands.dutyList, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'warn':
+                await executeWithCooldown(bot, sender, 'org_o_warn', orgLeaderCommands.warn, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'unwarn':
+                await executeWithCooldown(bot, sender, 'org_o_unwarn', orgLeaderCommands.unwarn, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'fine':
+                await executeWithCooldown(bot, sender, 'org_o_fine', orgLeaderCommands.fine, bot, sender, actionArgs, db, addLog);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org o [invite/accept/kick/rank/setsalary/paybonus/vacation/duty/warn/unwarn/fine]`);
+        }
+        return;
+    }
+    
+    // ========== МИНИСТРЫ (/org ministry) ==========
+    if (subCommand === 'ministry') {
+        const action = restArgs[0]?.toLowerCase();
+        const actionArgs = restArgs.slice(1);
+        
+        switch(action) {
+            case 'tax':
+                if (actionArgs[0] === 'set') {
+                    await executeWithCooldown(bot, sender, 'org_ministry_tax_set', ministryCommands.taxSet, bot, sender, actionArgs.slice(1), db, addLog);
+                } else if (actionArgs[0] === 'list') {
+                    await executeWithCooldown(bot, sender, 'org_ministry_tax_list', ministryCommands.taxList, bot, sender, actionArgs.slice(1), db);
+                }
+                break;
+            case 'budget':
+                await executeWithCooldown(bot, sender, 'org_ministry_budget', ministryCommands.budget, bot, sender, actionArgs, db);
+                break;
+            case 'bonus':
+                await executeWithCooldown(bot, sender, 'org_ministry_bonus', ministryCommands.bonus, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'grant':
+                await executeWithCooldown(bot, sender, 'org_ministry_grant', ministryCommands.grant, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'idset':
+                await executeWithCooldown(bot, sender, 'org_ministry_idset', ministryCommands.idSet, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'imtake':
+                await executeWithCooldown(bot, sender, 'org_ministry_imtake', ministryCommands.imTake, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'defense':
+                await executeWithCooldown(bot, sender, 'org_ministry_defense', ministryCommands.defenseBudget, bot, sender, actionArgs, db);
+                break;
+            case 'armystatus':
+                await executeWithCooldown(bot, sender, 'org_ministry_armystatus', ministryCommands.armyStatus, bot, sender, actionArgs, db);
+                break;
+            case 'mvdbudget':
+                await executeWithCooldown(bot, sender, 'org_ministry_mvdbudget', ministryCommands.mvdBudget, bot, sender, actionArgs, db);
+                break;
+            case 'mvdstatus':
+                await executeWithCooldown(bot, sender, 'org_ministry_mvdstatus', ministryCommands.mvdStatus, bot, sender, actionArgs, db);
+                break;
+            case 'crimelist':
+                await executeWithCooldown(bot, sender, 'org_ministry_crimelist', ministryCommands.crimeList, bot, sender, actionArgs, db);
+                break;
+            case 'healthbudget':
+                await executeWithCooldown(bot, sender, 'org_ministry_healthbudget', ministryCommands.healthBudget, bot, sender, actionArgs, db);
+                break;
+            case 'hospitalstatus':
+                await executeWithCooldown(bot, sender, 'org_ministry_hospitalstatus', ministryCommands.hospitalStatus, bot, sender, actionArgs, db);
+                break;
+            case 'edubudget':
+                await executeWithCooldown(bot, sender, 'org_ministry_edubudget', ministryCommands.eduBudget, bot, sender, actionArgs, db);
+                break;
+            case 'academystatus':
+                await executeWithCooldown(bot, sender, 'org_ministry_academystatus', ministryCommands.academyStatus, bot, sender, actionArgs, db);
+                break;
+            case 'mayorkick':
+                await executeWithCooldown(bot, sender, 'org_ministry_mayorkick', ministryCommands.mayorKick, bot, sender, actionArgs, db, addLog);
+                break;
+            case 'cityinfo':
+                await executeWithCooldown(bot, sender, 'org_ministry_cityinfo', ministryCommands.cityInfo, bot, sender, actionArgs, db);
+                break;
+            case 'setbudget':
+                await executeWithCooldown(bot, sender, 'org_ministry_setbudget', ministryCommands.setBudget, bot, sender, actionArgs, db, addLog);
+                break;
+            default:
+                bot.chat(`/msg ${sender} &7&l|&f /org ministry [tax/budget/bonus/grant/idset/imtake/defense/armystatus/mvdbudget/mvdstatus/crimelist/healthbudget/hospitalstatus/edubudget/academystatus/mayorkick/cityinfo/setbudget]`);
+        }
+        return;
+    }
+    
+    bot.chat(`/msg ${sender} &7&l|&f Неизвестная подкоманда: &e${subCommand}`);
+    bot.chat(`/msg ${sender} &7&l|&f Доступно: &epolice, army, hospital, academy, o, ministry`);
+}
+
+// ============================================
+// ВЫПОЛНЕНИЕ КОМАНДЫ
+// ============================================
+
 async function executeCommand(bot, sender, command, args, db, addLog) {
     const cmdName = command.toLowerCase();
     const cmd = commandMap.get(cmdName);
@@ -165,7 +358,6 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
     }
     
     try {
-        // Проверка прав (если требуется ранг)
         if (cmd.requiredRank > 0) {
             let staffRank;
             try {
@@ -180,7 +372,6 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
             }
         }
         
-        // Проверка остановки системы (для административных команд)
         if (cmd.category !== 'admin') {
             const isStopped = await db.getSetting('system_stopped');
             if (isStopped === 'true') {
@@ -189,7 +380,6 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
             }
         }
         
-        // Выполнение обработчика
         if (typeof cmd.handler === 'function') {
             await cmd.handler(bot, sender, args, db, addLog);
         } else {
@@ -199,12 +389,11 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
         
     } catch (error) {
         bot.chat(`/msg ${sender} &4&l|&c Ошибка выполнения команды: ${error.message}`);
-        if (addLog) addLog(`❌ Ошибка команды ${command}: ${error.message}`, 'error');
+        if (addLog) addLog(`Ошибка команды ${command}: ${error.message}`, 'error');
         return false;
     }
 }
 
-// Получение списка команд для помощи
 function getHelpList(rank = 0) {
     const categories = {
         player: [],
@@ -229,7 +418,6 @@ function getHelpList(rank = 0) {
     return categories;
 }
 
-// Инициализация при загрузке
 initialize();
 
 module.exports = {
@@ -237,5 +425,6 @@ module.exports = {
     getHelpList,
     registerCommand,
     registerAlias,
-    commandMap
+    commandMap,
+    handleOrgCommand
 };
