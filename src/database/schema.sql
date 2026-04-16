@@ -1,6 +1,6 @@
 -- ============================================
 -- RESISTANCE CITY PROJECT - ПОЛНАЯ СХЕМА БД
--- Версия: 6.1 (без дублирования source)
+-- Версия: 7.0 (ФИНАЛЬНАЯ)
 -- ============================================
 
 -- ============================================
@@ -61,9 +61,9 @@ CREATE TABLE IF NOT EXISTS rp_players (
     warnings INTEGER DEFAULT 0,
     has_education INTEGER DEFAULT 0,
     is_frozen INTEGER DEFAULT 0,
-    frozen_reason TEXT,        -- Добавлено
-    frozen_by TEXT,            -- Добавлено
-    frozen_at DATETIME,        -- Добавлено
+    frozen_reason TEXT,
+    frozen_by TEXT,
+    frozen_at DATETIME,
     last_pay_time DATETIME,
     education_courses TEXT DEFAULT '[]',
     passport_data TEXT
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS property_residents (
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active INTEGER DEFAULT 1,
     PRIMARY KEY (property_id, resident_nick),
-    FOREIGN KEY (property_id) REFERENCES property(id)
+    FOREIGN KEY (property_id) REFERENCES property(id) ON DELETE CASCADE
 );
 
 -- ============================================
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS businesses (
     daily_income REAL DEFAULT 0,
     total_income REAL DEFAULT 0,
     last_income_calc DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (property_id) REFERENCES property(id)
+    FOREIGN KEY (property_id) REFERENCES property(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS offices (
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS offices (
     current_streak INTEGER DEFAULT 0,
     last_question_date DATE,
     total_income REAL DEFAULT 0,
-    FOREIGN KEY (property_id) REFERENCES property(id)
+    FOREIGN KEY (property_id) REFERENCES property(id) ON DELETE CASCADE
 );
 
 -- ============================================
@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS organizations (
     leader_nick TEXT,
     is_frozen INTEGER DEFAULT 0,
     frozen_reason TEXT,
+    frozen_by TEXT,
     frozen_at DATETIME
 );
 
@@ -189,7 +190,7 @@ CREATE TABLE IF NOT EXISTS org_members (
     is_on_vacation INTEGER DEFAULT 0,
     vacation_until DATETIME,
     PRIMARY KEY (minecraft_nick, org_name),
-    FOREIGN KEY (org_name) REFERENCES organizations(name)
+    FOREIGN KEY (org_name) REFERENCES organizations(name) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS org_ranks (
@@ -202,8 +203,17 @@ CREATE TABLE IF NOT EXISTS org_ranks (
     can_invite INTEGER DEFAULT 0,
     can_kick INTEGER DEFAULT 0,
     can_promote INTEGER DEFAULT 0,
-    FOREIGN KEY (org_name) REFERENCES organizations(name),
+    FOREIGN KEY (org_name) REFERENCES organizations(name) ON DELETE CASCADE,
     UNIQUE(org_name, rank_name)
+);
+
+CREATE TABLE IF NOT EXISTS org_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player TEXT NOT NULL,
+    org_name TEXT NOT NULL,
+    invited_by TEXT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================
@@ -250,7 +260,7 @@ CREATE TABLE IF NOT EXISTS tax_logs (
 CREATE TABLE IF NOT EXISTS punishments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('mute', 'blacklist', 'ban', 'kick', 'rp_warn', 'warning')),
+    type TEXT NOT NULL CHECK(type IN ('mute', 'blacklist', 'ban', 'kick', 'rp_warn', 'warning', 'staff_warn')),
     reason TEXT NOT NULL,
     issued_by TEXT NOT NULL,
     duration_minutes INTEGER,
@@ -269,11 +279,9 @@ CREATE TABLE IF NOT EXISTS rp_warnings (
     reason TEXT NOT NULL,
     issued_by TEXT NOT NULL,
     issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    active BOOLEAN DEFAULT 1,
-    FOREIGN KEY (player) REFERENCES rp_players(minecraft_nick) ON DELETE CASCADE
+    active BOOLEAN DEFAULT 1
 );
 
--- ИСПРАВЛЕНО: Добавлен IF NOT EXISTS
 CREATE INDEX IF NOT EXISTS idx_rp_warnings_player ON rp_warnings(player);
 
 CREATE TABLE IF NOT EXISTS clan_blacklist (
@@ -284,6 +292,7 @@ CREATE TABLE IF NOT EXISTS clan_blacklist (
     expires_at DATETIME,
     is_active INTEGER DEFAULT 1
 );
+
 CREATE TABLE IF NOT EXISTS player_warnings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_nick TEXT NOT NULL,
@@ -421,7 +430,7 @@ INSERT OR IGNORE INTO staff_limits (rank_level, rank_name, max_kicks_per_day, ma
 
 -- Вставка организаций
 INSERT OR IGNORE INTO organizations (name, display_name, budget, tax_rate) VALUES
-('police', 'Полиция', 1000000, 0.01),
+('police', 'Полиция (МВД)', 1000000, 0.01),
 ('army', 'Армия', 1000000, 0.01),
 ('hospital', 'Больница', 1000000, 0.01),
 ('academy', 'Академия', 1000000, 0.01),
@@ -437,6 +446,48 @@ INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can
 ('police', 'Подполковник', 11000, 6, 1, 1, 1),
 ('police', 'Полковник', 13000, 7, 1, 1, 1);
 
+-- Вставка рангов армии
+INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
+('army', 'Рядовой', 4300, 1, 0, 0, 0),
+('army', 'Сержант', 5000, 2, 0, 0, 0),
+('army', 'Старшина', 5200, 3, 0, 0, 0),
+('army', 'Прапорщик', 5800, 4, 0, 0, 0),
+('army', 'Лейтенант', 6500, 5, 1, 0, 0),
+('army', 'Капитан', 8000, 6, 1, 1, 0),
+('army', 'Майор', 9000, 7, 1, 1, 0),
+('army', 'Подполковник', 10500, 8, 1, 1, 1),
+('army', 'Полковник', 12000, 9, 1, 1, 1),
+('army', 'Маршал', 15000, 10, 1, 1, 1);
+
+-- Вставка рангов больницы
+INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
+('hospital', 'Санитар(ка)', 4200, 1, 0, 0, 0),
+('hospital', 'Сестра-хозяйка', 4500, 2, 0, 0, 0),
+('hospital', 'Медсёстры/Брат', 5000, 3, 0, 0, 0),
+('hospital', 'Фельдшер', 5800, 4, 0, 0, 0),
+('hospital', 'Лаборант', 5500, 5, 0, 0, 0),
+('hospital', 'Акушерка', 6000, 6, 0, 0, 0),
+('hospital', 'Врач', 9000, 7, 1, 1, 0),
+('hospital', 'Главный врач', 14000, 8, 1, 1, 1);
+
+-- Вставка рангов академии
+INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote) VALUES
+('academy', 'Стажёр', 4200, 1, 0, 0, 0),
+('academy', 'Ассистент', 4800, 2, 0, 0, 0),
+('academy', 'Преподаватель', 6000, 3, 0, 0, 0),
+('academy', 'Зав. кафедрой', 7000, 4, 1, 0, 0),
+('academy', 'Проректор', 9000, 5, 1, 1, 0),
+('academy', 'Директор', 11000, 6, 1, 1, 1);
+
+-- Вставка рангов правительства
+INSERT OR IGNORE INTO org_ranks (org_name, rank_name, base_salary, priority, can_invite, can_kick, can_promote, is_leader) VALUES
+('government', 'Адвокат', 7500, 1, 0, 0, 0, 0),
+('government', 'Прокурор', 10500, 2, 0, 0, 0, 0),
+('government', 'Помощник судьи', 6500, 3, 0, 0, 0, 0),
+('government', 'Судья', 12000, 4, 0, 0, 0, 0),
+('government', 'Министр', 15000, 5, 1, 1, 1, 0),
+('government', 'Мэр', 17000, 6, 1, 1, 1, 1);
+
 -- Добавление первого администратора
 INSERT OR IGNORE INTO clan_members (minecraft_nick, rank_name, rank_priority, invited_by) 
 VALUES ('Ronch_', 'Администратор', 100, 'system');
@@ -444,12 +495,26 @@ VALUES ('Ronch_', 'Администратор', 100, 'system');
 INSERT OR IGNORE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by) 
 VALUES ('Ronch_', 6, 'Администратор', 'system');
 
--- Индексы
+-- ============================================
+-- ИНДЕКСЫ ДЛЯ ОПТИМИЗАЦИИ
+-- ============================================
+
 CREATE INDEX IF NOT EXISTS idx_punishments_player ON punishments(player);
 CREATE INDEX IF NOT EXISTS idx_punishments_active ON punishments(active);
+CREATE INDEX IF NOT EXISTS idx_punishments_expires ON punishments(expires_at);
 CREATE INDEX IF NOT EXISTS idx_property_owner ON property(owner_nick);
+CREATE INDEX IF NOT EXISTS idx_property_available ON property(is_available);
 CREATE INDEX IF NOT EXISTS idx_money_logs_player ON money_logs(player);
-CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);   
+CREATE INDEX IF NOT EXISTS idx_money_logs_created ON money_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_clan_chat_date ON clan_chat_logs(sent_at);
+CREATE INDEX IF NOT EXISTS idx_clan_chat_player ON clan_chat_logs(player);
+CREATE INDEX IF NOT EXISTS idx_org_members_nick ON org_members(minecraft_nick);
+CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_name);
+CREATE INDEX IF NOT EXISTS idx_rp_players_structure ON rp_players(structure);
+CREATE INDEX IF NOT EXISTS idx_rp_players_frozen ON rp_players(is_frozen);
+CREATE INDEX IF NOT EXISTS idx_verification_codes_active ON verification_codes(is_active, expires_at);
+CREATE INDEX IF NOT EXISTS idx_linked_accounts_discord ON linked_accounts(discord_id);
+
 -- ============================================
 -- НАЧАЛЬНЫЕ НАСТРОЙКИ
 -- ============================================
@@ -470,4 +535,28 @@ INSERT OR IGNORE INTO settings (key, value, description) VALUES
 ('mvd_budget', '1000000', 'Бюджет МВД'),
 ('health_budget', '1000000', 'Бюджет здравоохранения'),
 ('edu_budget', '1000000', 'Бюджет образования'),
-('salary_bonus', '0', 'Бонус к зарплатам (%)');
+('salary_bonus', '0', 'Бонус к зарплатам (%)'),
+('last_wipe_date', NULL, 'Дата последнего вайпа'),
+('last_reset_date', NULL, 'Дата последнего сброса лимитов');
+
+-- ============================================
+-- ТРИГГЕРЫ ДЛЯ АВТОМАТИЧЕСКОГО ОБНОВЛЕНИЯ
+-- ============================================
+
+-- Обновление last_seen при входе игрока
+CREATE TRIGGER IF NOT EXISTS update_last_seen 
+AFTER UPDATE OF last_seen ON clan_members
+BEGIN
+    UPDATE clan_members SET last_seen = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+-- Автоматический сброс лимитов персонала каждый день
+CREATE TRIGGER IF NOT EXISTS reset_staff_limits
+AFTER UPDATE OF last_reset_date ON staff_stats
+BEGIN
+    UPDATE staff_stats SET 
+        kicks_today = 0, 
+        mutes_today = 0, 
+        bl_today = 0 
+    WHERE last_reset_date < date('now');
+END; 

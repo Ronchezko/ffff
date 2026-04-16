@@ -24,11 +24,11 @@ function registerAlias(commandName, alias) {
     }
 }
 
-// Вспомогательная функция для выполнения с кулдауном
+// Вспомогательная функция для выполнения с кулдауном для КАЖДОЙ подкоманды
 async function executeWithCooldown(bot, sender, commandKey, handler, ...args) {
     const cooldownCheck = checkCooldown(sender, commandKey);
     if (!cooldownCheck.allowed) {
-        bot.chat(`/msg ${sender} &4&l|&c Подождите &e${cooldownCheck.remaining}&c сек перед повторным использованием`);
+        bot.chat(`/msg ${sender} &4&l|&c Подождите &e${cooldownCheck.remaining}&c сек перед повторным использованием команды &e${commandKey}`);
         return false;
     }
     
@@ -64,6 +64,7 @@ function initialize() {
     registerCommand('staff', 'spam', staffCommands.spam, 4);
     registerCommand('staff', 'r', staffCommands.r, 3);
     registerCommand('staff', 'logs', staffCommands.logs, 1);
+    registerCommand('staff', 'unfreeze', staffCommands.unfreeze, 1);  // ДОБАВЛЕНО
     
     // ========== ROLEPLAY КОМАНДЫ ==========
     registerCommand('rp', 'duty', rpCommands.duty, 0);
@@ -133,10 +134,11 @@ function initialize() {
     registerAlias('balance', 'баланс');
     registerAlias('help', 'помощь');
     registerAlias('discord', 'дс');
+    registerAlias('unfreeze', 'разморозить');
 }
 
 // ============================================
-// ОБРАБОТЧИК /org С КУЛДАУНАМИ ДЛЯ КАЖДОЙ ПОДКОМАНДЫ
+// ОБРАБОТЧИК /org С ОТДЕЛЬНЫМ КД ДЛЯ КАЖДОЙ ПОДКОМАНДЫ
 // ============================================
 
 async function handleOrgCommand(bot, sender, args, db, addLog) {
@@ -154,18 +156,25 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org police [search/check/fine/order]`);
+            return;
+        }
+        
+        const cooldownKey = `org_police_${action}`;
+        
         switch(action) {
             case 'search':
-                await executeWithCooldown(bot, sender, 'org_police_search', orgCommands.search, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.search, bot, sender, actionArgs, db);
                 break;
             case 'check':
-                await executeWithCooldown(bot, sender, 'org_police_check', orgCommands.check, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.check, bot, sender, actionArgs, db);
                 break;
             case 'fine':
-                await executeWithCooldown(bot, sender, 'org_police_fine', orgCommands.fine, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.fine, bot, sender, actionArgs, db, addLog);
                 break;
             case 'order':
-                await executeWithCooldown(bot, sender, 'org_police_order', orgCommands.order, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.order, bot, sender, actionArgs, db);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org police [search/check/fine/order]`);
@@ -178,12 +187,19 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org army [tr/border]`);
+            return;
+        }
+        
+        const cooldownKey = `org_army_${action}`;
+        
         switch(action) {
             case 'tr':
-                await executeWithCooldown(bot, sender, 'org_army_tr', orgCommands.tr, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.tr, bot, sender, actionArgs, db);
                 break;
             case 'border':
-                await executeWithCooldown(bot, sender, 'org_army_border', orgCommands.border, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.border, bot, sender, actionArgs, db);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org army [tr/border]`);
@@ -196,9 +212,16 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org hospital [redcode]`);
+            return;
+        }
+        
+        const cooldownKey = `org_hospital_${action}`;
+        
         switch(action) {
             case 'redcode':
-                await executeWithCooldown(bot, sender, 'org_hospital_redcode', orgCommands.redcode, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.redcode, bot, sender, actionArgs, db);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org hospital [redcode]`);
@@ -211,9 +234,16 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org academy [grade]`);
+            return;
+        }
+        
+        const cooldownKey = `org_academy_${action}`;
+        
         switch(action) {
             case 'grade':
-                await executeWithCooldown(bot, sender, 'org_academy_grade', orgCommands.grade, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgCommands.grade, bot, sender, actionArgs, db, addLog);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org academy [grade]`);
@@ -226,43 +256,54 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org o [invite/accept/kick/rank/setsalary/paybonus/vacation/duty/warn/unwarn/fine]`);
+            return;
+        }
+        
+        let cooldownKey = `org_o_${action}`;
+        
+        if (action === 'rank' && actionArgs[0] === 'set') {
+            cooldownKey = `org_o_rank_set`;
+        }
+        
         switch(action) {
             case 'invite':
-                await executeWithCooldown(bot, sender, 'org_o_invite', orgLeaderCommands.invite, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.invite, bot, sender, actionArgs, db, addLog);
                 break;
             case 'accept':
-                await executeWithCooldown(bot, sender, 'org_o_accept', orgLeaderCommands.accept, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.accept, bot, sender, actionArgs, db, addLog);
                 break;
             case 'kick':
-                await executeWithCooldown(bot, sender, 'org_o_kick', orgLeaderCommands.kick, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.kick, bot, sender, actionArgs, db, addLog);
                 break;
             case 'rank':
                 if (actionArgs[0] === 'set') {
-                    await executeWithCooldown(bot, sender, 'org_o_rank_set', orgLeaderCommands.rankSet, bot, sender, actionArgs.slice(1), db, addLog);
+                    await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.rankSet, bot, sender, actionArgs.slice(1), db, addLog);
                 } else {
-                    await executeWithCooldown(bot, sender, 'org_o_rankinfo', orgLeaderCommands.rankinfo, bot, sender, actionArgs, db, addLog);
+                    await executeWithCooldown(bot, sender, `org_o_rankinfo`, orgLeaderCommands.rankinfo, bot, sender, actionArgs, db, addLog);
                 }
                 break;
             case 'setsalary':
-                await executeWithCooldown(bot, sender, 'org_o_setsalary', orgLeaderCommands.setsalary, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.setsalary, bot, sender, actionArgs, db, addLog);
                 break;
             case 'paybonus':
-                await executeWithCooldown(bot, sender, 'org_o_paybonus', orgLeaderCommands.paybonus, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.paybonus, bot, sender, actionArgs, db, addLog);
                 break;
             case 'vacation':
-                await executeWithCooldown(bot, sender, 'org_o_vacation', orgLeaderCommands.vacationList, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.vacationList, bot, sender, actionArgs, db, addLog);
                 break;
             case 'duty':
-                await executeWithCooldown(bot, sender, 'org_o_duty', orgLeaderCommands.dutyList, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.dutyList, bot, sender, actionArgs, db, addLog);
                 break;
             case 'warn':
-                await executeWithCooldown(bot, sender, 'org_o_warn', orgLeaderCommands.warn, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.warn, bot, sender, actionArgs, db, addLog);
                 break;
             case 'unwarn':
-                await executeWithCooldown(bot, sender, 'org_o_unwarn', orgLeaderCommands.unwarn, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.unwarn, bot, sender, actionArgs, db, addLog);
                 break;
             case 'fine':
-                await executeWithCooldown(bot, sender, 'org_o_fine', orgLeaderCommands.fine, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, orgLeaderCommands.fine, bot, sender, actionArgs, db, addLog);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org o [invite/accept/kick/rank/setsalary/paybonus/vacation/duty/warn/unwarn/fine]`);
@@ -275,64 +316,81 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
         const action = restArgs[0]?.toLowerCase();
         const actionArgs = restArgs.slice(1);
         
+        if (!action) {
+            bot.chat(`/msg ${sender} &7&l|&f /org ministry [tax/budget/bonus/grant/idset/imtake/defense/armystatus/mvdbudget/mvdstatus/crimelist/healthbudget/hospitalstatus/edubudget/academystatus/mayorkick/cityinfo/setbudget]`);
+            return;
+        }
+        
+        let cooldownKey = `org_ministry_${action}`;
+        
+        if (action === 'tax') {
+            if (actionArgs[0] === 'set') {
+                cooldownKey = `org_ministry_tax_set`;
+            } else if (actionArgs[0] === 'list') {
+                cooldownKey = `org_ministry_tax_list`;
+            }
+        }
+        
         switch(action) {
             case 'tax':
                 if (actionArgs[0] === 'set') {
-                    await executeWithCooldown(bot, sender, 'org_ministry_tax_set', ministryCommands.taxSet, bot, sender, actionArgs.slice(1), db, addLog);
+                    await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.taxSet, bot, sender, actionArgs.slice(1), db, addLog);
                 } else if (actionArgs[0] === 'list') {
-                    await executeWithCooldown(bot, sender, 'org_ministry_tax_list', ministryCommands.taxList, bot, sender, actionArgs.slice(1), db);
+                    await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.taxList, bot, sender, actionArgs.slice(1), db);
+                } else {
+                    bot.chat(`/msg ${sender} &7&l|&f /org ministry tax [set/list]`);
                 }
                 break;
             case 'budget':
-                await executeWithCooldown(bot, sender, 'org_ministry_budget', ministryCommands.budget, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.budget, bot, sender, actionArgs, db);
                 break;
             case 'bonus':
-                await executeWithCooldown(bot, sender, 'org_ministry_bonus', ministryCommands.bonus, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.bonus, bot, sender, actionArgs, db, addLog);
                 break;
             case 'grant':
-                await executeWithCooldown(bot, sender, 'org_ministry_grant', ministryCommands.grant, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.grant, bot, sender, actionArgs, db, addLog);
                 break;
             case 'idset':
-                await executeWithCooldown(bot, sender, 'org_ministry_idset', ministryCommands.idSet, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.idSet, bot, sender, actionArgs, db, addLog);
                 break;
             case 'imtake':
-                await executeWithCooldown(bot, sender, 'org_ministry_imtake', ministryCommands.imTake, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.imTake, bot, sender, actionArgs, db, addLog);
                 break;
             case 'defense':
-                await executeWithCooldown(bot, sender, 'org_ministry_defense', ministryCommands.defenseBudget, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.defenseBudget, bot, sender, actionArgs, db);
                 break;
             case 'armystatus':
-                await executeWithCooldown(bot, sender, 'org_ministry_armystatus', ministryCommands.armyStatus, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.armyStatus, bot, sender, actionArgs, db);
                 break;
             case 'mvdbudget':
-                await executeWithCooldown(bot, sender, 'org_ministry_mvdbudget', ministryCommands.mvdBudget, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.mvdBudget, bot, sender, actionArgs, db);
                 break;
             case 'mvdstatus':
-                await executeWithCooldown(bot, sender, 'org_ministry_mvdstatus', ministryCommands.mvdStatus, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.mvdStatus, bot, sender, actionArgs, db);
                 break;
             case 'crimelist':
-                await executeWithCooldown(bot, sender, 'org_ministry_crimelist', ministryCommands.crimeList, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.crimeList, bot, sender, actionArgs, db);
                 break;
             case 'healthbudget':
-                await executeWithCooldown(bot, sender, 'org_ministry_healthbudget', ministryCommands.healthBudget, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.healthBudget, bot, sender, actionArgs, db);
                 break;
             case 'hospitalstatus':
-                await executeWithCooldown(bot, sender, 'org_ministry_hospitalstatus', ministryCommands.hospitalStatus, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.hospitalStatus, bot, sender, actionArgs, db);
                 break;
             case 'edubudget':
-                await executeWithCooldown(bot, sender, 'org_ministry_edubudget', ministryCommands.eduBudget, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.eduBudget, bot, sender, actionArgs, db);
                 break;
             case 'academystatus':
-                await executeWithCooldown(bot, sender, 'org_ministry_academystatus', ministryCommands.academyStatus, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.academyStatus, bot, sender, actionArgs, db);
                 break;
             case 'mayorkick':
-                await executeWithCooldown(bot, sender, 'org_ministry_mayorkick', ministryCommands.mayorKick, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.mayorKick, bot, sender, actionArgs, db, addLog);
                 break;
             case 'cityinfo':
-                await executeWithCooldown(bot, sender, 'org_ministry_cityinfo', ministryCommands.cityInfo, bot, sender, actionArgs, db);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.cityInfo, bot, sender, actionArgs, db);
                 break;
             case 'setbudget':
-                await executeWithCooldown(bot, sender, 'org_ministry_setbudget', ministryCommands.setBudget, bot, sender, actionArgs, db, addLog);
+                await executeWithCooldown(bot, sender, cooldownKey, ministryCommands.setBudget, bot, sender, actionArgs, db, addLog);
                 break;
             default:
                 bot.chat(`/msg ${sender} &7&l|&f /org ministry [tax/budget/bonus/grant/idset/imtake/defense/armystatus/mvdbudget/mvdstatus/crimelist/healthbudget/hospitalstatus/edubudget/academystatus/mayorkick/cityinfo/setbudget]`);
@@ -388,6 +446,7 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
         return true;
         
     } catch (error) {
+        console.error(`Ошибка выполнения команды ${command}:`, error);
         bot.chat(`/msg ${sender} &4&l|&c Ошибка выполнения команды: ${error.message}`);
         if (addLog) addLog(`Ошибка команды ${command}: ${error.message}`, 'error');
         return false;

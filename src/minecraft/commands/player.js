@@ -114,19 +114,40 @@ async function pass(bot, sender, args, db) {
 async function id(bot, sender, args, db) {
     const cleanNickname = cleanNick(sender);
     if (await checkRPFrozen(sender, bot, db)) return;
-    // Получаем rowid как ID
-    const member = await db.get('SELECT rowid, * FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     
+    // Проверяем, есть ли игрок в клане
+    const member = await db.getClanMember(cleanNickname);
     if (!member) {
         await sendMessage(bot, sender, `&4&l|&c Вы не состоите в клане!`);
         return;
     }
     
-    const playerId = member.rowid;
+    // Получаем ID разными способами
+    let playerId = member.id;
+    
+    // Если id нет, пробуем получить rowid
+    if (!playerId) {
+        const rowidResult = await db.get('SELECT rowid FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
+        if (rowidResult) {
+            playerId = rowidResult.rowid;
+        }
+    }
+    
+    // Если всё равно нет, пробуем через rowid в самой записи
+    if (!playerId && member.rowid) {
+        playerId = member.rowid;
+    }
+    
+    if (!playerId) {
+        await sendMessage(bot, sender, `&4&l|&c Не удалось получить ID. Обратитесь к администратору.`);
+        return;
+    }
+    
     await sendMessage(bot, sender, `&a&l|&f Ваш ID: &e${playerId}`);
-    await sendMessage(bot, sender, `&7&l|&f В клане с: &e${new Date(member.joined_at).toLocaleDateString()}`);
+    if (member.joined_at) {
+        await sendMessage(bot, sender, `&7&l|&f В клане с: &e${new Date(member.joined_at).toLocaleDateString()}`);
+    }
 }
-
 // ============================================
 // /keys - Список имущества
 // ============================================
@@ -184,13 +205,22 @@ async function help(bot, sender, args, db) {
 // /rp - Регистрация в RolePlay
 // ============================================
 
+// В начале файла player.js
+
+
 async function rp(bot, realNick, originalSender, args, db, addLog) {
-    if (await checkRPFrozen(sender, bot, db)) return;
     const sendTarget = originalSender || realNick;
     const cleanNickname = cleanNick(realNick);
     
+    // Проверка заморозки
+    const isFrozen = await db.isRPFrozen(realNick);
+    if (isFrozen) {
+        await sendMessage(bot, sendTarget, `&4&l|&c Ваш RP профиль заморожен!`);
+        return;
+    }
+    
     // Проверка: есть ли запись в таблице rp_players
-    const existing = await db.get('SELECT * FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
+    const existing = await db.getRPProfile(cleanNickname);
     
     if (existing) {
         await sendMessage(bot, sendTarget, `&4&l|&c Вы уже зарегистрированы в RolePlay!`);
@@ -225,7 +255,7 @@ async function rp(bot, realNick, originalSender, args, db, addLog) {
     
     rpCooldowns.set(cleanNickname, Date.now());
     
-    // Отправляем код (с задержкой)
+    // Отправляем код
     await sendMessage(bot, sendTarget, `&a&l|&f Ваш код: &e&l${code}`);
     await sendMessage(bot, sendTarget, `&7&l|&f Отправьте код мне в ЛС. Действует 5 минут.`);
     

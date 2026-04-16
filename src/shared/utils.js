@@ -1,6 +1,23 @@
 // src/shared/utils.js
 // Вспомогательные функции для форматирования, валидации и т.д.
 
+// ============================================
+// ФУНКЦИЯ ОЧИСТКИ НИКА (регистронезависимая)
+// ============================================
+
+function cleanNick(nick) {
+    if (!nick) return '';
+    let cleaned = nick;
+    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+    return cleaned.toLowerCase();
+}
+
+// ============================================
+// ФОРМАТИРОВАНИЕ
+// ============================================
+
 // Форматирование времени
 function formatTime(seconds) {
     if (!seconds) return '0 сек';
@@ -41,8 +58,12 @@ function formatNumber(num) {
 
 // Форматирование валюты
 function formatMoney(amount) {
-    return `💰 ${formatNumber(Math.floor(amount))}₽`;
+    return `${formatNumber(Math.floor(amount))}₽`;
 }
+
+// ============================================
+// ГЕНЕРАЦИЯ И ЗАДЕРЖКИ
+// ============================================
 
 // Генерация случайного кода
 function generateCode(length = 6) {
@@ -59,6 +80,10 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// ============================================
+// ОГРАНИЧЕНИЕ ВЫЗОВОВ
+// ============================================
+
 // Ограничение количества вызовов (debounce)
 function debounce(func, wait) {
     let timeout;
@@ -71,27 +96,6 @@ function debounce(func, wait) {
         timeout = setTimeout(later, wait);
     };
 }
-// Проверка заблокирован ли игрок в RP
-async function isRPFrozen(nick, db) {
-    const player = await db.get(
-        `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
-        [nick]
-    );
-    return player ? player.is_frozen === 1 : false;
-}
-
-// Проверка с отправкой сообщения
-async function checkRPFrozen(sender, bot, db) {
-    const isFrozen = await isRPFrozen(sender, db);
-    if (isFrozen) {
-        bot.chat(`/msg ${sender} &4&l|&c Ваш RP профиль заморожен!`);
-        bot.chat(`/msg ${sender} &4&l|&c Вы не можете использовать RP команды`);
-        bot.chat(`/msg ${sender} &7&l|&f Обратитесь к администрации для разморозки`);
-        return true;
-    }
-    return false;
-}
-
 
 // Ограничение частоты вызовов (throttle)
 function throttle(func, limit) {
@@ -105,6 +109,10 @@ function throttle(func, limit) {
     };
 }
 
+// ============================================
+// ВАЛИДАЦИЯ
+// ============================================
+
 // Валидация никнейма Minecraft
 function isValidMinecraftNick(nick) {
     if (!nick || typeof nick !== 'string') return false;
@@ -116,6 +124,10 @@ function isValidAmount(amount) {
     const num = parseFloat(amount);
     return !isNaN(num) && num > 0 && num <= 1000000;
 }
+
+// ============================================
+// ОБРАБОТКА ТЕКСТА
+// ============================================
 
 // Эскейп специальных символов для чата
 function escapeMarkdown(text) {
@@ -135,6 +147,10 @@ function truncateMessage(message, maxLength = 50) {
     return message.substring(0, maxLength - 3) + '...';
 }
 
+// ============================================
+// ПАРСИНГ
+// ============================================
+
 // Парсинг времени из строки (1h, 30m, 1d)
 function parseTimeString(timeStr) {
     const match = timeStr.match(/^(\d+)([hmd])$/i);
@@ -151,29 +167,6 @@ function parseTimeString(timeStr) {
     }
 }
 
-// Проверка, находится ли игрок на дежурстве
-async function isOnDuty(nick, db) {
-    const profile = await db.get('SELECT on_duty FROM rp_players WHERE minecraft_nick = ?', [nick]);
-    return profile ? profile.on_duty === 1 : false;
-}
-
-// Получение структуры игрока
-async function getPlayerStructure(nick, db) {
-    const profile = await db.get('SELECT structure, job_rank FROM rp_players WHERE minecraft_nick = ?', [nick]);
-    if (!profile) return { structure: 'Гражданин', rank: 'Нет' };
-    return {
-        structure: profile.structure,
-        rank: profile.job_rank
-    };
-}
-
-// Градиентные цвета для сообщений (совместимость с &hex)
-function colorize(text, gradientStart, gradientEnd) {
-    // Простая реализация — возвращаем текст с HEX кодом
-    // На сервере должен быть плагин, поддерживающий &hex
-    return `&#${gradientStart}${text}&r`;
-}
-
 // Разбор команды из сообщения
 function parseCommand(message) {
     if (!message || !message.startsWith('/')) return null;
@@ -185,7 +178,132 @@ function parseCommand(message) {
     return { command, args, raw: message };
 }
 
-// Проверка на спам (простая версия)
+// ============================================
+// RP ПРОВЕРКИ
+// ============================================
+
+// Проверка заблокирован ли игрок в RP
+async function isRPFrozen(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const player = await db.get(
+        `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
+        [cleanNickname]
+    );
+    return player ? player.is_frozen === 1 : false;
+}
+
+// Проверка с отправкой сообщения
+async function checkRPFrozen(nick, bot, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    
+    if (!profile) {
+        if (bot) {
+            await sleep(500);
+            bot.chat(`/msg ${nick} &4&l|&c Вы не зарегистрированы в RolePlay!`);
+            await sleep(500);
+            bot.chat(`/msg ${nick} &7&l|&f Используйте &e/rp &fдля регистрации`);
+        }
+        return true;
+    }
+    
+    const isFrozen = profile.is_frozen === 1;
+    if (isFrozen && bot) {
+        await sleep(500);
+        bot.chat(`/msg ${nick} &4&l|&c Ваш RP профиль заморожен!`);
+        await sleep(500);
+        bot.chat(`/msg ${nick} &4&l|&c Вы не можете использовать RP команды`);
+    }
+    return isFrozen;
+}
+
+// Проверка, находится ли игрок в клане
+async function isInClan(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const member = await db.getClanMember(cleanNickname);
+    return !!member;
+}
+
+// Проверка, находится ли игрок в RP
+async function isInRP(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    return !!profile;
+}
+
+// Проверка, находится ли игрок на дежурстве
+async function isOnDuty(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    return profile ? profile.on_duty === 1 : false;
+}
+
+// Получение структуры игрока
+async function getPlayerStructure(nick, db) {
+    const cleanNickname = cleanNick(nick);
+    const profile = await db.getRPProfile(cleanNickname);
+    if (!profile) return { structure: 'Гражданин', rank: 'Нет' };
+    return {
+        structure: profile.structure,
+        rank: profile.job_rank
+    };
+}
+
+// Комплексная проверка клана и RP
+async function checkClanAndRP(nick, db, bot, requireRP = false) {
+    const cleanNickname = cleanNick(nick);
+    
+    // Проверка в клане
+    const inClan = await isInClan(cleanNickname, db);
+    if (!inClan) {
+        if (bot) {
+            await sleep(500);
+            bot.chat(`/msg ${nick} &4&l|&c Вы не состоите в клане Resistance!`);
+        }
+        return { allowed: false, reason: 'not_in_clan' };
+    }
+    
+    // Проверка RP если требуется
+    if (requireRP) {
+        const inRP = await isInRP(cleanNickname, db);
+        if (!inRP) {
+            if (bot) {
+                await sleep(500);
+                bot.chat(`/msg ${nick} &4&l|&c Вы не зарегистрированы в RolePlay!`);
+                await sleep(500);
+                bot.chat(`/msg ${nick} &7&l|&f Используйте &e/rp &fдля регистрации`);
+            }
+            return { allowed: false, reason: 'not_in_rp' };
+        }
+        
+        const isFrozen = await isRPFrozen(cleanNickname, db);
+        if (isFrozen) {
+            if (bot) {
+                await sleep(500);
+                bot.chat(`/msg ${nick} &4&l|&c Ваш RP профиль заморожен!`);
+                await sleep(500);
+                bot.chat(`/msg ${nick} &4&l|&c Вы не можете использовать RP команды`);
+            }
+            return { allowed: false, reason: 'frozen' };
+        }
+    }
+    
+    return { allowed: true };
+}
+
+// ============================================
+// ГРАДИЕНТЫ (совместимость с &hex)
+// ============================================
+
+// Градиентные цвета для сообщений
+function colorize(text, gradientStart, gradientEnd) {
+    return `&#${gradientStart}${text}&r`;
+}
+
+// ============================================
+// КЛАСС SPAM DETECTOR
+// ============================================
+
 class SpamDetector {
     constructor(maxMessagesPerMinute = 3, cooldownSeconds = 30) {
         this.maxMessages = maxMessagesPerMinute;
@@ -194,60 +312,106 @@ class SpamDetector {
     }
     
     check(nick) {
+        const cleanNickname = cleanNick(nick);
         const now = Date.now();
-        const userData = this.userMessages.get(nick) || { timestamps: [], mutedUntil: 0 };
+        const userData = this.userMessages.get(cleanNickname) || { timestamps: [], mutedUntil: 0 };
         
-        // Проверяем, не в муте ли пользователь
         if (userData.mutedUntil > now) {
             return { isSpam: true, remainingSeconds: Math.ceil((userData.mutedUntil - now) / 1000) };
         }
         
-        // Очищаем старые сообщения (старше 60 секунд)
         userData.timestamps = userData.timestamps.filter(t => now - t < 60000);
-        
-        // Добавляем новое сообщение
         userData.timestamps.push(now);
         
-        // Проверяем, не спамит ли
         if (userData.timestamps.length > this.maxMessages) {
             userData.mutedUntil = now + this.cooldownSeconds * 1000;
-            this.userMessages.set(nick, userData);
+            this.userMessages.set(cleanNickname, userData);
             return { isSpam: true, remainingSeconds: this.cooldownSeconds };
         }
         
-        this.userMessages.set(nick, userData);
+        this.userMessages.set(cleanNickname, userData);
         return { isSpam: false };
     }
     
-    // Снять мут
     unmute(nick) {
-        const userData = this.userMessages.get(nick);
+        const cleanNickname = cleanNick(nick);
+        const userData = this.userMessages.get(cleanNickname);
         if (userData) {
             userData.mutedUntil = 0;
-            this.userMessages.set(nick, userData);
+            this.userMessages.set(cleanNickname, userData);
         }
+    }
+    
+    reset(nick) {
+        const cleanNickname = cleanNick(nick);
+        this.userMessages.delete(cleanNickname);
     }
 }
 
+// ============================================
+// ОТПРАВКА СООБЩЕНИЙ С ЗАДЕРЖКОЙ
+// ============================================
+
+async function sendMessage(bot, target, message) {
+    bot.chat(`/msg ${target} ${message}`);
+    await sleep(400);
+}
+
+async function sendClanMessage(bot, message) {
+    bot.chat(`/cc ${message}`);
+    await sleep(300);
+}
+
+// ============================================
+// ЭКСПОРТ
+// ============================================
+
 module.exports = {
+    // Очистка ника
+    cleanNick,
+    
+    // Форматирование
     formatTime,
     formatDate,
     formatNumber,
     formatMoney,
+    
+    // Генерация и задержки
     generateCode,
     sleep,
+    
+    // Ограничения
     debounce,
     throttle,
+    
+    // Валидация
     isValidMinecraftNick,
     isValidAmount,
+    
+    // Обработка текста
     escapeMarkdown,
     truncateMessage,
+    
+    // Парсинг
     parseTimeString,
+    parseCommand,
+    
+    // RP проверки
+    isRPFrozen,
+    checkRPFrozen,
+    isInClan,
+    isInRP,
     isOnDuty,
     getPlayerStructure,
+    checkClanAndRP,
+    
+    // Градиенты
     colorize,
-    parseCommand,
+    
+    // SpamDetector
     SpamDetector,
-    isRPFrozen,
-    checkRPFrozen
+    
+    // Отправка сообщений
+    sendMessage,
+    sendClanMessage
 };
