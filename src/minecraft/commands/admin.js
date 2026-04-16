@@ -2,7 +2,7 @@
 // Команды для администрации клана (полный функционал)
 
 const utils = require('../../shared/utils');
-
+const cleanNick = require('./cleanNick');
 function sendMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
 }
@@ -11,13 +11,7 @@ function sendMessage(bot, target, message) {
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================
 
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
+
 
 const roleNames = {
     1: 'Мл.Модератор',

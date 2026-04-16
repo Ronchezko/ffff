@@ -1,299 +1,299 @@
 // src/minecraft/index.js
-// Главный модуль Minecraft бота для Resistance City
+// ПОЛНОСТЬЮ ИСПРАВЛЕННАЯ ВЕРСИЯ С ПОДДЕРЖКОЙ ЗАПАСНОГО БОТА
 
 const mineflayer = require('mineflayer');
 const { SocksProxyAgent } = require('socks-proxy-agent');
-const EventEmitter = require('events');
-const utils = require('../shared/utils');
+const fs = require('fs');
+const path = require('path');
+const logger = require('../shared/logger');
+const { handleMessage } = require('./chatHandler');
+const payday = require('./payday');
 
-class MinecraftBot extends EventEmitter {
-    constructor(database, addLog) {
-        super();
-        this.db = database;
-        this.addLog = addLog || ((msg, type) => console.log(`[${type}] ${msg}`));
-        this.bot = null;
-        this.isConnected = false;
-        this.isRestartMode = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
-        this.reconnectDelay = 5000;
-        this.isConnecting = false; // Флаг для предотвращения множественных подключений
-        
-        // Настройки из .env
-        this.config = {
-            host: process.env.MC_SERVER || 'ru.dexland.org',
-            port: parseInt(process.env.MC_PORT) || 25565,
-            username: process.env.MC_MAIN_ACCOUNT || 'YT_FLATT807',
-            password: process.env.MC_BOT_PASSWORD,
-            auth: process.env.MC_AUTH || 'offline',
-            version: process.env.MC_VERSION || '1.12.2',
-            loginCommand: process.env.MC_LOGIN_COMMAND || '/s4',
-            proxyEnabled: process.env.PROXY_ENABLED === 'true',
-            proxyHost: process.env.PROXY_HOST,
-            proxyPort: parseInt(process.env.PROXY_PORT),
-            proxyType: process.env.PROXY_TYPE || 'socks5'
-        };
-        
-        this.spamDetector = new utils.SpamDetector(3, 30);
-    }
-    
-    // ============================================
-    // ПОДКЛЮЧЕНИЕ К СЕРВЕРУ
-    // ============================================
-    
-    async connect() {
-        if (this.isConnecting) {
-            this.addLog(`⚠️ Уже выполняется подключение, пропускаю...`, 'debug');
-            return;
-        }
-        
-        this.isConnecting = true;
-        
-        const options = {
-            host: this.config.host,
-            port: this.config.port,
-            username: this.config.username,
-            auth: this.config.auth,
-            version: this.config.version,
-            viewDistance: 'tiny'
-        };
-        
-        if (this.config.proxyEnabled && this.config.proxyHost) {
-            const proxyUrl = `${this.config.proxyType}://${this.config.proxyHost}:${this.config.proxyPort}`;
-            options.agent = new SocksProxyAgent(proxyUrl);
-            this.addLog(`🔌 Используется прокси: ${proxyUrl}`, 'info');
-        }
-        
-        this.addLog(`🔌 Подключение к ${this.config.host}:${this.config.port} как ${this.config.username}`, 'info');
-        
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.isConnecting = false;
-                reject(new Error('Таймаут подключения'));
-            }, 30000);
-            
-            this.bot = mineflayer.createBot(options);
-            
-            this.bot.once('login', () => {
-                clearTimeout(timeout);
-                this.isConnected = true;
-                this.isConnecting = false;
-                this.reconnectAttempts = 0;
-                this.addLog(`✅ Подключен как ${this.bot.username}`, 'success');
-                resolve();
-            });
-            
-            this.bot.once('error', (err) => {
-                clearTimeout(timeout);
-                this.isConnecting = false;
-                reject(err);
-            });
-        });
-    }
-    
-    // ============================================
-    // АВТОРИЗАЦИЯ НА СЕРВЕРЕ
-    // ============================================
-    
-    async authorize() {
-        if (!this.bot || !this.bot._client || !this.bot._client.socket) {
-            this.addLog(`⚠️ Бот не готов к отправке команд`, 'warn');
-            return;
-        }
-        
-        await utils.sleep(5000);
-        
-        if (this.config.loginCommand) {
-            try {
-                this.bot.chat(this.config.loginCommand);
-                this.addLog(`📝 Отправлена команда: ${this.config.loginCommand}`, 'info');
-            } catch (err) {
-                this.addLog(`❌ Ошибка отправки команды: ${err.message}`, 'error');
-            }
-        }
-        
-        await utils.sleep(1000);
-        
-        try {
-            this.bot.chat(`/cc &6[Resistance Bot] &aБот запущен и готов к работе!`);
-        } catch (err) {
-            this.addLog(`❌ Ошибка отправки приветствия: ${err.message}`, 'error');
-        }
-    }
-    
-    // ============================================
-    // ОБРАБОТКА СОБЫТИЙ БОТА
-    // ============================================
-    
-    setupEventHandlers() {
-        if (!this.bot) return;
-        
-        this.bot.once('spawn', async () => {
-    this.addLog('🎮 Бот появился в мире', 'success');
-    
-    try {
-        const { getModerationSystem } = require('./moderation');
-        const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
-        
-        if (typeof moderation.checkAllPlayersPunishments === 'function') {
-            await moderation.checkAllPlayersPunishments();
-        }
-        if (typeof moderation.checkActivePunishments === 'function') {
-            await moderation.checkActivePunishments(this.bot.username);
-        }
-    } catch (err) {
-        this.addLog(`⚠️ Ошибка проверки наказаний: ${err.message}`, 'warn');
-    }
-    
-    await this.authorize();
-});
-        
-        this.bot.on('message', async (json) => {
-            const message = json.toString();
-            const chatHandler = require('./chatHandler');
-            await chatHandler.handleMessage(this.bot, message, this.db, this);
-        });
-        
-        this.bot.on('kicked', async (reason) => {
-            const reasonStr = reason.toString();
-            this.addLog(`⚠️ Бот был кикнут: ${reasonStr}`, 'warn');
-            this.isConnected = false;
-            
-            // Закрываем текущее соединение принудительно
-            if (this.bot && this.bot._client) {
-                try {
-                    this.bot._client.end();
-                } catch (err) {}
-            }
-            
-            // Ждём 5 секунд перед переподключением
-            await utils.sleep(5000);
-            await this.handleDisconnect();
-        });
-        
-        this.bot.on('end', async (reason) => {
-            this.addLog(`🔌 Соединение разорвано: ${reason || 'неизвестно'}`, 'warn');
-            this.isConnected = false;
-            await this.handleDisconnect();
-        });
-        
-        this.bot.on('error', (err) => {
-            if (err.message?.includes('ECONNRESET')) {
-                this.addLog(`⚠️ Сетевая ошибка: ${err.message}`, 'warn');
-            } else if (!err.message?.includes('skin')) {
-                this.addLog(`❌ Ошибка бота: ${err.message}`, 'error');
-            }
-        });
-    }
-    
-    // ============================================
-    // ОБРАБОТКА ОТКЛЮЧЕНИЙ
-    // ============================================
-    
-    async handleDisconnect() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this.addLog(`❌ Достигнут лимит попыток переподключения (${this.maxReconnectAttempts})`, 'error');
-            this.emit('max_reconnect_reached');
-            return;
-        }
-        
-        this.reconnectAttempts++;
-        const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000);
-        
-        this.addLog(`🔄 Попытка переподключения ${this.reconnectAttempts}/${this.maxReconnectAttempts} через ${delay/1000} сек...`, 'info');
-        
-        await utils.sleep(delay);
-        
-        try {
-            if (this.bot) {
-                try {
-                    this.bot.end();
-                } catch (err) {}
-                this.bot = null;
-            }
-            await this.connect();
-            this.setupEventHandlers();
-        } catch (err) {
-            this.addLog(`❌ Ошибка переподключения: ${err.message}`, 'error');
-            await this.handleDisconnect();
-        }
-    }
-    
-    // ============================================
-    // ВЫПОЛНЕНИЕ КОМАНД
-    // ============================================
-    
-    async executeCommand(sender, command, args) {
-        try {
-            const { getModerationSystem } = require('./moderation');
-            const moderation = await getModerationSystem(this.bot, this.db, this.addLog);
-            
-            const isMuted = await moderation.isClanMuted(sender);
-            if (isMuted) {
-                this.bot.chat(`/msg ${sender} &c🔇 Вы в клановом муте и не можете использовать команды.`);
-                return;
-            }
-            
-            const commands = require('./commands');
-            const cmd = commands.commandMap?.get(command.toLowerCase());
-            
-            if (!cmd || typeof cmd.handler !== 'function') {
-                this.bot.chat(`/msg ${sender} &cНеизвестная команда. Используйте /help`);
-                return;
-            }
-            
-            if (cmd.requiredRank > 0) {
-                let staffRank = { rank_level: 0 };
-                try {
-                    staffRank = await this.db.getStaffRank?.(sender) || { rank_level: 0 };
-                } catch (err) {}
-                
-                if (staffRank.rank_level < cmd.requiredRank) {
-                    this.bot.chat(`/msg ${sender} &cУ вас недостаточно прав!`);
-                    return;
-                }
-            }
-            
-            await cmd.handler(this.bot, sender, args, this.db, this.addLog);
-            
-        } catch (err) {
-            this.addLog(`❌ Ошибка команды ${command}: ${err.message}`, 'error');
-            if (this.bot && this.bot.chat) {
-                this.bot.chat(`/msg ${sender} &cОшибка: ${err.message}`);
-            }
-        }
-    }
-    
-    // ============================================
-    // ОСТАНОВКА
-    // ============================================
-    
-    async stop() {
-        this.addLog('🛑 Остановка Minecraft бота...', 'info');
-        if (this.bot) {
-            try {
-                this.bot.quit();
-                this.bot.end();
-            } catch (err) {}
-            this.bot = null;
-        }
-        this.isConnected = false;
+// ============================================
+// КОНФИГУРАЦИЯ
+// ============================================
+
+const BOT_CONFIG = {
+    host: process.env.MC_HOST || 'ru.dexland.org',
+    port: parseInt(process.env.MC_PORT) || 25565,
+    username: process.env.MC_BOT_USERNAME || 'YT_FLATT807',
+    backupUsername: process.env.MC_BACKUP_USERNAME || 'xxx_toper_xxx',
+    password: process.env.MC_PASSWORD,
+    useProxy: process.env.USE_PROXY === 'true',
+    proxyHost: process.env.PROXY_HOST,
+    proxyPort: parseInt(process.env.PROXY_PORT) || 1080,
+    proxyType: process.env.PROXY_TYPE || 'socks5',
+    auth: process.env.MC_AUTH || 'offline',
+    version: process.env.MC_VERSION || '1.16.5'
+};
+
+let currentBot = null;
+let isUsingBackup = false;
+let reconnectAttempts = 0;
+let isRestartMode = false;
+let reconnectTimeout = null;
+let healthCheckInterval = null;
+
+// ============================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================
+
+function addLog(message, type = 'info') {
+    if (global.addBotLog) {
+        global.addBotLog(message, type);
+    } else {
+        console.log(`[${type.toUpperCase()}] ${message}`);
     }
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getProxyAgent() {
+    if (!BOT_CONFIG.useProxy) return null;
+    
+    const proxyUrl = `${BOT_CONFIG.proxyType}://${BOT_CONFIG.proxyHost}:${BOT_CONFIG.proxyPort}`;
+    addLog(`🔒 Используется прокси: ${proxyUrl}`, 'info');
+    return new SocksProxyAgent(proxyUrl);
+}
+
+function setRestartMode(mode) {
+    isRestartMode = mode;
+    addLog(`🔄 Режим перезагрузки сервера: ${mode ? 'ВКЛ' : 'ВЫКЛ'}`, 'debug');
+}
+
 // ============================================
-// ЗАПУСК (ФАБРИЧНАЯ ФУНКЦИЯ)
+// ЗАПУСК БОТА
 // ============================================
 
-async function start(database, addLog) {
-    const bot = new MinecraftBot(database, addLog);
+async function startBot(db, useBackup = false) {
+    const username = useBackup ? BOT_CONFIG.backupUsername : BOT_CONFIG.username;
+    isUsingBackup = useBackup;
+    
+    addLog(`🤖 Запуск ${useBackup ? 'ЗАПАСНОГО' : 'ОСНОВНОГО'} бота: ${username}`, 'info');
+    
+    const options = {
+        host: BOT_CONFIG.host,
+        port: BOT_CONFIG.port,
+        username: username,
+        version: BOT_CONFIG.version,
+        auth: BOT_CONFIG.auth
+    };
+    
+    if (BOT_CONFIG.password) {
+        options.password = BOT_CONFIG.password;
+    }
+    
+    const proxyAgent = getProxyAgent();
+    if (proxyAgent) {
+        options.agent = proxyAgent;
+    }
+    
+    const bot = mineflayer.createBot(options);
+    
+    // ============================================
+    // ОБРАБОТЧИКИ СОБЫТИЙ
+    // ============================================
+    
+    bot.on('login', () => {
+        addLog(`✅ Бот ${username} успешно зашёл на сервер!`, 'success');
+        reconnectAttempts = 0;
+        
+        // Отправляем /s1 через 5 секунд
+        setTimeout(() => {
+            bot.chat('/s3');
+            addLog(`📝 Отправлена команда: /s1`, 'info');
+        }, 5000);
+        
+        // Телепорт на точку (если нужно)
+        setTimeout(() => {
+            if (process.env.SPAWN_TP_COMMAND) {
+                bot.chat(process.env.SPAWN_TP_COMMAND);
+                addLog(`📍 Телепорт: ${process.env.SPAWN_TP_COMMAND}`, 'info');
+            }
+        }, 8000);
+        
+        // Оповещение о перезагрузке сервера
+        setTimeout(() => {
+            if (isRestartMode) {
+                bot.chat('/cc &a&l|&f Сервер &2успешно перезагружен&f!');
+                addLog(`📢 Оповещение о перезагрузке отправлено`, 'info');
+                isRestartMode = false;
+            } else if (isUsingBackup) {
+                bot.chat('/cc &4&l|&c ⚠️ ВНИМАНИЕ! Основной бот временно недоступен. Функции могут быть ограничены. ⚠️');
+                addLog(`📢 Запасной бот оповестил клан`, 'info');
+            }
+        }, 10000);
+    });
+    
+    bot.on('spawn', () => {
+        addLog(`🌟 Бот ${username} появился в мире!`, 'success');
+        
+        // Запускаем PayDay проверку каждый час
+        setInterval(() => {
+            if (!isUsingBackup) {
+                payday.processPayDay(bot, db, addLog);
+            }
+        }, 60 * 60 * 1000);
+    });
+    
+    bot.on('message', async (jsonMessage) => {
+        try {
+            await handleMessage(bot, jsonMessage, db, { addLog, setRestartMode });
+        } catch (err) {
+            addLog(`❌ Ошибка обработки сообщения: ${err.message}`, 'error');
+        }
+    });
+    
+    bot.on('end', async (reason) => {
+        addLog(`🔌 Бот отключён. Причина: ${reason}`, 'warn');
+        await handleDisconnect(reason);
+    });
+    
+    bot.on('error', (err) => {
+        addLog(`❌ Ошибка бота: ${err.message}`, 'error');
+    });
+    
+    bot.on('kicked', async (reason) => {
+        addLog(`👢 Бот кикнут! Причина: ${reason}`, 'warn');
+        await handleDisconnect(reason);
+    });
+    
+    return bot;
+}
+
+// ============================================
+// ОБРАБОТКА ОТКЛЮЧЕНИЯ И ПЕРЕПОДКЛЮЧЕНИЯ
+// ============================================
+
+async function handleDisconnect(reason) {
+    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    
+    const reasonStr = reason.toString().toLowerCase();
+    
+    // Проверка на бан
+    if (reasonStr.includes('бан') || reasonStr.includes('banned') || reasonStr.includes('забанен')) {
+        addLog(`🚫 ОСНОВНОЙ БОТ ЗАБАНЕН! Переключение на запасной...`, 'error');
+        
+        if (!isUsingBackup) {
+            // Останавливаем текущего бота
+            if (currentBot) {
+                currentBot.end();
+                currentBot = null;
+            }
+            
+            // Запускаем запасного бота
+            await sleep(5000);
+            currentBot = await startBot(null, true);
+            return;
+        } else {
+            addLog(`⚠️ Запасной бот тоже забанен. Ожидание 10 минут...`, 'warn');
+            await sleep(10 * 60 * 1000);
+            reconnectAttempts++;
+            
+            if (reconnectAttempts < 5) {
+                currentBot = await startBot(null, true);
+            } else {
+                addLog(`💀 Критическая ошибка: оба бота забанены!`, 'error');
+            }
+            return;
+        }
+    }
+    
+    // Проверка на кик в лобби
+    if (reasonStr.includes('лобби') || reasonStr.includes('lobby')) {
+        addLog(`🏨 Бот перемещён в лобби. Попытка /s1...`, 'warn');
+        
+        if (currentBot) {
+            currentBot.end();
+            currentBot = null;
+        }
+        
+        await sleep(3000);
+        currentBot = await startBot(null, isUsingBackup);
+        
+        if (currentBot) {
+            setTimeout(() => {
+                currentBot.chat('/s3');
+                addLog(`📝 Отправлена команда /s1 в лобби`, 'info');
+            }, 5000);
+        }
+        return;
+    }
+    
+    // Перезагрузка сервера в 3:00
+    if (isRestartMode) {
+        addLog(`🔄 Перезагрузка сервера в 3:00. Ожидание 5-10 минут...`, 'info');
+        
+        const now = new Date();
+        const mskTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+        const minutes = mskTime.getMinutes();
+        
+        let waitTime = 5 * 60 * 1000; // 5 минут по умолчанию
+        if (minutes < 5) {
+            waitTime = (5 - minutes) * 60 * 1000;
+        } else if (minutes < 10) {
+            waitTime = (10 - minutes) * 60 * 1000;
+        }
+        
+        addLog(`⏳ Ожидание ${waitTime / 1000} секунд перед переподключением...`, 'info');
+        await sleep(waitTime);
+        
+        if (currentBot) {
+            currentBot.end();
+            currentBot = null;
+        }
+        
+        currentBot = await startBot(null, false);
+        return;
+    }
+    
+    // Обычное переподключение с экспоненциальной задержкой
+    const delay = Math.min(5000 * Math.pow(2, reconnectAttempts), 60000);
+    reconnectAttempts++;
+    
+    addLog(`🔄 Переподключение через ${delay / 1000} секунд... (попытка ${reconnectAttempts})`, 'info');
+    
+    reconnectTimeout = setTimeout(async () => {
+        try {
+            if (currentBot) {
+                currentBot.end();
+                currentBot = null;
+            }
+            currentBot = await startBot(null, isUsingBackup);
+        } catch (err) {
+            addLog(`❌ Ошибка переподключения: ${err.message}`, 'error');
+        }
+    }, delay);
+}
+
+// ============================================
+// ЗАПУСК МОДУЛЯ
+// ============================================
+
+async function start(db, addLogCallback) {
+    if (addLogCallback) {
+        global.addBotLog = addLogCallback;
+    }
     
     try {
-        await bot.connect();
-        bot.setupEventHandlers();
-        return bot;
+        currentBot = await startBot(db, false);
+        return {
+            bot: currentBot,
+            setRestartMode,
+            stop: async () => {
+                if (currentBot) {
+                    currentBot.end();
+                    currentBot = null;
+                }
+                if (reconnectTimeout) clearTimeout(reconnectTimeout);
+                if (healthCheckInterval) clearInterval(healthCheckInterval);
+                addLog(`🛑 Minecraft бот остановлен`, 'info');
+            }
+        };
     } catch (err) {
-        bot.addLog(`❌ Не удалось запустить бота: ${err.message}`, 'error');
+        addLog(`❌ Фатальная ошибка запуска: ${err.message}`, 'error');
         throw err;
     }
 }

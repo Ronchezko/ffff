@@ -1,25 +1,30 @@
 // src/discord/commands/slash.js
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const database = require('../../database');
-const utils = require('../../shared/utils');
+// Регистрация слеш-команд
 
-module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('info')
-        .setDescription('Информация о проекте'),
-    
-    async execute(interaction) {
-        const embed = new EmbedBuilder()
-            .setColor(0x6b46c1)
-            .setTitle('🏛️ Resistance City')
-            .setDescription('Свободный город с демократическим укладом, развитой экономикой и системой государственных структур.')
-            .addFields(
-                { name: '📅 Основан', value: '2018 год', inline: true },
-                { name: '👥 Участников', value: database.getDb().prepare('SELECT COUNT(*) FROM clan_members').get().count.toString(), inline: true },
-                { name: '🎭 RolePlay', value: database.getDb().prepare('SELECT COUNT(*) FROM rp_players').get().count.toString(), inline: true }
-            )
-            .setFooter({ text: 'Resistance City' });
-        
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-    }
-};
+const { SlashCommandBuilder } = require('discord.js');
+
+const commands = [
+    new SlashCommandBuilder()
+        .setName('vv')
+        .setDescription('🎫 Вызвать сообщение верификации (только для администрации)'),
+    new SlashCommandBuilder()
+        .setName('stats')
+        .setDescription('📊 Статистика клана Resistance'),
+    new SlashCommandBuilder()
+        .setName('profile')
+        .setDescription('👤 Информация о вашем профиле')
+        .addUserOption(option => option.setName('user').setDescription('Пользователь').setRequired(false)),
+    new SlashCommandBuilder()
+        .setName('top')
+        .setDescription('🏆 Топ игроков по деньгам и убийствам')
+        .addStringOption(option => option.setName('type').setDescription('Тип топа').addChoices(
+            { name: '💰 По деньгам', value: 'money' },
+            { name: '⚔️ По убийствам', value: 'kills' },
+            { name: '⭐ По баллам RP', value: 'points' }
+        )),
+    new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('❓ Список всех команд')
+];
+
+module.exports = { commands };

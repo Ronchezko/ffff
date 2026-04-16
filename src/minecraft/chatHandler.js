@@ -3,7 +3,7 @@
 
 const utils = require('../shared/utils');
 
-// ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
+// ========== ФУНКЦИЯ ОЧИСТКИ НИКА (ДОЛЖНА БЫТЬ ПЕРВОЙ) ==========
 function cleanNick(nick) {
     if (!nick) return '';
     let cleaned = nick;
@@ -81,6 +81,7 @@ const rpCommands = [
 const publicCommands = ['/help', '/discord', '/ds', '/link', '/rp', '/fly', '/10t'];
 
 global.realnameCache = global.realnameCache || new Map();
+global.pendingRegistrations = global.pendingRegistrations || new Map();
 
 function safeLog(parentBot, message, level = 'info') {
     if (parentBot && typeof parentBot.addLog === 'function') {
@@ -221,7 +222,6 @@ class ChatHandler {
                 return;
             }
             
-            // Проверка на заморозку RP
             const isFrozen = rpProfile.is_frozen === 1;
             if (isFrozen) {
                 const randomMsg = getRandomMessage('frozen');
@@ -250,14 +250,12 @@ class ChatHandler {
             const command = parts[0].toLowerCase();
             const args = parts.slice(1);
             
-            // Команда /rp доступна даже если не в RP (для регистрации)
             if (command === 'rp') {
                 const playerCommands = require('./commands/player');
                 await playerCommands.rp(this.bot, nickname, originalSender, args, this.db, this.parentBot?.addLog);
                 return;
             }
             
-            // Для всех остальных команд проверяем, что игрок в RP
             if (isRPCommand && command !== 'rp') {
                 const rpProfile = await this.db.getRPProfile(cleanNickname);
                 if (!rpProfile) {
@@ -268,32 +266,24 @@ class ChatHandler {
                 }
             }
             
-            // Проверка кулдауна
             if (this.moderation.checkCommandCooldown) {
                 const cooldownResult = await this.moderation.checkCommandCooldown(nickname, command);
                 if (!cooldownResult.allowed) return;
             }
             
-            // Проверка приватных команд
             const cmdResult = await this.moderation.checkPrivateCommand(nickname, command);
             if (!cmdResult.allowed) return;
             
-            // ========== ИМПОРТ commands ТОЛЬКО ЗДЕСЬ ==========
             const commands = require('./commands');
             
-            // Проверка на спам командами (после импорта)
             const isValidCommand = commands.commandMap?.has(command);
             const spamCheck = await this.moderation.checkCommandSpam(nickname, command, isValidCommand);
-            if (!spamCheck.allowed) {
-                return;
-            }
+            if (!spamCheck.allowed) return;
             
-            // Выполнение команды
             const cmd = commands.commandMap?.get(command);
             if (cmd && cmd.handler) {
                 await cmd.handler(this.bot, nickname, args, this.db, this.parentBot?.addLog);
             } else {
-                // Неизвестная команда - отправляем случайное сообщение через модерацию
                 await this.moderation.checkInvalidCommand(nickname, command);
             }
         }
@@ -312,27 +302,39 @@ class ChatHandler {
         
         if (global.pendingRegistrations?.has(cleanNick)) {
             const pending = global.pendingRegistrations.get(cleanNick);
+            
             if (Date.now() > pending.expires) {
                 global.pendingRegistrations.delete(cleanNick);
                 await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &4&l|&c Время кода истекло.`);
+                this.bot.chat(`/msg ${sendTarget} &4&l|&c Время кода истекло. Используйте &e/rp &fснова`);
                 return;
             }
             
             if (pending.code === code) {
                 await this.db.registerRP(cleanNick);
                 global.pendingRegistrations.delete(cleanNick);
+                
                 await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &a&l|&f Вы успешно зарегистрированы!`);
+                this.bot.chat(`/msg ${sendTarget} &a&l|&f Вы &2успешно&f зарегистрированы в RolePlay!`);
+                await utils.sleep(400);
+                this.bot.chat(`/msg ${sendTarget} &7&l|&f Теперь вам доступны команды: &e/balance, /pay, /pass, /id, /org, /duty`);
                 await utils.sleep(400);
                 this.bot.chat(`/cc &a&l|&f &e${sendTarget} &aтеперь гражданин Resistance!`);
+                
+                const discord = global.botComponents?.discord;
+                if (discord && discord.client) {
+                    const channel = discord.client.channels.cache.get('1474633679442804798');
+                    if (channel) {
+                        channel.send(`✅ **Новый гражданин**\nИгрок ${sendTarget} зарегистрировался в RolePlay!`);
+                    }
+                }
             } else {
                 await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &4&l|&c Неверный код!`);
+                this.bot.chat(`/msg ${sendTarget} &4&l|&c Неверный код! Попробуйте снова или используйте &e/rp`);
             }
         } else {
             await utils.sleep(400);
-            this.bot.chat(`/msg ${sendTarget} &4&l|&c Сначала используйте &e/rp`);
+            this.bot.chat(`/msg ${sendTarget} &4&l|&c У вас нет активного кода. Сначала используйте &e/rp`);
         }
     }
     
@@ -344,21 +346,18 @@ class ChatHandler {
             this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot);
         }
         
-        // Проверка на мут
         const isMuted = await this.moderation.isClanMuted(nickname);
         if (isMuted) {
             safeLog(this.parentBot, `🚫 ${nickname} в клановом муте`, 'debug');
             return;
         }
         
-        // Проверяем сообщение через модерацию
         const result = await this.moderation.checkClanChat(nickname, message);
         
         if (!result.allowed && result.reason) {
             safeLog(this.parentBot, `🚫 Сообщение от ${nickname} отклонено: ${result.reason}`, 'debug');
         }
         
-        // Логируем сообщение (даже если отклонено)
         if (this.db.logClanChat) {
             await this.db.logClanChat(nickname, message);
         }
@@ -409,6 +408,8 @@ class ChatHandler {
         
         if (this.db.addClanMember) await this.db.addClanMember(cleanNick, 'system');
         
+        this.bot.chat(`/c rank ${nickname} &8⌜&e&l𐓏&8⌟ﾠ&#0b674d&lн&#0e6f50&lо&#127753&lʙ&#157f56&lᴇ&#198759&lн&#1c8e5b&lь&#1f965e&lᴋ&#239e61&lи&#26a664&lй`);
+        
         const messages = [
             `&a&l|&f Добро пожаловать в клан Resistance, &e${nickname}&f!`,
             `&a&l|&f Рады приветствовать &e${nickname} &fв Resistance!`,
@@ -447,7 +448,16 @@ class ChatHandler {
         
         tracker.count++;
         tracker.lastTime = now;
-        if (this.db.removeClanMember) await this.db.removeClanMember(cleanNick);
+        
+        await this.db.removeClanMember(cleanNick);
+        await this.db.run(`UPDATE rp_players SET structure = 'Гражданин', job_rank = 'Нет', on_duty = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNick]);
+        await this.db.run(`DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNick]);
+        
+        await utils.sleep(400);
+        this.bot.chat(`/msg ${nickname} &4&l|&c Вы покинули клан Resistance`);
+        await utils.sleep(400);
+        this.bot.chat(`/msg ${nickname} &4&l|&c Ваш RP профиль был удалён`);
+        
         safeLog(this.parentBot, `➖ ${nickname} покинул клан`, 'info');
     }
     

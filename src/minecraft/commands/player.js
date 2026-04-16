@@ -3,6 +3,7 @@
 
 const utils = require('../../shared/utils');
 const { checkRPFrozen } = require('../../shared/utils');
+const cleanNick = require('../../shared/cleanNick'); 
 // Глобальные кулдауны
 let lastFlyTime = 0;
 let lastTenTTime = 0;
@@ -10,13 +11,7 @@ const rpCooldowns = new Map();
 const payCooldowns = new Map();
 
 // ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
+
 
 // ========== ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ С ЗАДЕРЖКОЙ ==========
 async function sendMessage(bot, target, message) {
