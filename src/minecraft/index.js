@@ -8,7 +8,7 @@ const path = require('path');
 const logger = require('../shared/logger');
 const { handleMessage } = require('./chatHandler');
 const payday = require('./payday');
-
+require('../shared/cleanNick')
 // ============================================
 // КОНФИГУРАЦИЯ
 // ============================================

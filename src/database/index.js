@@ -14,15 +14,7 @@ let db = null;
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================
 
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
-
+const cleanNick = require('../shared/cleanNick');
 // ============================================
 // ИНИЦИАЛИЗАЦИЯ
 // ============================================
@@ -599,6 +591,7 @@ module.exports = {
     getBalance,
     transferMoney,
     isRPFrozen,
+    cleanNick,
     
     // Организации
     getOrganization,

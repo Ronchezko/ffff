@@ -1,6 +1,4 @@
 // src/shared/cleanNick.js
-// Отдельный файл для функции очистки ника
-
 function cleanNick(nick) {
     if (!nick) return '';
     let cleaned = nick;

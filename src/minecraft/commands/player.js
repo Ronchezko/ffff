@@ -3,7 +3,7 @@
 
 const utils = require('../../shared/utils');
 const { checkRPFrozen } = require('../../shared/utils');
-const cleanNick = require('../../shared/cleanNick'); 
+require('../../shared/cleanNick')
 // Глобальные кулдауны
 let lastFlyTime = 0;
 let lastTenTTime = 0;

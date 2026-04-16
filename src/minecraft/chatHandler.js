@@ -4,13 +4,7 @@
 const utils = require('../shared/utils');
 
 // ========== ФУНКЦИЯ ОЧИСТКИ НИКА (ДОЛЖНА БЫТЬ ПЕРВОЙ) ==========
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fklmnor]/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
+require('../shared/cleanNick')
 
 // ========== МАССИВЫ РАЗНЫХ СООБЩЕНИЙ ==========
 const UNKNOWN_COMMAND_MESSAGES = [
