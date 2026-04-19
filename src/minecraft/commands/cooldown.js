@@ -1,6 +1,6 @@
 // src/minecraft/commands/cooldown.js
 // Система кулдаунов для команд
-
+const { cleanNick } = require('../../shared/cleanNick');
 const cooldowns = new Map();
  
 // Кулдауны для КАЖДОЙ отдельной подкоманды (в секундах)
@@ -93,4 +93,4 @@ function clearCooldowns(sender) {
     }
 }
 
-module.exports = { checkCooldown, setCooldown, clearCooldowns, cooldownSettings, cleanni};
+module.exports = { checkCooldown, setCooldown, clearCooldowns, cooldownSettings, cleanNick };

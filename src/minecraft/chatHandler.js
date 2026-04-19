@@ -4,7 +4,7 @@
 const utils = require('../shared/utils');
 
 // ========== ФУНКЦИЯ ОЧИСТКИ НИКА (ДОЛЖНА БЫТЬ ПЕРВОЙ) ==========
-const cleanNick = require('../shared/cleanNick');
+const { cleanNick } = require('../shared/cleanNick');
 
 // ========== МАССИВЫ РАЗНЫХ СООБЩЕНИЙ ==========
 const UNKNOWN_COMMAND_MESSAGES = [

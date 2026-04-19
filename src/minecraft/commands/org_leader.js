@@ -2,7 +2,7 @@
 // Команды лидеров организаций (с Discord интеграцией)
 
 const utils = require('../../shared/utils');
-require('../../shared/cleanNick')
+const { cleanNick } = require('../shared/cleanNick');
 // ============================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================

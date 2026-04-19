@@ -2,7 +2,7 @@
 // Команды для управления имуществом
 
 const utils = require('../../shared/utils');
-require('../../shared/cleanNick') 
+const { cleanNick } = require('../shared/cleanNick');
 function sendMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
 }

@@ -1,6 +1,6 @@
 // src/minecraft/commands/index.js
 // ПОЛНАЯ РЕГИСТРАЦИЯ ВСЕХ КОМАНД
-require('../../shared/cleanNick')
+const { cleanNick } = require('../shared/cleanNick');
 const playerCommands = require('./player');
 const staffCommands = require('./staff');
 const rpCommands = require('./rp');

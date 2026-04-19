@@ -8,4 +8,4 @@ function cleanNick(nick) {
     return cleaned.toLowerCase();
 }
 
-module.exports = cleanNick;
+module.exports = { cleanNick };
