@@ -14,7 +14,7 @@ let db = null;
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================
 
-const cleanNick = require('../shared/cleanNick');
+const { cleanNick } = require('../shared/cleanNick');
 // ============================================
 // ИНИЦИАЛИЗАЦИЯ
 // ============================================
@@ -570,7 +570,6 @@ module.exports = {
     all,
     get,
     run,
-    cleanNick,
     
     // Участники клана
     addClanMember,

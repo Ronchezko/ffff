@@ -2,6 +2,7 @@
 // Команды для всех игроков клана (ПОЛНАЯ ВЕРСИЯ)
 
 const utils = require('../../shared/utils');
+
 const { checkRPFrozen } = require('../../shared/utils');
 const { cleanNick } = require('../shared/cleanNick');
 // Глобальные кулдауны

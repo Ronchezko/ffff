@@ -2,7 +2,7 @@
 // Команды для организаций (полиция, армия, больница, академия)
 
 const utils = require('../../shared/utils');
-const { cleanNick } = require('../shared/cleanNick');
+const { cleanNick } = require('../../shared/cleanNick');
 // ============================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================
