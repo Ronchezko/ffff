@@ -2,7 +2,7 @@
 // Команды для управления имуществом
 
 const utils = require('../../shared/utils');
-const { cleanNick } = require('../shared/cleanNick');
+const cleanNickname = global.cleanNick(nick);
 function sendMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
 }

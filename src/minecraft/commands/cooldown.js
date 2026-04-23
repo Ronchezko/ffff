@@ -2,7 +2,7 @@
 // Система кулдаунов для команд
 
 const cooldowns = new Map();
-
+const cleanNickname = global.cleanNick(nick);
 // Кулдауны для КАЖДОЙ отдельной подкоманды (в секундах)
 const cooldownSettings = {
     // ===== ПОЛИЦИЯ =====

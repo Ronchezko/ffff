@@ -14,7 +14,7 @@ let db = null;
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================
 
-const { cleanNick } = require('../shared/cleanNick');
+
 // ============================================
 // ИНИЦИАЛИЗАЦИЯ
 // ============================================
@@ -590,7 +590,6 @@ module.exports = {
     getBalance,
     transferMoney,
     isRPFrozen,
-    cleanNick,
     
     // Организации
     getOrganization,

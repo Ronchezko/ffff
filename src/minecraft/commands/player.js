@@ -4,7 +4,7 @@
 const utils = require('../../shared/utils');
 
 const { checkRPFrozen } = require('../../shared/utils');
-const { cleanNick } = require('../shared/cleanNick');
+const cleanNickname = global.cleanNick(nick);
 // Глобальные кулдауны
 let lastFlyTime = 0;
 let lastTenTTime = 0;

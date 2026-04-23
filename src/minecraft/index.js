@@ -8,11 +8,9 @@ const path = require('path');
 const logger = require('../shared/logger');
 const { handleMessage } = require('./chatHandler');
 const payday = require('./payday');
-require('../shared/cleanNick')
 // ============================================
 // КОНФИГУРАЦИЯ
 // ============================================
-
 const BOT_CONFIG = {
     host: process.env.MC_HOST || 'ru.dexland.org',
     port: parseInt(process.env.MC_PORT) || 25565,
