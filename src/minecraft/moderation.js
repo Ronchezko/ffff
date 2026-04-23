@@ -550,47 +550,52 @@ class ModerationSystem {
     // ============================================
     
     async checkPrivateCommand(nick, command) {
-        if (!this.config.enabled) return { allowed: true };
-        
-        // Проверяем блокировку ЛС
-        if (await this.isPrivateMuted(nick)) {
-            return { allowed: false, reason: 'Ваши команды заблокированы', shouldIgnore: true };
-        }
-        
-        if (await this.isImmune(nick)) return { allowed: true };
-        
-        const stats = this.getStats(nick);
-        const now = Date.now();
-        
-        if (stats.privateBlockedUntil > now) {
-            return { allowed: false, reason: 'Команды временно заблокированы', shouldIgnore: true };
-        }
-        
-        // Проверка на повтор одной команды
-        if (stats.privateLastCommand === command && stats.privateLastCommandTime > 0) {
-            const timeSince = now - stats.privateLastCommandTime;
-            const cooldown = this.config.privateChat.sameCommandCooldown * 1000;
-            if (timeSince < cooldown) {
-                stats.privateSameCommandCount++;
-                const remaining = Math.ceil((cooldown - timeSince) / 1000);
-                if (stats.privateSameCommandCount >= this.config.privateChat.maxSameCommandWarnings) {
-                    await this.handlePrivateViolation(nick, `Повтор команды "${command}"`, stats);
-                    return { allowed: false, reason: 'Команды заблокированы', shouldIgnore: true };
-                }
-                this.bot.chat(`/cc ${this.config.messages.cooldown.replace('{player}', nick).replace('{reason}', `повтор команды "${command}"`).replace('{seconds}', remaining)}`);
-                return { allowed: false, reason: `Повтор команды. Подождите ${remaining} секунд`, cooldown: remaining, shouldIgnore: false };
-            } else {
-                stats.privateSameCommandCount = 0;
+    console.log('[MOD] checkPrivateCommand вызван');
+    console.log('[MOD] nick =', nick);
+    console.log('[MOD] command =', command);
+    
+    if (!this.config.enabled) return { allowed: true };
+    
+    // Проверяем блокировку ЛС
+    if (await this.isPrivateMuted(nick)) {
+        return { allowed: false, reason: 'Ваши команды заблокированы', shouldIgnore: true };
+    }
+    
+    if (await this.isImmune(nick)) return { allowed: true };
+    
+    const stats = this.getStats(nick);
+    const now = Date.now();
+    
+    if (stats.privateBlockedUntil > now) {
+        return { allowed: false, reason: 'Команды временно заблокированы', shouldIgnore: true };
+    }
+    
+    // Проверка на повтор одной команды
+    if (stats.privateLastCommand === command && stats.privateLastCommandTime > 0) {
+        const timeSince = now - stats.privateLastCommandTime;
+        const cooldown = this.config.privateChat.sameCommandCooldown * 1000;
+        if (timeSince < cooldown) {
+            stats.privateSameCommandCount++;
+            const remaining = Math.ceil((cooldown - timeSince) / 1000);
+            if (stats.privateSameCommandCount >= this.config.privateChat.maxSameCommandWarnings) {
+                await this.handlePrivateViolation(nick, `Повтор команды "${command}"`, stats);
+                return { allowed: false, reason: 'Команды заблокированы', shouldIgnore: true };
             }
+            this.bot.chat(`/cc ${this.config.messages.cooldown.replace('{player}', nick).replace('{reason}', `повтор команды "${command}"`).replace('{seconds}', remaining)}`);
+            return { allowed: false, reason: `Повтор команды. Подождите ${remaining} секунд`, cooldown: remaining, shouldIgnore: false };
         } else {
             stats.privateSameCommandCount = 0;
         }
-        
-        stats.privateLastCommand = command;
-        stats.privateLastCommandTime = now;
-        
-        return { allowed: true };
+    } else {
+        stats.privateSameCommandCount = 0;
     }
+    
+    stats.privateLastCommand = command;
+    stats.privateLastCommandTime = now;
+    
+    console.log('[MOD] checkPrivateCommand завершён успешно');
+    return { allowed: true };
+}
     
     // ============================================
     // ПРОВЕРКА НЕВЕРНЫХ КОМАНД

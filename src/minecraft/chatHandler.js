@@ -2,6 +2,8 @@
 // Чистая версия с поддержкой всех функций
 
 const utils = require('../shared/utils');
+
+// ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
 function cleanNick(nick) {
     if (!nick) return '';
     let cleaned = nick;
@@ -10,8 +12,7 @@ function cleanNick(nick) {
     cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
     return cleaned.toLowerCase();
 }
-// ========== ФУНКЦИЯ ОЧИСТКИ НИКА (ДОЛЖНА БЫТЬ ПЕРВОЙ) ==========
-
+// ============================================
 
 // ========== МАССИВЫ РАЗНЫХ СООБЩЕНИЙ ==========
 const UNKNOWN_COMMAND_MESSAGES = [
@@ -257,16 +258,6 @@ class ChatHandler {
                 return;
             }
             
-            if (isRPCommand && command !== 'rp') {
-                const rpProfile = await this.db.getRPProfile(cleanNickname);
-                if (!rpProfile) {
-                    const randomMsg = getRandomMessage('notInRP');
-                    await utils.sleep(400);
-                    this.bot.chat(`/msg ${nickname} ${randomMsg}`);
-                    return;
-                }
-            }
-            
             if (this.moderation.checkCommandCooldown) {
                 const cooldownResult = await this.moderation.checkCommandCooldown(nickname, command);
                 if (!cooldownResult.allowed) return;
@@ -291,29 +282,29 @@ class ChatHandler {
     }
     
     async handleRPCode(nickname, code, originalSender) {
-        const cleanNick = cleanNick(nickname);
+        const cleanNickname = cleanNick(nickname);
         const sendTarget = originalSender || nickname;
         
-        const existing = await this.db.getRPProfile(cleanNick);
+        const existing = await this.db.getRPProfile(cleanNickname);
         if (existing && existing.structure !== 'Гражданин') {
             await utils.sleep(400);
             this.bot.chat(`/msg ${sendTarget} &4&l|&c Вы уже зарегистрированы в RolePlay!`);
             return;
         }
         
-        if (global.pendingRegistrations?.has(cleanNick)) {
-            const pending = global.pendingRegistrations.get(cleanNick);
+        if (global.pendingRegistrations?.has(cleanNickname)) {
+            const pending = global.pendingRegistrations.get(cleanNickname);
             
             if (Date.now() > pending.expires) {
-                global.pendingRegistrations.delete(cleanNick);
+                global.pendingRegistrations.delete(cleanNickname);
                 await utils.sleep(400);
                 this.bot.chat(`/msg ${sendTarget} &4&l|&c Время кода истекло. Используйте &e/rp &fснова`);
                 return;
             }
             
             if (pending.code === code) {
-                await this.db.registerRP(cleanNick);
-                global.pendingRegistrations.delete(cleanNick);
+                await this.db.registerRP(cleanNickname);
+                global.pendingRegistrations.delete(cleanNickname);
                 
                 await utils.sleep(400);
                 this.bot.chat(`/msg ${sendTarget} &a&l|&f Вы &2успешно&f зарегистрированы в RolePlay!`);
@@ -366,9 +357,9 @@ class ChatHandler {
     
     async handleJoinRequest(nickname) {
         const originalNick = nickname;
-        const cleanNick = cleanNick(nickname);
+        const cleanNickname = cleanNick(nickname);
         
-        const isBlacklisted = await this.db.isBlacklisted?.(cleanNick);
+        const isBlacklisted = await this.db.isBlacklisted?.(cleanNickname);
         if (isBlacklisted) {
             safeLog(this.parentBot, `🚫 Заявка от ${originalNick} отклонена (ЧС)`, 'warn');
             return;
@@ -380,14 +371,14 @@ class ChatHandler {
     }
     
     async handleJoinClan(nickname) {
-        const cleanNick = cleanNick(nickname);
+        const cleanNickname = cleanNick(nickname);
         const now = Date.now();
         const twelveHours = 12 * 60 * 60 * 1000;
         
-        let tracker = joinLeaveTracker.get(cleanNick);
+        let tracker = joinLeaveTracker.get(cleanNickname);
         if (!tracker) {
             tracker = { count: 0, lastTime: 0, firstTime: now };
-            joinLeaveTracker.set(cleanNick, tracker);
+            joinLeaveTracker.set(cleanNickname, tracker);
         }
         
         if (now - tracker.firstTime > twelveHours) {
@@ -396,8 +387,8 @@ class ChatHandler {
         }
         
         if (tracker.count >= 3) {
-            await this.db.addPunishment?.(cleanNick, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
-            this.bot.chat(`/c kick ${cleanNick}`);
+            await this.db.addPunishment?.(cleanNickname, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
+            this.bot.chat(`/c kick ${cleanNickname}`);
             await utils.sleep(400);
             this.bot.chat(`/cc &4&l|&c &e${nickname} &cдобавлен в ЧС на 6 часов за спам`);
             safeLog(this.parentBot, `⛔ ${nickname} в ЧС за спам`, 'warn');
@@ -407,7 +398,7 @@ class ChatHandler {
         tracker.count++;
         tracker.lastTime = now;
         
-        if (this.db.addClanMember) await this.db.addClanMember(cleanNick, 'system');
+        if (this.db.addClanMember) await this.db.addClanMember(cleanNickname, 'system');
         
         this.bot.chat(`/c rank ${nickname} &8⌜&e&l𐓏&8⌟ﾠ&#0b674d&lн&#0e6f50&lо&#127753&lʙ&#157f56&lᴇ&#198759&lн&#1c8e5b&lь&#1f965e&lᴋ&#239e61&lи&#26a664&lй`);
         
@@ -423,14 +414,14 @@ class ChatHandler {
     }
     
     async handleLeaveClan(nickname) {
-        const cleanNick = cleanNick(nickname);
+        const cleanNickname = cleanNick(nickname);
         const now = Date.now();
         const twelveHours = 12 * 60 * 60 * 1000;
         
-        let tracker = joinLeaveTracker.get(cleanNick);
+        let tracker = joinLeaveTracker.get(cleanNickname);
         if (!tracker) {
             tracker = { count: 0, lastTime: 0, firstTime: now };
-            joinLeaveTracker.set(cleanNick, tracker);
+            joinLeaveTracker.set(cleanNickname, tracker);
         }
         
         if (now - tracker.firstTime > twelveHours) {
@@ -439,8 +430,8 @@ class ChatHandler {
         }
         
         if (tracker.count >= 3) {
-            await this.db.addPunishment?.(cleanNick, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
-            this.bot.chat(`/c kick ${cleanNick}`);
+            await this.db.addPunishment?.(cleanNickname, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
+            this.bot.chat(`/c kick ${cleanNickname}`);
             await utils.sleep(400);
             this.bot.chat(`/cc &4&l|&c &e${nickname} &cдобавлен в ЧС на 6 часов за спам`);
             safeLog(this.parentBot, `⛔ ${nickname} в ЧС за спам`, 'warn');
@@ -450,9 +441,9 @@ class ChatHandler {
         tracker.count++;
         tracker.lastTime = now;
         
-        await this.db.removeClanMember(cleanNick);
-        await this.db.run(`UPDATE rp_players SET structure = 'Гражданин', job_rank = 'Нет', on_duty = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNick]);
-        await this.db.run(`DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNick]);
+        await this.db.removeClanMember(cleanNickname);
+        await this.db.run(`UPDATE rp_players SET structure = 'Гражданин', job_rank = 'Нет', on_duty = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNickname]);
+        await this.db.run(`DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNickname]);
         
         await utils.sleep(400);
         this.bot.chat(`/msg ${nickname} &4&l|&c Вы покинули клан Resistance`);

@@ -29,7 +29,7 @@ async function sendDiscordRedirect(bot, sender, commandName) {
 
 // Проверка, является ли игрок лидером организации
 async function isLeader(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     if (!profile || profile.structure === 'Гражданин') return false;
     
@@ -39,7 +39,7 @@ async function isLeader(nick, db) {
 
 // Получение организации игрока
 async function getPlayerOrg(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     if (!profile || profile.structure === 'Гражданин') return null;
     return profile.structure;

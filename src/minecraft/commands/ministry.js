@@ -29,42 +29,42 @@
 
     // Проверка ролей министров
     async function isEconomyMinister(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Экономики';
     }
 
     async function isDefenseMinister(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Обороны';
     }
 
     async function isMvdMinister(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Внутренних дел';
     }
 
     async function isHealthMinister(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Здравоохранения';
     }
 
     async function isEducationMinister(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Образования';
     }
 
     async function isMayor(nick, db) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Мэр';

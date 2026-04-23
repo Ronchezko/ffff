@@ -193,8 +193,17 @@ async function idim(bot, sender, args, db) {
 // ============================================
 
 async function help(bot, sender, args, db) {
-    await sendMessage(bot, sender, `&a&l|&f Команды: &e/balance, /pay, /pass, /id, /keys, /idim, /rp, /fly, /10t, /discord`);
-    await sendMessage(bot, sender, `&7&l|&f Полный список на Discord!`);
+    console.log('[HELP] Функция help вызвана!');
+    console.log('[HELP] sender =', sender);
+    console.log('[HELP] args =', args);
+    
+    try {
+        await sendMessage(bot, sender, `&a&l|&f Команды: &e/balance, /pay, /pass, /id, /keys, /idim, /rp, /fly, /10t, /discord`);
+        await sendMessage(bot, sender, `&7&l|&f Полный список команд в Discord!`);
+        console.log('[HELP] Сообщения отправлены');
+    } catch (err) {
+        console.error('[HELP] Ошибка:', err);
+    }
 }
 
 // ============================================

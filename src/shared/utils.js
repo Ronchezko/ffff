@@ -5,7 +5,14 @@
 // ФУНКЦИЯ ОЧИСТКИ НИКА (регистронезависимая)
 // ============================================
 
-
+function cleanNick(nick) {
+    if (!nick) return '';
+    let cleaned = nick;
+    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+    return cleaned.toLowerCase();
+}
 // ============================================
 // ФОРМАТИРОВАНИЕ
 // ============================================
@@ -176,7 +183,7 @@ function parseCommand(message) {
 
 // Проверка заблокирован ли игрок в RP
 async function isRPFrozen(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const player = await db.get(
         `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
         [cleanNickname]
@@ -186,7 +193,7 @@ async function isRPFrozen(nick, db) {
 
 // Проверка с отправкой сообщения
 async function checkRPFrozen(nick, bot, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     
     if (!profile) {
@@ -211,28 +218,28 @@ async function checkRPFrozen(nick, bot, db) {
 
 // Проверка, находится ли игрок в клане
 async function isInClan(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const member = await db.getClanMember(cleanNickname);
     return !!member;
 }
 
 // Проверка, находится ли игрок в RP
 async function isInRP(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     return !!profile;
 }
 
 // Проверка, находится ли игрок на дежурстве
 async function isOnDuty(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     return profile ? profile.on_duty === 1 : false;
 }
 
 // Получение структуры игрока
 async function getPlayerStructure(nick, db) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     const profile = await db.getRPProfile(cleanNickname);
     if (!profile) return { structure: 'Гражданин', rank: 'Нет' };
     return {
@@ -243,7 +250,7 @@ async function getPlayerStructure(nick, db) {
 
 // Комплексная проверка клана и RP
 async function checkClanAndRP(nick, db, bot, requireRP = false) {
-    const cleanNickname = cleanNick(nick);
+    const cleanNickname = global.cleanNick(nick);
     
     // Проверка в клане
     const inClan = await isInClan(cleanNickname, db);
@@ -304,7 +311,7 @@ class SpamDetector {
     }
     
     check(nick) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const now = Date.now();
         const userData = this.userMessages.get(cleanNickname) || { timestamps: [], mutedUntil: 0 };
         
@@ -326,7 +333,7 @@ class SpamDetector {
     }
     
     unmute(nick) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         const userData = this.userMessages.get(cleanNickname);
         if (userData) {
             userData.mutedUntil = 0;
@@ -335,7 +342,7 @@ class SpamDetector {
     }
     
     reset(nick) {
-        const cleanNickname = cleanNick(nick);
+        const cleanNickname = global.cleanNick(nick);
         this.userMessages.delete(cleanNickname);
     }
 }
@@ -361,7 +368,6 @@ async function sendClanMessage(bot, message) {
 module.exports = {
     // Очистка ника
     cleanNick,
-    
     // Форматирование
     formatTime,
     formatDate,
@@ -406,4 +412,5 @@ module.exports = {
     // Отправка сообщений
     sendMessage,
     sendClanMessage,
+
 };

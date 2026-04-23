@@ -1,6 +1,15 @@
 // src/minecraft/commands/index.js
-// ПОЛНАЯ РЕГИСТРАЦИЯ ВСЕХ КОМАНД
-const cleanNickname = global.cleanNick(nick);   
+// ПОЛНАЯ РЕГИСТРАЦИЯ ВСЕХ КОМАНД 
+if (typeof global.cleanNick !== 'function') {
+    global.cleanNick = function(nick) {
+        if (!nick) return '';
+        let cleaned = nick;
+        cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
+        cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
+        cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
+        return cleaned.toLowerCase();
+    };
+}
 const playerCommands = require('./player');
 const staffCommands = require('./staff');
 const rpCommands = require('./rp');
@@ -407,15 +416,23 @@ async function handleOrgCommand(bot, sender, args, db, addLog) {
 // ============================================
 
 async function executeCommand(bot, sender, command, args, db, addLog) {
+    console.log('[INDEX] executeCommand вызван');
+    console.log('[INDEX] sender =', sender);
+    console.log('[INDEX] command =', command);
+    
     const cmdName = command.toLowerCase();
     const cmd = commandMap.get(cmdName);
     
+    console.log('[INDEX] cmd =', cmd);
+    
     if (!cmd) {
+        console.log('[INDEX] Команда не найдена');
         bot.chat(`/msg ${sender} &4&l|&c Неизвестная команда. Используйте &e/help`);
         return false;
     }
     
     try {
+        console.log('[INDEX] Проверка прав...');
         if (cmd.requiredRank > 0) {
             let staffRank;
             try {
@@ -430,6 +447,7 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
             }
         }
         
+        console.log('[INDEX] Проверка остановки системы...');
         if (cmd.category !== 'admin') {
             const isStopped = await db.getSetting('system_stopped');
             if (isStopped === 'true') {
@@ -438,6 +456,7 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
             }
         }
         
+        console.log('[INDEX] Вызов обработчика...');
         if (typeof cmd.handler === 'function') {
             await cmd.handler(bot, sender, args, db, addLog);
         } else {
@@ -446,7 +465,7 @@ async function executeCommand(bot, sender, command, args, db, addLog) {
         return true;
         
     } catch (error) {
-        console.error(`Ошибка выполнения команды ${command}:`, error);
+        console.error('[INDEX] Ошибка:', error);
         bot.chat(`/msg ${sender} &4&l|&c Ошибка выполнения команды: ${error.message}`);
         if (addLog) addLog(`Ошибка команды ${command}: ${error.message}`, 'error');
         return false;
