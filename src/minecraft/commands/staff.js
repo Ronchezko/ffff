@@ -2,7 +2,7 @@
 // Команды для персонала (модераторы, администраторы) с Discord интеграцией
 
 const utils = require('../../shared/utils');
-const cleanNickname = global.cleanNick(nick);
+const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 // ============================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 // ============================================

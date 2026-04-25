@@ -4,14 +4,7 @@
 const utils = require('../shared/utils');
 
 // ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
+
 // ============================================
 
 // ========== МАССИВЫ РАЗНЫХ СООБЩЕНИЙ ==========
@@ -201,14 +194,14 @@ class ChatHandler {
     }
     
     async processMessage(nickname, message, originalSender) {
-        const cleanNickname = cleanNick(nickname);
+        const playerName = nickname;
         
         // ========== ПРОВЕРКА: Игрок в клане? ==========
-        const isInClan = await this.db.getClanMember(nickname);
+        const isInClan = await this.db.getClanMember(playerName);
         if (!isInClan) {
             const randomMsg = getRandomMessage('notInClan');
             await utils.sleep(400);
-            this.bot.chat(`/msg ${nickname} ${randomMsg}`);
+            this.bot.chat(`/msg ${playerName} ${randomMsg}`);
             return;
         }
         

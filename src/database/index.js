@@ -96,7 +96,7 @@ async function run(sql, params = []) {
 // ============================================
 
 async function addClanMember(nick, invitedBy = null) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const cleanInvitedBy = invitedBy ? global.cleanNick(invitedBy) : null;
     
     const existing = await get('SELECT minecraft_nick FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
@@ -113,14 +113,14 @@ async function addClanMember(nick, invitedBy = null) {
 }
 
 async function removeClanMember(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     await run('DELETE FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     logger.info(`➖ Игрок ${cleanNickname} удалён из клана`);
     return true;
 }
 
 async function getClanMember(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     return await get('SELECT rowid, * FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
 }
 
@@ -129,12 +129,12 @@ async function getAllClanMembers() {
 }
 
 async function updateClanMemberRank(nick, rankName, priority) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     await run('UPDATE clan_members SET rank_name = ?, rank_priority = ? WHERE LOWER(minecraft_nick) = LOWER(?)', [rankName, priority, cleanNickname]);
 }
 
 async function updateLastSeen(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     await run('UPDATE clan_members SET last_seen = CURRENT_TIMESTAMP WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
 }
 
@@ -162,7 +162,7 @@ async function addKill(killer, victim) {
 }
 
 async function getPlayerStats(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     return await get(
         `SELECT c.*, r.money, r.structure, r.job_rank, r.rp_points, r.warnings, r.is_frozen
          FROM clan_members c
@@ -176,7 +176,7 @@ async function getPlayerStats(nick) {
 // ============================================
 
 async function registerRP(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     
     const existing = await get('SELECT minecraft_nick FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     if (existing) return false;
@@ -187,12 +187,12 @@ async function registerRP(nick) {
 }
 
 async function getRPProfile(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     return await get('SELECT * FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
 }
 
 async function updateMoney(nick, amount, type, description, performedBy = 'system') {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const profile = await get('SELECT money FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     if (!profile) return false;
     
@@ -210,7 +210,7 @@ async function updateMoney(nick, amount, type, description, performedBy = 'syste
 }
 
 async function getBalance(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const profile = await get('SELECT money FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     return profile ? profile.money : 0;
 }
@@ -238,7 +238,7 @@ async function transferMoney(from, to, amount, description) {
 // ============================================
 
 async function isRPFrozen(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const player = await get(
         `SELECT is_frozen FROM rp_players WHERE LOWER(minecraft_nick) = LOWER(?)`,
         [cleanNickname]
@@ -293,13 +293,13 @@ async function removePunishment(player, type, liftedBy, liftReason) {
 // ============================================
 
 async function getStaffRank(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const row = await get('SELECT rank_level, rank_name, awarns, kicks_today, mutes_today, bl_today FROM staff_stats WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
     return row || { rank_level: 0, rank_name: null, awarns: 0, kicks_today: 0, mutes_today: 0, bl_today: 0 };
 }
 
 async function setStaffRank(nick, rankLevel, rankName, hiredBy = null) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const cleanHiredBy = hiredBy ? global.cleanNick(hiredBy) : null;
     
     const existing = await get('SELECT * FROM staff_stats WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
@@ -341,13 +341,13 @@ async function checkStaffLimit(nick, action) {
 }
 
 async function incrementStaffCounter(nick, action) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const field = action === 'kick' ? 'kicks_today' : (action === 'mute' ? 'mutes_today' : 'bl_today');
     await run(`UPDATE staff_stats SET ${field} = ${field} + 1 WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNickname]);
 }
 
 async function isMuted(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const mute = await get(
         `SELECT * FROM punishments WHERE LOWER(player) = LOWER(?) AND type = 'mute' AND active = 1 
          AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)`,
@@ -373,7 +373,7 @@ async function getOrgMembers(orgName) {
 }
 
 async function addOrgMember(nick, orgName, rankName) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const cleanOrg = global.cleanNick(orgName);
     
     const existing = await get('SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND LOWER(org_name) = LOWER(?)', [cleanNickname, cleanOrg]);
@@ -387,7 +387,7 @@ async function addOrgMember(nick, orgName, rankName) {
 }
 
 async function removeOrgMember(nick, orgName) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const cleanOrg = global.cleanNick(orgName);
     await run('DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND LOWER(org_name) = LOWER(?)', [cleanNickname, cleanOrg]);
     const other = await get('SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
@@ -396,7 +396,7 @@ async function removeOrgMember(nick, orgName) {
 }
 
 async function setDuty(nick, orgName, onDuty) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const cleanOrg = orgName ? global.cleanNick(orgName) : null;
     const now = new Date().toISOString();
     
@@ -427,7 +427,7 @@ async function getAllAvailableProperties() {
 }
 
 async function getPlayerProperties(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     return await all('SELECT * FROM property WHERE LOWER(owner_nick) = LOWER(?)', [cleanNickname]);
 }
 
@@ -470,7 +470,7 @@ async function addPropertyResident(id, owner, resident) {
 // ============================================
 
 async function isBlacklisted(nick) {
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
     const result = await get(
         `SELECT * FROM clan_blacklist 
          WHERE LOWER(minecraft_nick) = LOWER(?) 

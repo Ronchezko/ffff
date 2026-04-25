@@ -2,7 +2,7 @@
     // Команды для министров города Resistance (с Discord интеграцией)
 
     const utils = require('../../shared/utils');
-    const cleanNickname = global.cleanNick(nick);
+    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 
     // ============================================
     // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -29,42 +29,42 @@
 
     // Проверка ролей министров
     async function isEconomyMinister(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Экономики';
     }
 
     async function isDefenseMinister(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Обороны';
     }
 
     async function isMvdMinister(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Внутренних дел';
     }
 
     async function isHealthMinister(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Здравоохранения';
     }
 
     async function isEducationMinister(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Министр Образования';
     }
 
     async function isMayor(nick, db) {
-        const cleanNickname = global.cleanNick(nick);
+        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
         const profile = await db.getRPProfile(cleanNickname);
         if (!profile || profile.structure !== 'government') return false;
         return profile.job_rank === 'Мэр';

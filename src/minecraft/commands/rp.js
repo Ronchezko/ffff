@@ -4,7 +4,7 @@
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const cleanNickname = global.cleanNick(nick);
+const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 const logger = require('./shared/logger');
 const database = require('./database');
 

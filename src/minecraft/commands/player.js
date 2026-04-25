@@ -4,7 +4,7 @@
 const utils = require('../../shared/utils');
 
 const { checkRPFrozen } = require('../../shared/utils');
-const cleanNickname = global.cleanNick(nick);
+const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 // Глобальные кулдауны
 let lastFlyTime = 0;
 let lastTenTTime = 0;

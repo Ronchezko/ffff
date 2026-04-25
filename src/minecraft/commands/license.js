@@ -1,7 +1,7 @@
 // src/minecraft/commands/license.js
 const utils = require('../../shared/utils');
 const database = require('../../database');
-const cleanNickname = global.cleanNick(nick);
+const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 // Цвета Minecraft для красивого оформления
 const colors = {
     black: '&0', dark_blue: '&1', dark_green: '&2', dark_aqua: '&3',

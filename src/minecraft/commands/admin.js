@@ -2,7 +2,7 @@
 // Команды для администрации клана (полный функционал)
 
 const utils = require('../../shared/utils');
-const cleanNickname = global.cleanNick(nick);
+const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
 function sendMessage(bot, target, message) {
     bot.chat(`/msg ${target} ${message}`);
 }
