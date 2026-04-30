@@ -1,6 +1,6 @@
 // src/minecraft/commands/index.js
 // ПОЛНАЯ РЕГИСТРАЦИЯ ВСЕХ КОМАНД 
-
+const logger = require('../../shared/logger');
 const playerCommands = require('./player');
 const staffCommands = require('./staff');
 const rpCommands = require('./rp');

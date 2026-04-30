@@ -5,7 +5,6 @@ const mineflayer = require('mineflayer');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const fs = require('fs');
 const path = require('path');
-const logger = require('../shared/logger');
 const { handleMessage } = require('./chatHandler');
 const payday = require('./payday');
 // ============================================
