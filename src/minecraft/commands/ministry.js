@@ -1,497 +1,646 @@
-    // src/minecraft/commands/ministry.js
-    // Команды для министров города Resistance (с Discord интеграцией)
+// src/minecraft/commands/ministry.js — Команды министров и мэра Resistance City v5.0.0
+// /tax, /budget, /grant, /crime, /bonus, /materials, /freezeorg, /citystats, /orgstatus
 
-    const utils = require('../../shared/utils');
-    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
+'use strict';
 
-    // ============================================
-    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-    // ============================================
+const config = require('../../config');
+const db = require('../../database');
+const utils = require('../../shared/utils');
+const permissions = require('../../shared/permissions');
+const { logger } = require('../../shared/logger');
 
+function msg(bot, user, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/msg ' + user + ' ' + text); } catch(e) {}
+}
+function cc(bot, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/cc ' + text); } catch(e) {}
+}
 
-    async function sendMessage(bot, target, message) {
-        bot.chat(`/msg ${target} ${message}`);
-        await utils.sleep(400);
+function checkMinistryAccess(username, role) {
+    if (permissions.isAdmin(username, db)) return true;
+    if (permissions.isMayor(username, db)) return true;
+    if (role === 'minister' || role === 'any') return permissions.isMinister(username, db);
+    return false;
+}
+
+// ==================== /TAX ====================
+function taxManage(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'minister')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр экономики или мэр');
     }
 
-    async function sendClanMessage(bot, message) {
-        bot.chat(`/cc ${message}`);
-        await utils.sleep(300);
+    if (args.length < 1) {
+        const pt = db.settings.getNumber('economy_tax_rate') || 0.01;
+        const it = db.settings.getNumber('payday_tax_rate') || 0.01;
+        const bt = db.settings.getNumber('business_tax_rate') || 0.02;
+        const tt = db.settings.getNumber('transfer_tax_rate') || 0;
+
+        msg(bot, username,
+            '&#80C4C5💰 Налоговая система Resistance\n' +
+            '&#D4D4D4══════════════════════\n' +
+            '&#D4D4D4На имущество: &#FFB800' + (pt * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4Подоходный: &#FFB800' + (it * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4На бизнес: &#FFB800' + (bt * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4На переводы: &#FFB800' + (tt * 100).toFixed(1) + '%\n\n' +
+            '&#D4D4D4Изменить: &#FFB800/tax set <тип> <ставка_%>\n' +
+            '&#D4D4D4Список: &#FFB800/tax list\n' +
+            '&#D4D4D4Статистика: &#FFB800/tax stats'
+        );
+        return;
     }
 
-    // Отправка сообщения о необходимости использовать Discord
-    async function sendDiscordRedirect(bot, sender, commandName) {
-        const discordLink = process.env.DISCORD_INVITE_LINK || 'https://discord.gg/resistance';
-        await sendMessage(bot, sender, `&e&l|&f Для использования команды &e/${commandName} &fперейдите в Discord сервер Resistance`);
-        await sendMessage(bot, sender, `&7&l|&f Ссылка: &e${discordLink}`);
-        await sendMessage(bot, sender, `&7&l|&f В Discord доступна полная информация и статистика`);
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    // ==================== TAX SET ====================
+    if (sub === 'set') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /tax set <property|income|business|transfer> <ставка_%>');
+
+        const taxType = subArgs[0].toLowerCase();
+        const rate = parseFloat(subArgs[1]);
+
+        if (isNaN(rate) || rate < 0 || rate > 50) return msg(bot, username, '&#CA4E4E❌ Ставка должна быть от 0 до 50%');
+
+        const settingsMap = {
+            property: 'economy_tax_rate',
+            income: 'payday_tax_rate',
+            business: 'business_tax_rate',
+            transfer: 'transfer_tax_rate'
+        };
+
+        const namesMap = {
+            property: 'на имущество',
+            income: 'подоходный',
+            business: 'на бизнес',
+            transfer: 'на переводы'
+        };
+
+        if (!settingsMap[taxType]) {
+            return msg(bot, username, '&#CA4E4E❌ Неверный тип. Доступные: property, income, business, transfer');
+        }
+
+        const rateDecimal = rate / 100;
+        db.settings.set(settingsMap[taxType], String(rateDecimal));
+
+        logger.warn(username + ' изменил налог ' + namesMap[taxType] + ': ' + rate + '%');
+
+        msg(bot, username, '&#76C519✅ Налог ' + namesMap[taxType] + ' установлен: &#FFB800' + rate + '%');
+        cc(bot, '&#FFB800💰 Ставка налога ' + namesMap[taxType] + ' изменена: ' + rate + '%');
+        return;
     }
 
-    // Проверка ролей министров
-    async function isEconomyMinister(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Министр Экономики';
+    // ==================== TAX LIST ====================
+    if (sub === 'list') {
+        const pt = db.settings.getNumber('economy_tax_rate') || 0.01;
+        const it = db.settings.getNumber('payday_tax_rate') || 0.01;
+        const bt = db.settings.getNumber('business_tax_rate') || 0.02;
+        const tt = db.settings.getNumber('transfer_tax_rate') || 0;
+
+        msg(bot, username,
+            '&#80C4C5📋 Текущие налоги:\n' +
+            '&#D4D4D4══════════════════════\n' +
+            '&#D4D4D4На имущество: &#FFB800' + (pt * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4Подоходный: &#FFB800' + (it * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4На бизнес: &#FFB800' + (bt * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4На переводы: &#FFB800' + (tt * 100).toFixed(1) + '%'
+        );
+        return;
     }
 
-    async function isDefenseMinister(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Министр Обороны';
+    // ==================== TAX STATS ====================
+    if (sub === 'stats') {
+        const propertyTax = db.all("SELECT SUM(ABS(amount)) as t FROM balance_logs WHERE type = 'tax_payment'")[0]?.t || 0;
+        const allPaydays = db.all("SELECT SUM(amount) as t FROM balance_logs WHERE type = 'payday'")[0]?.t || 0;
+        const incomeTaxRate = db.settings.getNumber('payday_tax_rate') || 0.01;
+        const estimatedIncomeTax = Math.floor(Math.abs(allPaydays) * incomeTaxRate);
+        const totalFines = db.all("SELECT SUM(amount) as t FROM fines WHERE status = 'paid'")[0]?.t || 0;
+
+        msg(bot, username,
+            '&#80C4C5📊 Налоговая статистика:\n' +
+            '&#D4D4D4══════════════════════\n' +
+            '&#D4D4D4Налог на имущество: &#76C519' + utils.formatMoney(propertyTax) + '\n' +
+            '&#D4D4D4Подоходный (примерно): &#76C519' + utils.formatMoney(estimatedIncomeTax) + '\n' +
+            '&#D4D4D4Штрафы: &#76C519' + utils.formatMoney(totalFines) + '\n' +
+            '&#D4D4D4Всего собрано: &#76C519' + utils.formatMoney(propertyTax + estimatedIncomeTax + totalFines)
+        );
+        return;
     }
 
-    async function isMvdMinister(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Министр Внутренних дел';
+    // ==================== TAX INFO ====================
+    if (sub === 'info') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /tax info <property|income|business|transfer>');
+
+        const taxType = subArgs[0].toLowerCase();
+        const namesMap = {
+            property: 'на имущество',
+            income: 'подоходный',
+            business: 'на бизнес',
+            transfer: 'на переводы'
+        };
+        const descMap = {
+            property: 'Взимается еженедельно с владельцев недвижимости',
+            income: 'Взимается с каждой зарплаты (PayDay)',
+            business: 'Взимается с дохода бизнесов',
+            transfer: 'Взимается с денежных переводов между игроками'
+        };
+        const settingsMap = {
+            property: 'economy_tax_rate',
+            income: 'payday_tax_rate',
+            business: 'business_tax_rate',
+            transfer: 'transfer_tax_rate'
+        };
+
+        if (!namesMap[taxType]) return msg(bot, username, '&#CA4E4E❌ Неверный тип. property, income, business, transfer');
+
+        const currentRate = db.settings.getNumber(settingsMap[taxType]) || 0.01;
+
+        msg(bot, username,
+            '&#80C4C5💰 Налог ' + namesMap[taxType] + '\n' +
+            '&#D4D4D4══════════════════════\n' +
+            '&#D4D4D4' + descMap[taxType] + '\n' +
+            '&#D4D4D4Текущая ставка: &#FFB800' + (currentRate * 100).toFixed(1) + '%\n' +
+            '&#D4D4D4Изменить: &#FFB800/tax set ' + taxType + ' <ставка_%>'
+        );
+        return;
     }
 
-    async function isHealthMinister(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Министр Здравоохранения';
+    msg(bot, username, '&#CA4E4E❌ /tax <set|list|stats|info>');
+}
+
+// ==================== /BUDGET ====================
+function budgetManage(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'minister')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр, мэр или администратор');
     }
 
-    async function isEducationMinister(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Министр Образования';
+    const isMayorOrAdmin = permissions.isMayor(username, db) || permissions.isAdmin(username, db);
+
+    if (args.length < 1) {
+        const allOrgs = db.orgBudgets.getAll();
+        let totalBudget = 0;
+        let totalMaterials = 0;
+
+        msg(bot, username, '&#80C4C5💰 Бюджет Resistance\n&#D4D4D4══════════════════════');
+
+        for (const org of allOrgs) {
+            const employeeCount = db.all(
+                'SELECT COUNT(*) as c FROM rp_members WHERE organization = ? AND is_active = 1',
+                [org.name]
+            )[0]?.c || 0;
+
+            msg(bot, username,
+                '&#FFB800' + org.name + '\n' +
+                '&#D4D4D4  Бюджет: &#76C519' + utils.formatMoney(org.budget) + '\n' +
+                '&#D4D4D4  Материалы: &#76C519' + org.materials + '\n' +
+                '&#D4D4D4  Сотрудников: &#76C519' + employeeCount +
+                (org.is_frozen ? ' &#CA4E4E[Заморожена]' : '')
+            );
+
+            totalBudget += org.budget;
+            totalMaterials += org.materials;
+        }
+
+        msg(bot, username,
+            '&#D4D4D4══════════════════════\n' +
+            '&#D4D4D4Общий бюджет: &#76C519' + utils.formatMoney(totalBudget) + '\n' +
+            '&#D4D4D4Всего материалов: &#76C519' + totalMaterials + '\n' +
+            '&#D4D4D4Управление: &#FFB800/budget <ключ> <set|add|info>'
+        );
+        return;
     }
 
-    async function isMayor(nick, db) {
-        const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-        const profile = await db.getRPProfile(cleanNickname);
-        if (!profile || profile.structure !== 'government') return false;
-        return profile.job_rank === 'Мэр';
+    const subArgs = args;
+
+    // ==================== BUDGET INFO ====================
+    if (subArgs[0].toLowerCase() === 'info') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /budget info <ключ_организации>');
+
+        const orgKey = subArgs[1].toLowerCase();
+        const orgConfig = config.organizations[orgKey];
+        if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация. ' + Object.keys(config.organizations).join(', '));
+
+        const budget = db.orgBudgets.get(orgKey);
+        const employeeCount = db.all(
+            'SELECT COUNT(*) as c FROM rp_members WHERE organization = ? AND is_active = 1',
+            [orgConfig.name]
+        )[0]?.c || 0;
+
+        msg(bot, username,
+            '&#80C4C5💰 ' + orgConfig.name + '\n' +
+            '&#D4D4D4Бюджет: &#76C519' + utils.formatMoney(budget?.budget || 0) + '\n' +
+            '&#D4D4D4Материалы: &#76C519' + (budget?.materials || 0) + '\n' +
+            '&#D4D4D4Сотрудников: &#76C519' + employeeCount + '\n' +
+            '&#D4D4D4Статус: ' + (budget?.is_frozen ? '&#CA4E4EЗаморожена' : '&#76C519Активна')
+        );
+        return;
     }
 
-    // ============================================
-    // МИНИСТР ЭКОНОМИКИ
-    // ============================================
+    // ==================== BUDGET SET/ADD ====================
+    if (args.length < 3) return msg(bot, username, '&#CA4E4E❌ /budget <ключ> <set|add> <сумма>');
 
-    // /org/o tax set [тип] [ставка] - Установить налог
-    async function taxSet(bot, sender, args, db, addLog) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
+    const orgKey = args[0].toLowerCase();
+    const action = args[1].toLowerCase();
+    const amount = parseFloat(args[2]);
+
+    const orgConfig = config.organizations[orgKey];
+    if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+
+    if (isNaN(amount) || amount < 0) return msg(bot, username, '&#CA4E4E❌ Сумма должна быть ≥ 0');
+
+    if (action === 'set') {
+        const current = db.orgBudgets.get(orgKey);
+        const diff = amount - (current?.budget || 0);
+        db.orgBudgets.updateBudget(orgKey, diff);
+        logger.warn(username + ' установил бюджет ' + orgConfig.name + ': ' + utils.formatMoney(amount));
+        msg(bot, username, '&#76C519✅ Бюджет ' + orgConfig.name + ': &#FFB800' + utils.formatMoney(amount));
+        return;
+    }
+
+    if (action === 'add') {
+        db.orgBudgets.updateBudget(orgKey, amount);
+        logger.info(username + ' пополнил бюджет ' + orgConfig.name + ' на ' + utils.formatMoney(amount));
+        msg(bot, username, '&#76C519✅ +' + utils.formatMoney(amount) + ' → ' + orgConfig.name);
+        return;
+    }
+
+    if (action === 'transfer') {
+        if (args.length < 4) return msg(bot, username, '&#CA4E4E❌ /budget transfer <из> <в> <сумма>');
+        if (!isMayorOrAdmin) return msg(bot, username, '&#CA4E4E❌ Только мэр или администратор');
+
+        const toKey = args[2].toLowerCase();
+        const transferAmount = parseFloat(args[3]);
+        const toConfig = config.organizations[toKey];
+
+        if (!toConfig) return msg(bot, username, '&#CA4E4E❌ Неверная целевая организация');
+        if (orgKey === toKey) return msg(bot, username, '&#CA4E4E❌ Нельзя перевести в ту же организацию');
+        if (isNaN(transferAmount) || transferAmount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма > 0');
+
+        const fromBudget = db.orgBudgets.get(orgKey);
+        if (!fromBudget || fromBudget.budget < transferAmount) {
+            return msg(bot, username, '&#CA4E4E❌ В ' + orgConfig.name + ' недостаточно средств');
+        }
+
+        db.orgBudgets.updateBudget(orgKey, -transferAmount);
+        db.orgBudgets.updateBudget(toKey, transferAmount);
+        logger.warn(username + ' перевёл ' + utils.formatMoney(transferAmount) + ' из ' + orgConfig.name + ' в ' + toConfig.name);
+
+        msg(bot, username, '&#76C519✅ Перевод ' + utils.formatMoney(transferAmount) + ': ' + orgConfig.name + ' → ' + toConfig.name);
+        cc(bot, '&#FFB800💰 Перевод ' + utils.formatMoney(transferAmount) + ': ' + orgConfig.name + ' → ' + toConfig.name);
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /budget <ключ> <set|add|transfer|info>');
+}
+
+// ==================== /GRANT ====================
+function grantManage(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'minister')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр экономики, мэр или администратор');
+    }
+
+    if (args.length < 3) {
+        if (args.length === 1 && args[0].toLowerCase() === 'list') {
+            const grants = db.all("SELECT * FROM balance_logs WHERE type = 'grant' ORDER BY created_at DESC LIMIT 10");
+            if (grants.length === 0) return msg(bot, username, '&#D4D4D4Гранты ещё не выдавались');
+
+            msg(bot, username, '&#80C4C5🎓 Последние гранты:');
+            for (const g of grants) {
+                msg(bot, username,
+                    '&#76C519' + g.username + ' &#D4D4D4— ' + utils.formatMoney(Math.abs(g.amount)) +
+                    ' &#D4D4D4| ' + (g.reason || '—') + ' &#D4D4D4| ' + utils.formatDate(g.created_at)
+                );
+            }
             return;
         }
-        
-        if (args.length < 2) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o tax set [тип] [ставка]`);
-            await sendMessage(bot, sender, `&7&l|&f Типы: &eproperty, business, office`);
+
+        if (args.length === 1 && args[0].toLowerCase() === 'total') {
+            const total = db.all("SELECT SUM(ABS(amount)) as t FROM balance_logs WHERE type = 'grant'")[0]?.t || 0;
+            const count = db.all("SELECT COUNT(*) as c FROM balance_logs WHERE type = 'grant'")[0]?.c || 0;
+            msg(bot, username, '&#80C4C5🎓 Выдано грантов: &#FFB800' + count + ' &#D4D4D4на сумму &#76C519' + utils.formatMoney(total));
             return;
         }
-        
-        const type = args[0].toLowerCase();
-        const rate = parseFloat(args[1]);
-        
-        if (isNaN(rate) || rate < 0 || rate > 100) {
-            await sendMessage(bot, sender, `&4&l|&c Ставка должна быть от 0 до 100%`);
-            return;
-        }
-        
-        const settingKey = `${type}_tax_rate`;
-        await db.setSetting(settingKey, (rate / 100).toString(), sender);
-        
-        await sendMessage(bot, sender, `&a&l|&f Налог на &e${type} &aустановлен на &e${rate}%`);
-        await sendClanMessage(bot, `&a💰 Министр экономики ${sender} установил налог на ${type} ${rate}%`);
-        
-        if (addLog) addLog(`💰 ${sender} установил налог ${type} ${rate}%`, 'info');
+
+        return msg(bot, username, '&#CA4E4E❌ /grant <ник> <сумма> [причина]');
     }
 
-    // /org/o tax list - Список налогов (→ Discord)
-    async function taxList(bot, sender, args, db) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o tax list');
+    const target = args[0];
+    const amount = parseFloat(args[1]);
+    const reason = args.slice(2).join(' ') || 'Грант';
+
+    if (isNaN(amount) || amount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма гранта должна быть положительной');
+    if (amount > 500000 && !permissions.isAdmin(username, db)) {
+        return msg(bot, username, '&#CA4E4E❌ Максимальная сумма: 500 000 ₽. Для больших сумм — к администратору.');
     }
 
-    // /org/o budget - Бюджет города (→ Discord)
-    async function budget(bot, sender, args, db) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o budget');
+    const tm = db.rpMembers.get(target);
+    if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не найден в RP');
+
+    const cityBudget = db.orgBudgets.get('government');
+    if (!cityBudget || cityBudget.budget < amount) {
+        return msg(bot, username, '&#CA4E4E❌ Недостаточно средств в бюджете города!\nДоступно: ' + utils.formatMoney(cityBudget?.budget || 0));
     }
 
-    // /org/o bonus [процент] - Установить бонус к зарплатам
-    async function bonus(bot, sender, args, db, addLog) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
+    db.orgBudgets.updateBudget('government', -amount);
+    db.rpMembers.updateBalance(target, amount, 'grant', 'Грант: ' + reason, username);
+
+    logger.warn(username + ' выдал грант ' + target + ' на ' + utils.formatMoney(amount) + '. Причина: ' + reason);
+
+    msg(bot, username, '&#76C519✅ Грант ' + utils.formatMoney(amount) + ' выдан ' + target);
+    cc(bot, '&#76C519🎓 ' + target + ' получил грант ' + utils.formatMoney(amount) + ' от ' + username);
+    try { bot.chat('/msg ' + target + ' &#76C519🎉 Вы получили грант ' + utils.formatMoney(amount) + '! ' + reason); } catch(e) {}
+}
+
+// ==================== /CRIME ====================
+function crimeStats(bot, username, args, source) {
+    const rpMember = db.rpMembers.get(username);
+    if (!rpMember || rpMember.organization !== 'Полиция (МВД)') {
+        if (!checkMinistryAccess(username, 'minister')) {
+            return msg(bot, username, '&#CA4E4E❌ Только министр МВД, мэр или администратор');
         }
-        
+    }
+
+    const sub = args[0]?.toLowerCase() || 'all';
+
+    if (sub === 'fines') {
+        const total = db.all('SELECT COUNT(*) as c FROM fines')[0]?.c || 0;
+        const pending = db.all("SELECT COUNT(*) as c FROM fines WHERE status = 'pending'")[0]?.c || 0;
+        const paid = db.all("SELECT COUNT(*) as c FROM fines WHERE status = 'paid'")[0]?.c || 0;
+        const totalSum = db.all('SELECT SUM(amount) as t FROM fines')[0]?.t || 0;
+        const unpaidSum = db.all("SELECT SUM(amount) as t FROM fines WHERE status IN ('pending', 'rejected')")[0]?.t || 0;
+
+        msg(bot, username,
+            '&#80C4C5🚔 Штрафы:\n' +
+            '&#D4D4D4Всего: &#FFB800' + total + '\n' +
+            '&#D4D4D4Оплачено: &#76C519' + paid + '\n' +
+            '&#D4D4D4Не оплачено: &#CA4E4E' + pending + '\n' +
+            '&#D4D4D4Сумма к оплате: &#CA4E4E' + utils.formatMoney(unpaidSum)
+        );
+        return;
+    }
+
+    if (sub === 'jail') {
+        const total = db.all('SELECT COUNT(*) as c FROM jail_records')[0]?.c || 0;
+        const active = db.all('SELECT COUNT(*) as c FROM jail_records WHERE is_active = 1')[0]?.c || 0;
+
+        msg(bot, username,
+            '&#80C4C5🔒 Тюрьма:\n' +
+            '&#D4D4D4Всего заключений: &#FFB800' + total + '\n' +
+            '&#D4D4D4Сейчас в тюрьме: &#CA4E4E' + active
+        );
+
+        if (active > 0 && active <= 10) {
+            const prisoners = db.all(
+                "SELECT j.username, j.reason, j.jail_end FROM jail_records j WHERE j.is_active = 1"
+            );
+            for (const p of prisoners) {
+                msg(bot, username, '&#CA4E4E' + p.username + ' — ' + p.reason + ' (до ' + utils.formatDate(p.jail_end) + ')');
+            }
+        }
+        return;
+    }
+
+    if (sub === 'top') {
+        const top = db.all(
+            "SELECT username, COUNT(*) as c FROM fines GROUP BY username_lower ORDER BY c DESC LIMIT 10"
+        );
+        if (top.length === 0) return msg(bot, username, '&#D4D4D4Нет данных');
+
+        msg(bot, username, '&#80C4C5🚔 Топ-10 нарушителей:');
+        for (let i = 0; i < top.length; i++) {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
+            msg(bot, username, medal + ' &#CA4E4E' + top[i].username + ' &#D4D4D4— ' + top[i].c + ' штрафов');
+        }
+        return;
+    }
+
+    // ALL
+    const totalFines = db.all('SELECT COUNT(*) as c FROM fines')[0]?.c || 0;
+    const pendingFines = db.all("SELECT COUNT(*) as c FROM fines WHERE status = 'pending'")[0]?.c || 0;
+    const totalJail = db.all('SELECT COUNT(*) as c FROM jail_records')[0]?.c || 0;
+    const activeJail = db.all('SELECT COUNT(*) as c FROM jail_records WHERE is_active = 1')[0]?.c || 0;
+    const unpaidSum = db.all("SELECT SUM(amount) as t FROM fines WHERE status IN ('pending', 'rejected')")[0]?.t || 0;
+
+    msg(bot, username,
+        '&#80C4C5🚔 Криминальная статистика\n' +
+        '&#D4D4D4Штрафов: &#FFB800' + totalFines + ' &#D4D4D4| Не оплачено: &#CA4E4E' + pendingFines + ' (' + utils.formatMoney(unpaidSum) + ')\n' +
+        '&#D4D4D4Тюрьма: всего &#FFB800' + totalJail + ' &#D4D4D4| сейчас &#CA4E4E' + activeJail + '\n' +
+        '&#D4D4D4Подробнее: &#FFB800/crime <fines|jail|top>'
+    );
+}
+
+// ==================== /BONUS ====================
+function bonusManage(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'minister')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр, мэр или администратор');
+    }
+
+    if (args.length < 2) {
+        const allOrgs = db.orgBudgets.getAll();
+        msg(bot, username, '&#80C4C5🎁 Бонусы к зарплатам:');
+        for (const org of allOrgs) {
+            msg(bot, username, '&#FFB800' + org.name + ': &#76C519' + ((org.bonus_percent || 0) * 100).toFixed(0) + '%');
+        }
+        msg(bot, username, '&#D4D4D4Установить: &#FFB800/bonus <ключ> <процент>');
+        return;
+    }
+
+    const orgKey = args[0].toLowerCase();
+    const percent = parseFloat(args[1]);
+
+    if (isNaN(percent) || percent < 0 || percent > 100) {
+        return msg(bot, username, '&#CA4E4E❌ Процент бонуса: 0-100');
+    }
+
+    const orgConfig = config.organizations[orgKey];
+    if (!orgConfig) {
+        return msg(bot, username, '&#CA4E4E❌ Неверная организация. ' + Object.keys(config.organizations).join(', '));
+    }
+
+    db.orgBudgets.setBonus(orgKey, percent / 100);
+    logger.warn(username + ' установил бонус ' + percent + '% для ' + orgConfig.name);
+
+    msg(bot, username, '&#76C519✅ Бонус ' + orgConfig.name + ': &#FFB800' + percent + '%');
+    cc(bot, '&#FFB800🎁 Бонус к ЗП в ' + orgConfig.name + ': ' + percent + '%');
+}
+
+// ==================== /MATERIALS ====================
+function materialsManage(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'minister')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр обороны, мэр или администратор');
+    }
+
+    if (args.length < 3) {
         if (args.length < 1) {
-            const currentBonus = await db.getSetting('salary_bonus') || 0;
-            await sendMessage(bot, sender, `&a&l|&f Текущий бонус к зарплатам: &e${currentBonus}%`);
+            const allOrgs = db.orgBudgets.getAll();
+            msg(bot, username, '&#80C4C5📦 Материалы организаций:');
+            for (const org of allOrgs) {
+                msg(bot, username, '&#FFB800' + org.name + ': &#76C519' + org.materials);
+            }
+            msg(bot, username, '&#D4D4D4Изменить: &#FFB800/materials <ключ> <set|add|del> <количество>');
             return;
         }
-        
-        const percent = parseInt(args[0]);
-        if (isNaN(percent) || percent < 0 || percent > 100) {
-            await sendMessage(bot, sender, `&4&l|&c Процент должен быть от 0 до 100`);
-            return;
-        }
-        
-        await db.setSetting('salary_bonus', percent.toString(), sender);
-        
-        await sendMessage(bot, sender, `&a&l|&f Бонус к зарплатам установлен на &e${percent}%`);
-        await sendClanMessage(bot, `&a💰 Министр экономики ${sender} установил бонус к зарплатам ${percent}%`);
-        
-        if (addLog) addLog(`💰 ${sender} установил бонус зарплат ${percent}%`, 'info');
+        return msg(bot, username, '&#CA4E4E❌ /materials <ключ> <set|add|del> <количество>');
     }
 
-    // /org/o grant [ник] [сумма] [причина] - Выдать грант
-    async function grant(bot, sender, args, db, addLog) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
+    const orgKey = args[0].toLowerCase();
+    const action = args[1].toLowerCase();
+    const amount = parseInt(args[2]);
+
+    const orgConfig = config.organizations[orgKey];
+    if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+    if (isNaN(amount) || amount < 0) return msg(bot, username, '&#CA4E4E❌ Количество ≥ 0');
+
+    if (action === 'set') {
+        const current = db.orgBudgets.get(orgKey);
+        const diff = amount - (current?.materials || 0);
+        db.orgBudgets.updateMaterials(orgKey, diff);
+        logger.warn(username + ' установил материалы ' + orgConfig.name + ': ' + amount);
+        msg(bot, username, '&#76C519✅ Материалы ' + orgConfig.name + ': &#FFB800' + amount);
+    } else if (action === 'add') {
+        db.orgBudgets.updateMaterials(orgKey, amount);
+        logger.info(username + ' добавил ' + amount + ' материалов в ' + orgConfig.name);
+        msg(bot, username, '&#76C519✅ +' + amount + ' материалов → ' + orgConfig.name);
+    } else if (action === 'del') {
+        const current = db.orgBudgets.get(orgKey);
+        if ((current?.materials || 0) < amount) {
+            return msg(bot, username, '&#CA4E4E❌ Недостаточно материалов. Текущие: ' + (current?.materials || 0));
         }
-        
-        if (args.length < 3) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o grant [ник] [сумма] [причина]`);
-            return;
-        }
-        
-        const target = args[0];
-        const amount = parseInt(args[1]);
-        const reason = args.slice(2).join(' ');
-        const cleanTarget = cleanNick(target);
-        
-        if (isNaN(amount) || amount <= 0) {
-            await sendMessage(bot, sender, `&4&l|&c Укажите корректную сумму!`);
-            return;
-        }
-        
-        const cityBudget = parseInt(await db.getSetting('city_budget') || 10000000);
-        if (cityBudget < amount) {
-            await sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете города!`);
-            return;
-        }
-        
-        const targetProfile = await db.getRPProfile(cleanTarget);
-        if (!targetProfile) {
-            await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay!`);
-            return;
-        }
-        
-        await db.setSetting('city_budget', (cityBudget - amount).toString(), sender);
-        await db.updateMoney(cleanTarget, amount, 'grant', `Грант от правительства: ${reason}`, sender);
-        
-        await sendMessage(bot, sender, `&a&l|&f Выдан грант &e${amount.toLocaleString()}₽ &aигроку &e${target}`);
-        await sendMessage(bot, target, `&a&l|&f Вы получили грант &e${amount.toLocaleString()}₽ &aот правительства. Причина: &e${reason}`);
-        await sendClanMessage(bot, `&a💰 &e${target} &aполучил грант ${amount.toLocaleString()}₽ от правительства`);
-        
-        if (addLog) addLog(`💰 ${sender} выдал грант ${amount} ${target} (${reason})`, 'info');
+        db.orgBudgets.updateMaterials(orgKey, -amount);
+        logger.info(username + ' убрал ' + amount + ' материалов из ' + orgConfig.name);
+        msg(bot, username, '&#76C519✅ -' + amount + ' материалов из ' + orgConfig.name);
+    } else {
+        msg(bot, username, '&#CA4E4E❌ /materials <ключ> <set|add|del>');
+    }
+}
+
+// ==================== /FREEZEORG ====================
+function freezeOrgManage(bot, username, args, source) {
+    if (!permissions.isMayor(username, db) && !permissions.isAdmin(username, db)) {
+        return msg(bot, username, '&#CA4E4E❌ Только мэр или администратор');
     }
 
-    // /org/o id set [id] [цена] - Изменить цену имущества
-    async function idSet(bot, sender, args, db, addLog) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
-        }
-        
-        if (args.length < 2) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o id set [id] [цена]`);
-            return;
-        }
-        
-        const propertyId = args[0];
-        const price = parseInt(args[1]);
-        
-        if (isNaN(price) || price <= 0) {
-            await sendMessage(bot, sender, `&4&l|&c Укажите корректную цену!`);
-            return;
-        }
-        
-        const property = await db.getProperty(propertyId);
-        if (!property) {
-            await sendMessage(bot, sender, `&4&l|&c Имущество с ID &e${propertyId} &cне найдено`);
-            return;
-        }
-        
-        await db.run(`UPDATE property SET price = ? WHERE id = ?`, [price, propertyId]);
-        
-        await sendMessage(bot, sender, `&a&l|&f Цена имущества #&e${propertyId} &aизменена на &e${price.toLocaleString()}₽`);
-        await sendClanMessage(bot, `&a💰 Министр экономики ${sender} изменил цену имущества #${propertyId}`);
-        
-        if (addLog) addLog(`💰 ${sender} изменил цену имущества #${propertyId} на ${price}`, 'info');
+    if (args.length < 2) return msg(bot, username, '&#CA4E4E❌ /freezeorg <ключ_организации> <on|off> [причина]');
+
+    const orgKey = args[0].toLowerCase();
+    const action = args[1].toLowerCase();
+    const reason = args.slice(2).join(' ') || 'Не указана';
+
+    const orgConfig = config.organizations[orgKey];
+    if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+
+    if (action === 'on') {
+        db.orgBudgets.setFrozen(orgKey, true, reason);
+        logger.warn(username + ' заморозил организацию ' + orgConfig.name + '. Причина: ' + reason);
+        msg(bot, username, '&#76C519✅ ' + orgConfig.name + ' заморожена');
+        cc(bot, '&#CA4E4E⚠ Организация ' + orgConfig.name + ' ЗАМОРОЖЕНА! Причина: ' + reason);
+    } else if (action === 'off') {
+        db.orgBudgets.setFrozen(orgKey, false);
+        logger.warn(username + ' разморозил организацию ' + orgConfig.name);
+        msg(bot, username, '&#76C519✅ ' + orgConfig.name + ' разморожена');
+        cc(bot, '&#76C519✅ Организация ' + orgConfig.name + ' разморожена');
+    } else {
+        msg(bot, username, '&#CA4E4E❌ /freezeorg <ключ> <on|off>');
+    }
+}
+
+// ==================== /CITYSTATS ====================
+function cityStatsCommand(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'any')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр, мэр или администратор');
     }
 
-    // /org/o im [ник] [id] - Забрать имущество
-    async function imTake(bot, sender, args, db, addLog) {
-        if (!await isEconomyMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Экономики может использовать эту команду!`);
-            return;
-        }
-        
-        if (args.length < 2) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o im [ник] [id]`);
-            return;
-        }
-        
-        const target = args[0];
-        const propertyId = args[1];
-        const cleanTarget = cleanNick(target);
-        
-        const property = await db.getProperty(propertyId);
-        if (!property || property.owner_nick !== cleanTarget) {
-            await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне владеет имуществом #&e${propertyId}`);
-            return;
-        }
-        
-        await db.run(`UPDATE property SET owner_nick = NULL, is_available = 1, co_owner1 = NULL, co_owner2 = NULL WHERE id = ?`, [propertyId]);
-        
-        const regionName = `TRTR${propertyId}`;
-        bot.chat(`/rg removemember ${regionName} ${cleanTarget}`);
-        
-        await sendMessage(bot, sender, `&a&l|&f Имущество #&e${propertyId} &aизъято у &e${target}`);
-        await sendMessage(bot, target, `&c&l|&f У вас изъято имущество #&e${propertyId} &cправительством`);
-        await sendClanMessage(bot, `&c🏠 Имущество #${propertyId} изъято у ${target} правительством`);
-        
-        if (addLog) addLog(`🏠 ${sender} изъял имущество #${propertyId} у ${target}`, 'warn');
-    }
-    // ============================================
-    // МИНИСТР ОБОРОНЫ
-    // ============================================
+    const rpMembers = db.rpMembers.getAll();
+    const activeMembers = rpMembers.filter(m => m.is_in_city);
+    const orgMembers = rpMembers.filter(m => m.organization);
+    const jailed = rpMembers.filter(m => m.is_in_jail);
+    const sick = rpMembers.filter(m => m.is_sick);
 
-    // /org/o defense - Бюджет обороны (→ Discord)
-    async function defenseBudget(bot, sender, args, db) {
-        if (!await isDefenseMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Обороны может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o defense');
+    const allOrgs = db.orgBudgets.getAll();
+    const totalBudget = allOrgs.reduce((s, o) => s + o.budget, 0);
+    const totalMaterials = allOrgs.reduce((s, o) => s + o.materials, 0);
+    const totalPlayerMoney = rpMembers.reduce((s, m) => s + m.balance + (m.bank_balance || 0), 0);
+    const totalProperties = db.properties.getAll().filter(p => p.is_owned).length;
+
+    msg(bot, username,
+        '&#80C4C5📊 Статистика Resistance\n' +
+        '&#D4D4D4══════════════════════════════\n\n' +
+        '&#FFB800👥 Население:\n' +
+        '&#D4D4D4  Всего в RP: &#76C519' + rpMembers.length + '\n' +
+        '&#D4D4D4  В городе: &#76C519' + activeMembers.length + '\n' +
+        '&#D4D4D4  В организациях: &#76C519' + orgMembers.length + '\n' +
+        '&#D4D4D4  В тюрьме: &#CA4E4E' + jailed.length + '\n' +
+        '&#D4D4D4  Больны: &#FFB800' + sick.length
+    );
+
+    msg(bot, username,
+        '&#FFB800💰 Экономика:\n' +
+        '&#D4D4D4  Бюджет города: &#76C519' + utils.formatMoney(totalBudget) + '\n' +
+        '&#D4D4D4  Деньги игроков: &#76C519' + utils.formatMoney(totalPlayerMoney) + '\n' +
+        '&#D4D4D4  Всего в экономике: &#76C519' + utils.formatMoney(totalBudget + totalPlayerMoney) + '\n' +
+        '&#D4D4D4  Материалы: &#76C519' + totalMaterials
+    );
+
+    msg(bot, username,
+        '&#FFB800🏠 Недвижимость:\n' +
+        '&#D4D4D4  Занято: &#76C519' + totalProperties
+    );
+}
+
+// ==================== /ORGSTATUS ====================
+function orgStatusCommand(bot, username, args, source) {
+    if (!checkMinistryAccess(username, 'any')) {
+        return msg(bot, username, '&#CA4E4E❌ Только министр, мэр или администратор');
     }
 
-    // /org/o armystatus - Статус армии (→ Discord)
-    async function armyStatus(bot, sender, args, db) {
-        if (!await isDefenseMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Обороны может использовать эту команду!`);
-            return;
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgstatus <ключ_организации>');
+
+    const orgKey = args[0].toLowerCase();
+    const orgConfig = config.organizations[orgKey];
+    if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+
+    const budget = db.orgBudgets.get(orgKey);
+    const members = db.all(
+        'SELECT username, rank FROM rp_members WHERE organization = ? AND is_active = 1 ORDER BY rank, username',
+        [orgConfig.name]
+    );
+    const onDuty = db.all("SELECT username_lower FROM active_duties WHERE organization = ?", [orgConfig.name]);
+    const onDutySet = new Set(onDuty.map(d => d.username_lower));
+
+    msg(bot, username,
+        '&#80C4C5📊 Статус: ' + orgConfig.name + '\n' +
+        '&#D4D4D4══════════════════════\n' +
+        '&#D4D4D4Бюджет: &#76C519' + utils.formatMoney(budget?.budget || 0) + '\n' +
+        '&#D4D4D4Материалы: &#76C519' + (budget?.materials || 0) + '\n' +
+        '&#D4D4D4Бонус: &#76C519' + ((budget?.bonus_percent || 0) * 100).toFixed(0) + '%\n' +
+        '&#D4D4D4Статус: ' + (budget?.is_frozen ? '&#CA4E4EЗаморожена' : '&#76C519Активна') + '\n' +
+        '&#D4D4D4Сотрудников: &#FFB800' + members.length + '\n' +
+        '&#D4D4D4На дежурстве: &#76C519' + onDuty.length
+    );
+
+    if (members.length > 0 && members.length <= 15) {
+        msg(bot, username, '&#FFB800Состав:');
+        let currentRank = '';
+        for (const m of members) {
+            if (m.rank !== currentRank) {
+                currentRank = m.rank;
+                const rankCount = members.filter(x => x.rank === currentRank).length;
+                msg(bot, username, '&#FFB800  ' + currentRank + ' (' + rankCount + '):');
+            }
+            const dutyIcon = onDutySet.has(m.username.toLowerCase()) ? '🟢' : '⚫';
+            msg(bot, username, '&#D4D4D4    ' + dutyIcon + ' ' + m.username);
         }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o armystatus');
     }
+}
 
-    // ============================================
-    // МИНИСТР МВД
-    // ============================================
-
-    // /org/o mvdbudget - Бюджет МВД (→ Discord)
-    async function mvdBudget(bot, sender, args, db) {
-        if (!await isMvdMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр МВД может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o mvdbudget');
-    }
-
-    // /org/o mvdstatus - Статус МВД (→ Discord)
-    async function mvdStatus(bot, sender, args, db) {
-        if (!await isMvdMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр МВД может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o mvdstatus');
-    }
-
-    // /org/o crimelist - Список нарушений (→ Discord)
-    async function crimeList(bot, sender, args, db) {
-        if (!await isMvdMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр МВД может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o crimelist');
-    }
-
-    // ============================================
-    // МИНИСТР ЗДРАВООХРАНЕНИЯ
-    // ============================================
-
-    // /org/o healthbudget - Бюджет здравоохранения (→ Discord)
-    async function healthBudget(bot, sender, args, db) {
-        if (!await isHealthMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Здравоохранения может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o healthbudget');
-    }
-
-    // /org/o hospitalstatus - Статус больницы (→ Discord)
-    async function hospitalStatus(bot, sender, args, db) {
-        if (!await isHealthMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Здравоохранения может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o hospitalstatus');
-    }
-    // ============================================
-    // МИНИСТР ОБРАЗОВАНИЯ
-    // ============================================
-
-    // /org/o edubudget - Бюджет образования (→ Discord)
-    async function eduBudget(bot, sender, args, db) {
-        if (!await isEducationMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Образования может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o edubudget');
-    }
-
-    // /org/o academystatus - Статус академии (→ Discord)
-    async function academyStatus(bot, sender, args, db) {
-        if (!await isEducationMinister(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Министр Образования может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o academystatus');
-    }
-
-    // ============================================
-    // МЭР ГОРОДА
-    // ============================================
-
-    // /org/o mayorkick [ник] [причина] - Изгнать из города
-    async function mayorKick(bot, sender, args, db, addLog) {
-        if (!await isMayor(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Мэр может использовать эту команду!`);
-            return;
-        }
-        
-        if (args.length < 1) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o mayorkick [ник] [причина]`);
-            return;
-        }
-        
-        const target = args[0];
-        const reason = args.slice(1).join(' ') || 'Не указана';
-        const cleanTarget = cleanNick(target);
-        
-        const targetProfile = await db.getRPProfile(cleanTarget);
-        if (!targetProfile) {
-            await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay!`);
-            return;
-        }
-        
-        await db.removeClanMember(cleanTarget);
-        await db.run(`UPDATE rp_players SET 
-            structure = 'Гражданин', 
-            job_rank = 'Нет', 
-            is_frozen = 1, 
-            warnings = 0,
-            on_duty = 0
-            WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanTarget]);
-        
-        await db.run(`DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanTarget]);
-        
-        await sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aизгнан из города Resistance`);
-        await sendMessage(bot, target, `&c&l|&f Вы изгнаны из города Resistance. Причина: &e${reason}`);
-        await sendClanMessage(bot, `&c👑 &e${target} &cизгнан из города мэром ${sender}`);
-        
-        if (addLog) addLog(`👑 ${sender} изгнал ${target} из города (${reason})`, 'warn');
-    }
-
-    // /org/o cityinfo - Информация о городе (→ Discord)
-    async function cityInfo(bot, sender, args, db) {
-        if (!await isMayor(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Мэр может использовать эту команду!`);
-            return;
-        }
-        
-        // Отправляем в Discord
-        await sendDiscordRedirect(bot, sender, 'org/o cityinfo');
-    }
-
-    // /org/o setbudget [сумма] - Установить бюджет города
-    async function setBudget(bot, sender, args, db, addLog) {
-        if (!await isMayor(sender, db)) {
-            await sendMessage(bot, sender, `&4&l|&c Только Мэр может использовать эту команду!`);
-            return;
-        }
-        
-        if (args.length < 1) {
-            await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o setbudget [сумма]`);
-            return;
-        }
-        
-        const amount = parseInt(args[0]);
-        if (isNaN(amount) || amount < 0) {
-            await sendMessage(bot, sender, `&4&l|&c Укажите корректную сумму!`);
-            return;
-        }
-        
-        await db.setSetting('city_budget', amount.toString(), sender);
-        
-        await sendMessage(bot, sender, `&a&l|&f Бюджет города установлен на &e${amount.toLocaleString()}₽`);
-        await sendClanMessage(bot, `&a💰 Мэр ${sender} установил бюджет города ${amount.toLocaleString()}₽`);
-        
-        if (addLog) addLog(`💰 ${sender} установил бюджет города ${amount}`, 'info');
-    }
-
-    // ============================================
-    // ЭКСПОРТ ВСЕХ КОМАНД
-    // ============================================
-
-    module.exports = {
-        // Министр экономики
-        taxSet,
-        taxList,       // → Discord
-        budget,        // → Discord
-        bonus,
-        grant,
-        idSet,
-        imTake,
-        
-        // Министр обороны
-        defenseBudget, // → Discord
-        armyStatus,    // → Discord
-        
-        // Министр МВД
-        mvdBudget,     // → Discord
-        mvdStatus,     // → Discord
-        crimeList,     // → Discord
-        
-        // Министр здравоохранения
-        healthBudget,  // → Discord
-        hospitalStatus,// → Discord
-        
-        // Министр образования
-        eduBudget,     // → Discord
-        academyStatus, // → Discord
-        
-        // Мэр
-        mayorKick,
-        cityInfo,      // → Discord
-        setBudget
-    };
+// ==================== ЭКСПОРТ ====================
+module.exports = {
+    taxManage,
+    budgetManage,
+    grantManage,
+    crimeStats,
+    bonusManage,
+    materialsManage,
+    freezeOrgManage,
+    cityStatsCommand,
+    orgStatusCommand,
+};

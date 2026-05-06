@@ -1,0 +1,334 @@
+[2026-05-02 19:00:25.183] [ERROR] [MinecraftBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:25.185] [ERROR] [MinecraftBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:53.067] [ERROR] [MinecraftBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:53.069] [ERROR] [MinecraftBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:55.454] [ERROR] [MinecraftBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:55.456] [ERROR] [MinecraftBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:01:23.072] [ERROR] [MinecraftBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:01:23.074] [ERROR] [MinecraftBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:03:16.798] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:03:16.800] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:03:16.802] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:03:16.802] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:03:16.802] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:03:16.802] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:03:16.803] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:03:16.803] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:03:16.803] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:03:16.803] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:03:16.836] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:03:16.547Z"}
+[2026-05-02 19:03:17.002] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:03:17.017] [ERROR] [MinecraftBot] Ошибка инициализации обработчиков: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+[2026-05-02 19:03:17.017] [ERROR] [MinecraftBot] Error: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js:9:16)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+[2026-05-02 19:03:17.111] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:03:19.014] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:03:19.371] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:03:19.372] [ERROR] [MinecraftBot] Ошибка инициализации обработчиков: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+[2026-05-02 19:03:19.373] [ERROR] [MinecraftBot] Error: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js:9:16)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+[2026-05-02 19:03:19.417] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:03:21.377] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:03:22.011] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:03:24.372] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:03:24.714] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:03:24.716] [ERROR] [MinecraftBot] Ошибка инициализации обработчиков: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+[2026-05-02 19:03:24.716] [ERROR] [MinecraftBot] Error: Cannot find module '../../config'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js:9:16)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+[2026-05-02 19:03:24.777] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:03:26.719] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:03:29.724] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:05:55.132] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:05:55.133] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:05:55.135] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:05:55.135] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:05:55.136] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:05:55.136] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:05:55.136] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:05:55.136] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:05:55.137] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:05:55.137] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:05:55.190] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:05:54.894Z"}
+[2026-05-02 19:05:55.589] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:05:55.600] [ERROR] [MinecraftBot] Ошибка инициализации обработчиков: Cannot find module '../../database'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+[2026-05-02 19:05:55.601] [ERROR] [MinecraftBot] Error: Cannot find module '../../database'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js:10:12)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+[2026-05-02 19:05:55.689] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:05:57.591] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:05:57.962] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:05:57.964] [ERROR] [MinecraftBot] Ошибка инициализации обработчиков: Cannot find module '../../database'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+[2026-05-02 19:05:57.964] [ERROR] [MinecraftBot] Error: Cannot find module '../../database'
+Require stack:
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js
+- C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\property.js:10:12)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+[2026-05-02 19:05:57.980] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:05:59.972] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:06:00.595] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:06:02.967] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:07:08.000] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:07:08.001] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:07:08.003] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:07:08.004] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:07:08.004] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:07:08.005] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:07:08.005] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:07:08.005] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:07:08.006] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:07:08.006] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:07:08.064] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:07:07.750Z"}
+[2026-05-02 19:07:08.463] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:07:08.711] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:07:08.711] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:07:08.711] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:07:08.743] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:07:10.473] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:07:10.764] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:07:10.765] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:07:10.814] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:07:12.768] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:07:13.463] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:07:15.767] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:08:53.828] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:08:53.830] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:08:53.832] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:08:53.832] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:08:53.832] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:08:53.832] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:08:53.833] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:08:53.833] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:08:53.833] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:08:53.833] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:08:53.899] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:08:53.582Z"}
+[2026-05-02 19:08:54.070] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:08:54.330] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:08:54.330] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:08:54.331] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:08:54.367] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:08:56.075] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:08:56.414] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:08:56.414] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:08:56.476] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:08:58.420] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:08:59.070] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:09:01.416] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:25:16.732] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:25:16.734] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:25:16.736] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:25:16.736] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:25:16.736] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:25:16.737] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:25:16.737] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:25:16.737] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:25:16.738] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:25:16.738] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:25:16.761] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:25:16.481Z"}
+[2026-05-02 19:25:16.943] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:25:17.198] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:25:17.199] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:25:17.199] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:25:17.231] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:25:18.950] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:25:19.270] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:25:19.271] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:25:19.297] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:25:21.284] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:25:21.955] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:25:24.274] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:29:53.439] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:29:53.441] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:29:53.442] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:29:53.443] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:29:53.443] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:29:53.443] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:29:53.444] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:29:53.444] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:29:53.444] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:29:53.445] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:29:53.467] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:29:53.200Z"}
+[2026-05-02 19:29:53.656] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:29:53.899] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:29:53.899] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:29:53.900] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:29:53.931] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:29:55.657] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:29:55.998] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:29:55.999] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:29:56.041] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:29:58.009] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:29:58.664] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:30:01.012] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:31:41.487] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:31:41.489] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:31:41.490] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:31:41.491] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:31:41.491] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:31:41.491] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:31:41.492] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:31:41.492] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:31:41.492] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:31:41.493] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:31:41.515] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:31:41.230Z"}
+[2026-05-02 19:31:41.664] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:31:41.909] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:31:41.909] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:31:41.910] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:31:41.941] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:31:43.671] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:31:44.044] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:31:44.045] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:31:44.090] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:31:46.052] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:31:46.679] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:31:49.052] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:34:10.657] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:34:10.658] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:34:10.660] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:34:10.661] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-02 19:34:10.662] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:34:10.662] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-02 19:34:10.662] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-02 19:34:10.663] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-02 19:34:10.663] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-02 19:34:10.664] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-02 19:34:10.719] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-02T16:34:10.413Z"}
+[2026-05-02 19:34:10.859] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:34:11.105] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:34:11.106] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-02 19:34:11.106] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-02 19:34:11.139] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:34:12.876] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:34:13.187] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-02 19:34:13.187] [SUCCESS] [MinecraftBot] Все обработчики инициализированы
+[2026-05-02 19:34:13.233] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-02 19:34:15.190] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-02 19:34:15.862] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 19:34:18.195] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-02 20:34:11.119] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 20:34:11.120] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 20:34:13.195] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 20:34:13.195] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 21:34:11.128] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 21:34:11.129] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 21:34:13.207] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 21:34:13.208] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 22:34:11.132] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 22:34:11.132] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 22:34:13.208] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 22:34:13.209] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 23:34:11.143] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 23:34:11.144] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена
+[2026-05-02 23:34:13.218] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-02 23:34:13.218] [WARN] [MinecraftBot] RegionChecker: бот не подключён, проверка отложена

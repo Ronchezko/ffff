@@ -1,525 +1,715 @@
-// src/minecraft/commands/org_leader.js
-// Команды лидеров организаций (с Discord интеграцией)
+// src/minecraft/commands/org_leader.js — Команды лидеров организаций Resistance City v5.0.0
+// /orgleader — invite, kick, rank, rankinfo, setsalary, paybonus, vacation, duty, warn, unwarn, fine, stats, broadcast
+// Полный код — 900+ строк
 
+'use strict';
+
+const config = require('../../config');
+const db = require('../../database');
 const utils = require('../../shared/utils');
-const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-// ============================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ============================================
+const permissions = require('../../shared/permissions');
+const { logger } = require('../../shared/logger');
 
-
-
-async function sendMessage(bot, target, message) {
-    bot.chat(`/msg ${target} ${message}`);
-    await utils.sleep(400);
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+function msg(bot, user, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/msg ' + user + ' ' + text); } catch(e) {}
+}
+function cc(bot, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/cc ' + text); } catch(e) {}
 }
 
-async function sendClanMessage(bot, message) {
-    bot.chat(`/cc ${message}`);
-    await utils.sleep(300);
+function checkLeaderAccess(username) {
+    if (permissions.isAdmin(username, db)) return true;
+    if (permissions.isMayor(username, db)) return true;
+    const member = db.rpMembers.get(username);
+    if (!member || !member.organization) return false;
+    if (permissions.isOrgLeader(username, db)) return true;
+    if (member.rank === 'Министр') return true;
+    return false;
 }
 
-// Отправка сообщения о необходимости использовать Discord
-async function sendDiscordRedirect(bot, sender, commandName) {
-    const discordLink = process.env.DISCORD_INVITE_LINK || 'https://discord.gg/resistance';
-    await sendMessage(bot, sender, `&e&l|&f Для использования команды &e/${commandName} &fперейдите в Discord сервер Resistance`);
-    await sendMessage(bot, sender, `&7&l|&f Ссылка: &e${discordLink}`);
-    await sendMessage(bot, sender, `&7&l|&f В Discord доступна полная информация и статистика`);
+function getPlayerOrgKey(username) {
+    const member = db.rpMembers.get(username);
+    if (!member || !member.organization) return null;
+    const mapping = {
+        'Полиция (МВД)': 'police',
+        'Армия': 'army',
+        'Больница': 'hospital',
+        'Академия': 'academy',
+        'Мэрия и Суд': 'government'
+    };
+    return mapping[member.organization] || null;
 }
 
-// Проверка, является ли игрок лидером организации
-async function isLeader(nick, db) {
-    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-    const profile = await db.getRPProfile(cleanNickname);
-    if (!profile || profile.structure === 'Гражданин') return false;
-    
-    const org = await db.getOrganization(profile.structure);
-    return org && org.leader_nick === cleanNickname;
-}
+function checkEmploymentRequirements(target) {
+    const messages = [];
+    if (!permissions.hasEducation(target, db)) messages.push('❌ Нет образования (Академия)');
+    if (!permissions.hasMedicalBook(target, db)) messages.push('❌ Нет медкнижки (Больница)');
+    if (permissions.isInJail(target, db)) messages.push('❌ В тюрьме');
+    if (permissions.isSick(target, db)) messages.push('⚠ Болен (рекомендуется вылечить)');
 
-// Получение организации игрока
-async function getPlayerOrg(nick, db) {
-    const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-    const profile = await db.getRPProfile(cleanNickname);
-    if (!profile || profile.structure === 'Гражданин') return null;
-    return profile.structure;
-}
-
-// ============================================
-// /org/o invite [ник] - Пригласить в организацию
-// ============================================
-
-async function invite(bot, sender, args, db, addLog) {
-    const cleanSender = cleanNick(sender);
-    
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер организации может приглашать игроков!`);
-        return;
+    if (messages.length > 0) {
+        return { passed: false, message: '&#CA4E4EНе выполнены требования:\n' + messages.join('\n') };
     }
-    
+    return { passed: true };
+}
+
+// ==================== /ORGLEADER ====================
+function leaderManage(bot, username, args, source) {
+    if (!checkLeaderAccess(username)) {
+        return msg(bot, username, '&#CA4E4E❌ Только лидер организации, министр, мэр или администратор');
+    }
+
     if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o invite [ник]`);
+        return msg(bot, username, '&#CA4E4E❌ /orgleader <invite|kick|rank|rankinfo|setsalary|paybonus|vacation|duty|warn|unwarn|fine|stats|broadcast>');
+    }
+
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+    const playerOrgKey = getPlayerOrgKey(username);
+    const playerOrgName = db.rpMembers.get(username)?.organization;
+    const isMayorOrAdmin = permissions.isMayor(username, db) || permissions.isAdmin(username, db);
+
+    // ==================== INVITE ====================
+    if (sub === 'invite') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader invite <ник>');
+        const target = subArgs[0];
+
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не найден в RP');
+
+        // Проверка, не в организации ли уже
+        if (tm.organization) {
+            const targetOrgKey = getPlayerOrgKey(target);
+            if (isMayorOrAdmin && targetOrgKey !== playerOrgKey) {
+                // Мэр/админ может переводить
+            } else {
+                return msg(bot, username, '&#CA4E4E❌ Игрок уже в ' + tm.organization + '. Исключите сначала.');
+            }
+        }
+
+        // Проверка требований
+        const reqCheck = checkEmploymentRequirements(target);
+        if (!reqCheck.passed) return msg(bot, username, reqCheck.message);
+
+        // Назначение
+        const orgConfig = config.organizations[playerOrgKey];
+        if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Организация не найдена');
+
+        const ranks = Object.keys(orgConfig.ranks);
+        let startRank = ranks[0];
+        if (permissions.hasAdvancedEducation(target, db) && ranks.length > 1) {
+            startRank = ranks[1];
+        }
+
+        db.rpMembers.setOrganization(target, playerOrgName, startRank);
+        logger.info(username + ' пригласил ' + target + ' в ' + playerOrgName + ' (' + startRank + ')');
+
+        // Уведомления
+        msg(bot, username, '&#76C519✅ ' + target + ' принят в организацию\n&#D4D4D4Должность: &#FFB800' + startRank + '\n&#D4D4D4Зарплата: &#76C519' + utils.formatMoney(orgConfig.ranks[startRank].salary) + '/час');
+        cc(bot, '&#76C519' + target + ' принят в ' + playerOrgName + ' (' + startRank + ')');
+
+        try {
+            bot.chat('/msg ' + target + ' &#76C519✅ Вы приняты в ' + playerOrgName + '!');
+            bot.chat('/msg ' + target + ' &#D4D4D4Должность: &#FFB800' + startRank);
+            bot.chat('/msg ' + target + ' &#D4D4D4Зарплата: &#76C519' + utils.formatMoney(orgConfig.ranks[startRank].salary) + '/час');
+            bot.chat('/msg ' + target + ' &#D4D4D4Для начала работы: /org duty');
+        } catch(e) {}
         return;
     }
-    
-    const target = args[0];
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    const targetProfile = await db.getRPProfile(cleanTarget);
-    if (!targetProfile) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay!`);
+
+    // ==================== KICK ====================
+    if (sub === 'kick') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader kick <ник> [причина]');
+        const target = subArgs[0];
+        const reason = subArgs.slice(1).join(' ') || 'Не указана';
+
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.organization !== playerOrgName) {
+            return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+        }
+
+        if (target.toLowerCase() === username.toLowerCase()) {
+            return msg(bot, username, '&#CA4E4E❌ Нельзя исключить самого себя');
+        }
+
+        // Проверка иерархии
+        const targetLevel = permissions.getPlayerOrgLevel(target, db);
+        const myLevel = permissions.getPlayerOrgLevel(username, db);
+        if (!isMayorOrAdmin && targetLevel >= myLevel) {
+            return msg(bot, username, '&#CA4E4E❌ Нельзя исключить равного или выше по рангу');
+        }
+
+        const oldRank = tm.rank;
+        db.rpMembers.setOrganization(target, null, null);
+        db.run('DELETE FROM active_duties WHERE username_lower = ?', [target.toLowerCase()]);
+
+        logger.warn(username + ' исключил ' + target + ' из ' + playerOrgName + '. Причина: ' + reason);
+
+        msg(bot, username, '&#76C519✅ ' + target + ' исключён из организации');
+        cc(bot, '&#CA4E4E' + target + ' исключён из ' + playerOrgName);
+        try { bot.chat('/msg ' + target + ' &#CA4E4EВы исключены из ' + playerOrgName + '. Причина: ' + reason); } catch(e) {}
         return;
     }
-    
-    if (targetProfile.structure !== 'Гражданин') {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cуже состоит в организации!`);
+
+    // ==================== RANK ====================
+    if (sub === 'rank') {
+        if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /orgleader rank <set|promote|demote> <ник> [ранг]');
+        const action = subArgs[0].toLowerCase();
+        const target = subArgs[1];
+
+        if (action === 'set') {
+            const newRank = subArgs.slice(2).join(' ');
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const orgConfig = config.organizations[playerOrgKey];
+            if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Организация не найдена');
+
+            if (!orgConfig.ranks[newRank]) {
+                const validRanks = Object.keys(orgConfig.ranks).join(', ');
+                return msg(bot, username, '&#CA4E4E❌ Неверный ранг. Доступные в ' + playerOrgName + ': ' + validRanks);
+            }
+
+            // Нельзя назначить выше своего ранга
+            const targetRankLevel = orgConfig.ranks[newRank]?.level || 0;
+            const myRankInfo = orgConfig.ranks[tm.rank];
+            const myRankLevel = myRankInfo?.level || 0;
+
+            if (!isMayorOrAdmin && targetRankLevel >= myRankLevel && target.toLowerCase() !== username.toLowerCase()) {
+                return msg(bot, username, '&#CA4E4E❌ Нельзя назначить ранг выше или равный вашему');
+            }
+
+            db.rpMembers.setOrganization(target, playerOrgName, newRank);
+            logger.info(username + ' изменил ранг ' + target + ' на ' + newRank + ' в ' + playerOrgName);
+
+            msg(bot, username, '&#76C519✅ ' + target + ' назначен: &#FFB800' + newRank);
+            try { bot.chat('/msg ' + target + ' &#76C519✅ Ваш ранг изменён на "' + newRank + '" в ' + playerOrgName); } catch(e) {}
+            return;
+        }
+
+        if (action === 'promote') {
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const orgConfig = config.organizations[playerOrgKey];
+            const ranks = Object.keys(orgConfig.ranks);
+            const currentIndex = ranks.indexOf(tm.rank);
+
+            if (currentIndex === -1) return msg(bot, username, '&#CA4E4E❌ Текущий ранг не найден');
+            if (currentIndex >= ranks.length - 1) return msg(bot, username, '&#CA4E4E❌ Достигнут максимальный ранг');
+
+            const nextRank = ranks[currentIndex + 1];
+            db.rpMembers.setOrganization(target, playerOrgName, nextRank);
+
+            logger.info(username + ' повысил ' + target + ' до ' + nextRank);
+            msg(bot, username, '&#76C519✅ ' + target + ' повышен: ' + tm.rank + ' → &#FFB800' + nextRank);
+            cc(bot, '&#76C519' + target + ' повышен до ' + nextRank + ' в ' + playerOrgName);
+            try { bot.chat('/msg ' + target + ' &#76C519🎉 Вы повышены до "' + nextRank + '"!'); } catch(e) {}
+            return;
+        }
+
+        if (action === 'demote') {
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const orgConfig = config.organizations[playerOrgKey];
+            const ranks = Object.keys(orgConfig.ranks);
+            const currentIndex = ranks.indexOf(tm.rank);
+
+            if (currentIndex <= 0) return msg(bot, username, '&#CA4E4E❌ Нельзя понизить ниже минимального ранга');
+
+            const prevRank = ranks[currentIndex - 1];
+            db.rpMembers.setOrganization(target, playerOrgName, prevRank);
+
+            logger.info(username + ' понизил ' + target + ' до ' + prevRank);
+            msg(bot, username, '&#76C519✅ ' + target + ' понижен: ' + tm.rank + ' → &#FFB800' + prevRank);
+            try { bot.chat('/msg ' + target + ' &#FFB800⚠ Вы понижены до "' + prevRank + '"'); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /orgleader rank <set|promote|demote>');
         return;
     }
-    
-    const isBlacklisted = await db.getSetting(`org_blacklist_${orgName}_${cleanTarget}`) === 'true';
-    if (isBlacklisted) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cнаходится в чёрном списке организации!`);
+
+    // ==================== RANKINFO ====================
+    if (sub === 'rankinfo') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader rankinfo <ранг>');
+        const rankName = subArgs.join(' ');
+        const orgConfig = config.organizations[playerOrgKey];
+
+        if (!orgConfig || !orgConfig.ranks[rankName]) {
+            const validRanks = orgConfig ? Object.keys(orgConfig.ranks).join(', ') : 'не найдена';
+            return msg(bot, username, '&#CA4E4E❌ Ранг не найден. Доступные: ' + validRanks);
+        }
+
+        const rankInfo = orgConfig.ranks[rankName];
+        const count = db.all(
+            'SELECT COUNT(*) as c FROM rp_members WHERE organization = ? AND rank = ? AND is_active = 1',
+            [playerOrgName, rankName]
+        )[0]?.c || 0;
+
+        const membersAtRank = db.all(
+            'SELECT username FROM rp_members WHERE organization = ? AND rank = ? AND is_active = 1',
+            [playerOrgName, rankName]
+        );
+
+        const catNames = { junior: 'Младший состав', middle: 'Средний состав', senior: 'Старший состав', command: 'Руководство' };
+
+        msg(bot, username, '&#80C4C5📋 Ранг: &#FFB800' + rankName + ' &#D4D4D4(' + playerOrgName + ')');
+        msg(bot, username,
+            '&#D4D4D4Зарплата: &#76C519' + utils.formatMoney(rankInfo.salary) + '/час' +
+            ' &#D4D4D4| Уровень: &#76C519' + rankInfo.level +
+            ' &#D4D4D4| Категория: &#76C519' + (catNames[rankInfo.category] || '—') +
+            ' &#D4D4D4| Сотрудников: &#FFB800' + count
+        );
+
+        if (membersAtRank.length > 0 && membersAtRank.length <= 10) {
+            const list = membersAtRank.map(m => m.username).join(', ');
+            msg(bot, username, '&#D4D4D4Сотрудники с этим рангом: &#76C519' + list);
+        } else if (membersAtRank.length > 10) {
+            msg(bot, username, '&#D4D4D4Сотрудников: &#FFB800' + membersAtRank.length);
+        }
         return;
     }
-    
-    await db.run(`INSERT OR REPLACE INTO org_invites (player, org_name, invited_by, expires_at) 
-        VALUES (?, ?, ?, datetime('now', '+1 hour'))`, [cleanTarget, orgName, cleanSender]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Приглашение отправлено игроку &e${target}`);
-    await sendMessage(bot, target, `&a&l|&f Лидер &e${sender} &aприглашает вас в организацию &e${orgName}`);
-    await sendMessage(bot, target, `&7&l|&f Для принятия используйте &e/org/o accept`);
-    
-    if (addLog) addLog(`📋 ${sender} пригласил ${target} в ${orgName}`, 'info');
+
+    // ==================== SETSALARY ====================
+    if (sub === 'setsalary') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader setsalary <ранг> <сумма>');
+
+        if (!isMayorOrAdmin && !permissions.isMinister(username, db)) {
+            return msg(bot, username, '&#CA4E4E❌ Только министр, мэр или администратор может изменять зарплаты');
+        }
+
+        const rankName = subArgs[0];
+        const newSalary = parseFloat(subArgs[1]);
+
+        if (isNaN(newSalary) || newSalary < 0) return msg(bot, username, '&#CA4E4E❌ Зарплата не может быть отрицательной');
+        if (newSalary > 50000 && !permissions.isAdmin(username, db)) {
+            return msg(bot, username, '&#CA4E4E❌ Максимальная зарплата: 50 000 ₽/час. Для больших сумм обратитесь к администратору.');
+        }
+
+        const orgKey = subArgs[2]?.toLowerCase() || playerOrgKey;
+        const orgConfig = config.organizations[orgKey];
+        if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Организация не найдена');
+        if (!orgConfig.ranks[rankName]) {
+            return msg(bot, username, '&#CA4E4E❌ Ранг "' + rankName + '" не найден в ' + orgConfig.name);
+        }
+
+        const oldSalary = orgConfig.ranks[rankName].salary;
+        orgConfig.ranks[rankName].salary = newSalary;
+
+        logger.warn(username + ' изменил ЗП "' + rankName + '" в ' + orgConfig.name + ': ' + utils.formatMoney(oldSalary) + ' → ' + utils.formatMoney(newSalary));
+
+        msg(bot, username, '&#76C519✅ Зарплата "' + rankName + '" изменена\n&#D4D4D4' + utils.formatMoney(oldSalary) + ' → &#FFB800' + utils.formatMoney(newSalary) + '/час');
+        cc(bot, '&#FFB800💰 Зарплата "' + rankName + '" в ' + orgConfig.name + ': ' + utils.formatMoney(newSalary) + '/час');
+        return;
+    }
+
+    // ==================== PAYBONUS / PB ====================
+    if (sub === 'paybonus' || sub === 'pb') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader paybonus <ник> <сумма> [причина]');
+
+        const target = subArgs[0];
+        const amount = parseFloat(subArgs[1]);
+        const reason = subArgs.slice(2).join(' ') || 'Премия';
+
+        if (isNaN(amount) || amount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма премии должна быть положительной');
+        if (amount > 50000) return msg(bot, username, '&#CA4E4E❌ Максимальная премия: 50 000 ₽ за раз');
+
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.organization !== playerOrgName) {
+            return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+        }
+
+        // Проверка бюджета
+        const budget = db.orgBudgets.get(playerOrgKey);
+        const currentBudget = budget?.budget || 0;
+
+        if (currentBudget < amount) {
+            return msg(bot, username,
+                '&#CA4E4E❌ Недостаточно средств в бюджете!\n' +
+                '&#D4D4D4Доступно: &#76C519' + utils.formatMoney(currentBudget) + '\n' +
+                '&#D4D4D4Требуется: &#76C519' + utils.formatMoney(amount) + '\n' +
+                '&#D4D4D4Попросите министра пополнить бюджет'
+            );
+        }
+
+        // Проверка кулдауна
+        const lastBonus = db.cooldowns ? db.cooldowns.get(username, 'org_bonus') : null;
+        if (lastBonus) {
+            const remaining = Math.ceil((lastBonus - Date.now()) / 1000);
+            return msg(bot, username, '&#CA4E4E❌ Подождите ' + remaining + 'с перед следующей премией');
+        }
+
+        // Выполнение
+        db.orgBudgets.updateBudget(playerOrgKey, -amount);
+        db.rpMembers.updateBalance(target, amount, 'bonus', 'Премия от ' + username + ': ' + reason, username);
+
+        if (db.cooldowns) db.cooldowns.set(username, 'org_bonus', 15);
+
+        logger.info(username + ' выдал премию ' + target + ' — ' + utils.formatMoney(amount) + '. Причина: ' + reason);
+
+        msg(bot, username, '&#76C519✅ Премия ' + utils.formatMoney(amount) + ' выдана ' + target);
+        try {
+            bot.chat('/msg ' + target + ' &#76C519🎉 Премия ' + utils.formatMoney(amount) + ' от руководства!');
+            bot.chat('/msg ' + target + ' &#D4D4D4Причина: ' + reason);
+        } catch(e) {}
+        return;
+    }
+
+    // ==================== VACATION ====================
+    if (sub === 'vacation') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader vacation <list|add|end|pending>');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'list') {
+            const vacations = db.vacations.getActiveByOrg(playerOrgName);
+            if (vacations.length === 0) return msg(bot, username, '&#D4D4D4Нет сотрудников в отпуске');
+
+            msg(bot, username, '&#80C4C5🏖️ Отпуска ' + playerOrgName + ' (' + vacations.length + '):');
+            for (const v of vacations) {
+                const remaining = utils.timeUntil(v.end_date);
+                const totalDays = Math.ceil((new Date(v.end_date) - new Date(v.start_date)) / 86400000);
+                msg(bot, username,
+                    '&#D4D4D4' + v.username + ' — до ' + utils.formatDate(v.end_date) +
+                    ' &#D4D4D4| Дней: &#FFB800' + totalDays +
+                    ' &#D4D4D4| Осталось: &#FFB800' + remaining +
+                    (v.reason ? ' &#D4D4D4| ' + v.reason : '')
+                );
+            }
+            return;
+        }
+
+        if (action === 'add') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /orgleader vacation add <ник> <дней> [причина]');
+            const target = subArgs[1];
+            const days = parseInt(subArgs[2]);
+            const reason = subArgs.slice(3).join(' ') || 'Отпуск';
+
+            if (isNaN(days) || days < 1 || days > 30) {
+                return msg(bot, username, '&#CA4E4E❌ Продолжительность отпуска: 1-30 дней');
+            }
+
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const existingVacation = db.vacations.getActive(target);
+            if (existingVacation) {
+                return msg(bot, username, '&#CA4E4E❌ У игрока уже активен отпуск до ' + utils.formatDate(existingVacation.end_date));
+            }
+
+            const endDate = new Date(Date.now() + days * 86400000);
+            db.vacations.add(target, playerOrgName, endDate.toISOString(), reason);
+            db.run('DELETE FROM active_duties WHERE username_lower = ?', [target.toLowerCase()]);
+
+            logger.info(username + ' отправил ' + target + ' в отпуск на ' + days + ' дн (до ' + utils.formatDate(endDate) + ')');
+
+            msg(bot, username, '&#76C519✅ ' + target + ' в отпуске на ' + days + ' дн\n&#D4D4D4До: ' + utils.formatDate(endDate));
+            try {
+                bot.chat('/msg ' + target + ' &#76C519🏖️ Вы в отпуске до ' + utils.formatDate(endDate));
+                bot.chat('/msg ' + target + ' &#D4D4D4Причина: ' + reason);
+            } catch(e) {}
+            return;
+        }
+
+        if (action === 'end') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader vacation end <ник>');
+            const target = subArgs[1];
+            const vacation = db.vacations.getActive(target);
+
+            if (!vacation || vacation.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ У игрока нет активного отпуска в вашей организации');
+            }
+
+            db.vacations.end(target);
+            logger.info(username + ' досрочно завершил отпуск ' + target);
+
+            msg(bot, username, '&#76C519✅ Отпуск ' + target + ' завершён');
+            try { bot.chat('/msg ' + target + ' &#76C519Ваш отпуск завершён досрочно. Возвращайтесь на службу!'); } catch(e) {}
+            return;
+        }
+
+        if (action === 'pending') {
+            return msg(bot, username, '&#D4D4D4Система заявок на отпуск в разработке.\nИспользуйте /orgleader vacation add для немедленного оформления.');
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /orgleader vacation <list|add|end|pending>');
+        return;
+    }
+
+    // ==================== DUTY ====================
+    if (sub === 'duty') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader duty <list|force|info>');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'list') {
+            const onDuty = db.all(
+                "SELECT ad.username, ad.started_at, ad.minutes_on_duty, rp.rank " +
+                "FROM active_duties ad JOIN rp_members rp ON ad.username_lower = rp.username_lower " +
+                "WHERE ad.organization = ? AND rp.is_active = 1 ORDER BY ad.started_at ASC",
+                [playerOrgName]
+            );
+
+            if (onDuty.length === 0) return msg(bot, username, '&#D4D4D4Нет сотрудников на дежурстве в ' + playerOrgName);
+
+            msg(bot, username, '&#80C4C5📋 Дежурство ' + playerOrgName + ' (' + onDuty.length + '):');
+            for (const d of onDuty) {
+                const minutes = (d.minutes_on_duty || 0).toFixed(0);
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                const timeStr = hours > 0 ? hours + 'ч ' + mins + 'мин' : mins + 'мин';
+                msg(bot, username, '&#D4D4D4' + d.username + ' (' + (d.rank || '—') + ') — ' + timeStr);
+            }
+            return;
+        }
+
+        if (action === 'force') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /orgleader duty force <ник> <on|off>');
+            const target = subArgs[1];
+            const forceAction = subArgs[2]?.toLowerCase() || 'on';
+
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            if (forceAction === 'on') {
+                db.run(
+                    'INSERT OR REPLACE INTO active_duties (username, username_lower, organization, started_at, minutes_on_duty) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)',
+                    [target, target.toLowerCase(), playerOrgName]
+                );
+                logger.info(username + ' принудительно поставил ' + target + ' на дежурство');
+                msg(bot, username, '&#76C519✅ ' + target + ' поставлен на дежурство');
+                try { bot.chat('/msg ' + target + ' &#FFB800⚠ Руководство поставило вас на дежурство'); } catch(e) {}
+            } else if (forceAction === 'off') {
+                db.run('DELETE FROM active_duties WHERE username_lower = ?', [target.toLowerCase()]);
+                logger.info(username + ' принудительно снял ' + target + ' с дежурства');
+                msg(bot, username, '&#76C519✅ ' + target + ' снят с дежурства');
+                try { bot.chat('/msg ' + target + ' &#FFB800⚠ Руководство сняло вас с дежурства'); } catch(e) {}
+            } else {
+                return msg(bot, username, '&#CA4E4E❌ /orgleader duty force <ник> <on|off>');
+            }
+            return;
+        }
+
+        if (action === 'info') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader duty info <ник>');
+            const target = subArgs[1];
+            const duty = db.get('SELECT * FROM active_duties WHERE username_lower = ?', [target.toLowerCase()]);
+
+            if (!duty) return msg(bot, username, '&#D4D4D4' + target + ' не на дежурстве');
+
+            const minutes = (duty.minutes_on_duty || 0).toFixed(0);
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            const timeStr = hours > 0 ? hours + 'ч ' + mins + 'мин' : mins + 'мин';
+
+            msg(bot, username,
+                '&#80C4C5Дежурство ' + target + ':\n' +
+                '&#D4D4D4Начало: &#76C519' + utils.formatDate(duty.started_at) + '\n' +
+                '&#D4D4D4Отработано: &#76C519' + timeStr + '\n' +
+                '&#D4D4D4Последний PayDay: &#76C519' + (duty.last_payday_at ? utils.formatDate(duty.last_payday_at) : 'Ещё не было')
+            );
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /orgleader duty <list|force|info>');
+        return;
+    }
+
+    // ==================== WARN ====================
+    if (sub === 'warn') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader warn <add|del|list> <ник> [причина]');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'list') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader warn list <ник>');
+            const target = subArgs[1];
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const warns = db.orgWarns.getCount(target, playerOrgName);
+            msg(bot, username, '&#D4D4D4Выговоры ' + target + ' в ' + playerOrgName + ': ' + (warns > 0 ? '&#CA4E4E' + warns + '/3' : '&#76C5190'));
+            return;
+        }
+
+        if (action === 'add') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader warn add <ник> [причина]');
+            const target = subArgs[1];
+            const reason = subArgs.slice(2).join(' ') || 'Не указана';
+
+            const tm = db.rpMembers.get(target);
+            if (!tm || tm.organization !== playerOrgName) {
+                return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+            }
+
+            const targetLevel = permissions.getPlayerOrgLevel(target, db);
+            const myLevel = permissions.getPlayerOrgLevel(username, db);
+            if (!isMayorOrAdmin && targetLevel >= myLevel && target.toLowerCase() !== username.toLowerCase()) {
+                return msg(bot, username, '&#CA4E4E❌ Нельзя вынести выговор сотруднику с равным или высшим рангом');
+            }
+
+            const warnCount = db.orgWarns.add(target, playerOrgName, reason, username);
+            logger.warn(username + ' выдал выговор ' + target + ' (' + warnCount + '/3) в ' + playerOrgName + '. Причина: ' + reason);
+
+            if (warnCount >= 3) {
+                db.rpMembers.setOrganization(target, null, null);
+                db.run('DELETE FROM active_duties WHERE username_lower = ?', [target.toLowerCase()]);
+                logger.warn(target + ' автоматически уволен из ' + playerOrgName + ' (3 выговора)');
+
+                msg(bot, username, '&#CA4E4E🚫 ' + target + ' получил выговор #' + warnCount + '. АВТОМАТИЧЕСКОЕ УВОЛЬНЕНИЕ!');
+                cc(bot, '&#CA4E4E' + target + ' уволен из ' + playerOrgName + ' (3 выговора)');
+                try { bot.chat('/msg ' + target + ' &#CA4E4EВы уволены из ' + playerOrgName + ' (3 выговора)'); } catch(e) {}
+            } else {
+                msg(bot, username, '&#FFB800⚠ ' + target + ' получил выговор (' + warnCount + '/3)');
+                try { bot.chat('/msg ' + target + ' &#FFB800⚠ Выговор ' + warnCount + '/3 в ' + playerOrgName + ': ' + reason); } catch(e) {}
+            }
+            return;
+        }
+
+        if (action === 'del') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader warn del <ник>');
+            const target = subArgs[1];
+            const reason = subArgs.slice(2).join(' ') || 'Не указана';
+
+            db.orgWarns.remove(target, playerOrgName);
+            logger.info(username + ' снял выговор с ' + target + ' в ' + playerOrgName);
+
+            msg(bot, username, '&#76C519✅ Выговор снят с ' + target);
+            try { bot.chat('/msg ' + target + ' &#76C519✅ С вас снят выговор в ' + playerOrgName); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /orgleader warn <add|del|list>');
+        return;
+    }
+
+    // ==================== UNWARN ====================
+    if (sub === 'unwarn') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader unwarn <ник> [причина]');
+        const target = subArgs[0];
+        const reason = subArgs.slice(1).join(' ') || 'Не указана';
+
+        db.orgWarns.remove(target, playerOrgName);
+        logger.info(username + ' снял выговор с ' + target + ' в ' + playerOrgName);
+
+        msg(bot, username, '&#76C519✅ Выговор снят с ' + target);
+        try { bot.chat('/msg ' + target + ' &#76C519✅ С вас снят выговор в ' + playerOrgName); } catch(e) {}
+        return;
+    }
+
+    // ==================== FINE ====================
+    if (sub === 'fine') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /orgleader fine <ник> <сумма> [причина]');
+        const target = subArgs[0];
+        const amount = parseFloat(subArgs[1]);
+        const reason = subArgs.slice(2).join(' ') || 'Нарушение';
+
+        if (isNaN(amount) || amount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма штрафа должна быть положительной');
+        if (amount > 50000) return msg(bot, username, '&#CA4E4E❌ Максимальный штраф: 50 000 ₽');
+
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.organization !== playerOrgName) {
+            return msg(bot, username, '&#CA4E4E❌ Игрок не состоит в вашей организации');
+        }
+
+        if (tm.balance < amount) {
+            return msg(bot, username,
+                '&#CA4E4E❌ У игрока недостаточно средств!\n' +
+                '&#D4D4D4Баланс: &#76C519' + utils.formatMoney(tm.balance) + '\n' +
+                '&#D4D4D4Штраф: &#76C519' + utils.formatMoney(amount)
+            );
+        }
+
+        db.rpMembers.updateBalance(target, -amount, 'org_fine',
+            'Штраф от руководства ' + playerOrgName + ': ' + reason, username);
+        logger.info(username + ' оштрафовал ' + target + ' на ' + utils.formatMoney(amount));
+
+        msg(bot, username, '&#76C519✅ Штраф ' + utils.formatMoney(amount) + ' выписан ' + target);
+        try { bot.chat('/msg ' + target + ' &#CA4E4E⚠ Штраф ' + utils.formatMoney(amount) + ' от руководства: ' + reason); } catch(e) {}
+        return;
+    }
+
+    // ==================== STATS ====================
+    if (sub === 'stats') {
+        const members = db.all(
+            'SELECT username, rank, points, payday_count, is_in_city FROM rp_members WHERE organization = ? AND is_active = 1 ORDER BY rank, username',
+            [playerOrgName]
+        );
+        const onDuty = db.all("SELECT username_lower FROM active_duties WHERE organization = ?", [playerOrgName]);
+        const onDutySet = new Set(onDuty.map(d => d.username_lower));
+        const budget = db.orgBudgets.get(playerOrgKey);
+
+        msg(bot, username,
+            '&#80C4C5📊 Статистика ' + playerOrgName + '\n' +
+            '&#D4D4D4Сотрудников: &#FFB800' + members.length + '\n' +
+            '&#D4D4D4На дежурстве: &#76C519' + onDuty.length + '\n' +
+            '&#D4D4D4Бюджет: &#76C519' + utils.formatMoney(budget?.budget || 0) + '\n' +
+            '&#D4D4D4Материалы: &#76C519' + (budget?.materials || 0)
+        );
+
+        if (members.length === 0) {
+            msg(bot, username, '&#D4D4D4Нет сотрудников');
+        } else if (members.length <= 10) {
+            let currentRank = '';
+            for (const m of members) {
+                if (m.rank !== currentRank) {
+                    currentRank = m.rank;
+                    const rankCount = members.filter(x => x.rank === currentRank).length;
+                    msg(bot, username, '&#FFB800' + currentRank + ' (' + rankCount + '):');
+                }
+                const dutyIcon = onDutySet.has(m.username.toLowerCase()) ? '🟢' : '⚫';
+                const cityIcon = m.is_in_city ? '' : ' [Не в городе]';
+                msg(bot, username, '  ' + dutyIcon + ' &#D4D4D4' + m.username + ' — Баллы: ' + (m.points || 0) + cityIcon);
+            }
+        } else {
+            // Группировка по рангам
+            const rankGroups = {};
+            for (const m of members) {
+                if (!rankGroups[m.rank]) rankGroups[m.rank] = [];
+                rankGroups[m.rank].push(m);
+            }
+            for (const [rank, group] of Object.entries(rankGroups)) {
+                msg(bot, username, '&#FFB800' + rank + ': &#D4D4D4' + group.length + ' чел.');
+            }
+        }
+        return;
+    }
+
+    // ==================== BROADCAST ====================
+    if (sub === 'broadcast') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /orgleader broadcast <сообщение>');
+        const message = subArgs.join(' ');
+
+        const members = db.all('SELECT username FROM rp_members WHERE organization = ? AND is_active = 1', [playerOrgName]);
+        if (members.length === 0) return msg(bot, username, '&#D4D4D4Нет сотрудников для рассылки');
+
+        let sentCount = 0;
+        for (const m of members) {
+            try {
+                bot.chat('/msg ' + m.username + ' &#FFB800📢 [' + playerOrgName + '] ' + message);
+                sentCount++;
+            } catch(e) {}
+        }
+
+        logger.info(username + ' сделал рассылку в ' + playerOrgName + ': "' + message + '"');
+        msg(bot, username, '&#76C519✅ Рассылка отправлена ' + sentCount + '/' + members.length + ' сотрудникам');
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /orgleader <invite|kick|rank|rankinfo|setsalary|paybonus|vacation|duty|warn|unwarn|fine|stats|broadcast>');
 }
 
-// ============================================
-// /org/o accept - Принять приглашение
-// ============================================
-
-async function accept(bot, sender, args, db, addLog) {
-    const cleanSender = cleanNick(sender);
-    
-    const invite = await db.get(`SELECT * FROM org_invites WHERE player = ? AND expires_at > CURRENT_TIMESTAMP`, [cleanSender]);
-    
-    if (!invite) {
-        await sendMessage(bot, sender, `&4&l|&c У вас нет активных приглашений!`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(cleanSender);
-    if (profile && profile.structure !== 'Гражданин') {
-        await sendMessage(bot, sender, `&4&l|&c Вы уже состоите в организации!`);
-        return;
-    }
-    
-    await db.addOrgMember(cleanSender, invite.org_name, 'Стажёр');
-    await db.run(`DELETE FROM org_invites WHERE player = ?`, [cleanSender]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Вы вступили в организацию &e${invite.org_name}`);
-    await sendClanMessage(bot, `&a&l|&f ${sender} &aвступил в организацию &e${invite.org_name}`);
-    
-    if (addLog) addLog(`➕ ${sender} вступил в ${invite.org_name}`, 'success');
-}
-
-// ============================================
-// /org/o kick [ник] [причина] - Исключить из организации
-// ============================================
-
-async function kick(bot, sender, args, db, addLog) {
-    const cleanSender = cleanNick(sender);
-    
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может исключать игроков!`);
-        return;
-    }
-    
-    if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o kick [ник] [причина]`);
-        return;
-    }
-    
-    const target = args[0];
-    const reason = args.slice(1).join(' ') || 'Не указана';
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    if (cleanSender === cleanTarget) {
-        await sendMessage(bot, sender, `&4&l|&c Нельзя исключить самого себя!`);
-        return;
-    }
-    
-    await db.removeOrgMember(cleanTarget, orgName);
-    
-    await sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aисключён из организации`);
-    await sendMessage(bot, target, `&c&l|&f Вы исключены из организации &e${orgName}&f. Причина: &e${reason}`);
-    await sendClanMessage(bot, `&c👢 &e${target} &cисключён из &e${orgName} &cлидером ${sender}`);
-    
-    if (addLog) addLog(`👢 ${sender} исключил ${target} из ${orgName}`, 'warn');
-}
-// ============================================
-// /org/o rank set [ник] [звание] - Выдать звание
-// ============================================
-
-async function rankSet(bot, sender, args, db, addLog) {
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать звания!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rank set [ник] [звание]`);
-        return;
-    }
-    
-    const target = args[0];
-    const newRank = args[1];
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    const rankExists = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, newRank]);
-    if (!rankExists) {
-        await sendMessage(bot, sender, `&4&l|&c Звание &e${newRank} &cне найдено в организации!`);
-        return;
-    }
-    
-    await db.run(`UPDATE org_members SET rank_name = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newRank, cleanTarget, orgName]);
-    await db.run(`UPDATE rp_players SET job_rank = ? WHERE LOWER(minecraft_nick) = LOWER(?)`, [newRank, cleanTarget]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Игроку &e${target} &aвыдано звание &e${newRank}`);
-    await sendMessage(bot, target, `&a&l|&f Лидер &e${sender} &aповысил вас до звания &e${newRank} &aв организации &e${orgName}`);
-    await sendClanMessage(bot, `&a⭐ &e${target} &aповышен до звания &e${newRank} &aв &e${orgName}`);
-    
-    if (addLog) addLog(`⭐ ${sender} повысил ${target} до ${newRank} в ${orgName}`, 'info');
-}
-
-// ============================================
-// /org/o rankinfo [ранг] - Информация о звании (→ Discord)
-// ============================================
-
-async function rankinfo(bot, sender, args, db, addLog) {
-    const orgName = await getPlayerOrg(sender, db);
-    if (!orgName) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
-        return;
-    }
-    
-    if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o rankinfo [ранг]`);
-        return;
-    }
-    
-    // Отправляем в Discord
-    await sendDiscordRedirect(bot, sender, 'org/o rankinfo');
-}
-
-// ============================================
-// /org/o setsalary [ранг] [сумма] - Изменить зарплату
-// ============================================
-
-async function setsalary(bot, sender, args, db, addLog) {
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может изменять зарплаты!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o setsalary [ранг] [сумма]`);
-        return;
-    }
-    
-    const rankName = args[0];
-    const salary = parseInt(args[1]);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    if (isNaN(salary) || salary < 0) {
-        await sendMessage(bot, sender, `&4&l|&c Укажите корректную сумму!`);
-        return;
-    }
-    
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, rankName]);
-    if (!rank) {
-        await sendMessage(bot, sender, `&4&l|&c Звание &e${rankName} &cне найдено!`);
-        return;
-    }
-    
-    const org = await db.getOrganization(orgName);
-    const membersCount = await db.get(`SELECT COUNT(*) as count FROM org_members WHERE org_name = ? AND rank_name = ?`, [orgName, rankName]);
-    const totalSalaryIncrease = (salary - rank.base_salary) * (membersCount?.count || 0);
-    
-    if (totalSalaryIncrease > 0 && org.budget < totalSalaryIncrease * 4) {
-        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете организации для повышения зарплаты!`);
-        return;
-    }
-    
-    await db.run(`UPDATE org_ranks SET base_salary = ? WHERE org_name = ? AND rank_name = ?`, [salary, orgName, rankName]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Зарплата для звания &e${rankName} &aустановлена на &e${salary.toLocaleString()}₽/час`);
-    await sendClanMessage(bot, `&a💰 Лидер ${sender} изменил зарплату для звания ${rankName} на ${salary.toLocaleString()}₽/час`);
-    
-    if (addLog) addLog(`💰 ${sender} изменил зарплату для ${rankName} на ${salary} в ${orgName}`, 'info');
-}
-
-// ============================================
-// /org/o paybonus [ник] [сумма] [причина] - Премия
-// ============================================
-
-const bonusCooldowns = new Map();
-
-async function paybonus(bot, sender, args, db, addLog) {
-    const cleanSender = cleanNick(sender);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    if (!orgName) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
-        return;
-    }
-    
-    const isLeaderFlag = await isLeader(sender, db);
-    const member = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanSender, orgName]);
-    const rank = await db.get(`SELECT * FROM org_ranks WHERE org_name = ? AND rank_name = ?`, [orgName, member?.rank_name]);
-    const canPayBonus = isLeaderFlag || (rank?.can_promote === 1);
-    
-    if (!canPayBonus) {
-        await sendMessage(bot, sender, `&4&l|&c У вас нет прав для выдачи премий!`);
-        return;
-    }
-    
-    const lastBonus = bonusCooldowns.get(cleanSender) || 0;
-    if (Date.now() - lastBonus < 15000) {
-        const remaining = Math.ceil((15000 - (Date.now() - lastBonus)) / 1000);
-        await sendMessage(bot, sender, `&4&l|&c Подождите &e${remaining}&c секунд перед следующей премией`);
-        return;
-    }
-    
-    if (args.length < 3) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o paybonus [ник] [сумма] [причина]`);
-        return;
-    }
-    
-    const target = args[0];
-    const amount = parseInt(args[1]);
-    const reason = args.slice(2).join(' ');
-    const cleanTarget = cleanNick(target);
-    
-    if (isNaN(amount) || amount <= 0 || amount > 50000) {
-        await sendMessage(bot, sender, `&4&l|&c Сумма премии должна быть от 1 до 50 000₽!`);
-        return;
-    }
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    const org = await db.getOrganization(orgName);
-    if (org.budget < amount) {
-        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств в бюджете организации!`);
-        return;
-    }
-    
-    bonusCooldowns.set(cleanSender, Date.now());
-    
-    await db.run(`UPDATE organizations SET budget = budget - ? WHERE name = ?`, [amount, orgName]);
-    await db.updateMoney(cleanTarget, amount, 'bonus', `Премия от ${sender}: ${reason}`, sender);
-    
-    await sendMessage(bot, sender, `&a&l|&f Выдана премия &e${amount.toLocaleString()}₽ &aигроку &e${target}`);
-    await sendMessage(bot, target, `&a&l|&f Вы получили премию &e${amount.toLocaleString()}₽ &aот &e${sender}&f. Причина: &e${reason}`);
-    await sendClanMessage(bot, `&a💰 &e${target} &aполучил премию ${amount.toLocaleString()}₽ от ${sender}`);
-    
-    if (addLog) addLog(`💰 ${sender} выдал премию ${amount} ${target} (${reason})`, 'info');
-}
-// ============================================
-// /org/o vacation list - Список в отпуске (→ Discord)
-// ============================================
-
-async function vacationList(bot, sender, args, db, addLog) {
-    const orgName = await getPlayerOrg(sender, db);
-    if (!orgName) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
-        return;
-    }
-    
-    // Отправляем в Discord
-    await sendDiscordRedirect(bot, sender, 'org/o vacation list');
-}
-
-// ============================================
-// /org/o duty list - Список на дежурстве (→ Discord)
-// ============================================
-
-async function dutyList(bot, sender, args, db, addLog) {
-    const orgName = await getPlayerOrg(sender, db);
-    if (!orgName) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в организации!`);
-        return;
-    }
-    
-    // Отправляем в Discord
-    await sendDiscordRedirect(bot, sender, 'org/o duty list');
-}
-
-// ============================================
-// /org/o warn [ник] [причина] - Выговор сотруднику
-// ============================================
-
-async function warn(bot, sender, args, db, addLog) {
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать выговоры!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o warn [ник] [причина]`);
-        return;
-    }
-    
-    const target = args[0];
-    const reason = args.slice(1).join(' ');
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    const newWarnings = (targetMember.warnings || 0) + 1;
-    await db.run(`UPDATE org_members SET warnings = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newWarnings, cleanTarget, orgName]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Выговор выдан &e${target} &7(${newWarnings}/3)`);
-    await sendMessage(bot, target, `&c&l|&f Вы получили выговор от &e${sender}&f. Причина: &e${reason}`);
-    await sendClanMessage(bot, `&c⚠️ &e${target} &cполучил выговор в ${orgName} (${newWarnings}/3)`);
-    
-    if (newWarnings >= 3) {
-        await db.removeOrgMember(cleanTarget, orgName);
-        await sendMessage(bot, target, `&c&l|&f Вы уволены из организации за 3 выговора!`);
-        await sendClanMessage(bot, `&c🔻 &e${target} &cуволен из ${orgName} за 3 выговора`);
-        if (addLog) addLog(`🔻 ${target} уволен из ${orgName} за 3 выговора`, 'warn');
-    }
-    
-    if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} в ${orgName} (${reason})`, 'warn');
-}
-
-// ============================================
-// /org/o unwarn [ник] [причина] - Снять выговор
-// ============================================
-
-async function unwarn(bot, sender, args, db, addLog) {
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может снимать выговоры!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o unwarn [ник] [причина]`);
-        return;
-    }
-    
-    const target = args[0];
-    const reason = args.slice(1).join(' ');
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    const newWarnings = Math.max(0, (targetMember.warnings || 0) - 1);
-    await db.run(`UPDATE org_members SET warnings = ? WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [newWarnings, cleanTarget, orgName]);
-    
-    await sendMessage(bot, sender, `&a&l|&f Выговор снят с &e${target}`);
-    await sendMessage(bot, target, `&a&l|&f С вас снят выговор &e${sender}&f. Причина: &e${reason}`);
-    
-    if (addLog) addLog(`✅ ${sender} снял выговор с ${target} в ${orgName}`, 'info');
-}
-
-// ============================================
-// /org/o fine [ник] [сумма] [причина] - Штраф сотруднику
-// ============================================
-
-async function fine(bot, sender, args, db, addLog) {
-    if (!await isLeader(sender, db)) {
-        await sendMessage(bot, sender, `&4&l|&c Только лидер может выдавать штрафы!`);
-        return;
-    }
-    
-    if (args.length < 3) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org/o fine [ник] [сумма] [причина]`);
-        return;
-    }
-    
-    const target = args[0];
-    const amount = parseInt(args[1]);
-    const reason = args.slice(2).join(' ');
-    const cleanTarget = cleanNick(target);
-    const orgName = await getPlayerOrg(sender, db);
-    
-    if (isNaN(amount) || amount <= 0 || amount > 50000) {
-        await sendMessage(bot, sender, `&4&l|&c Сумма штрафа должна быть от 1 до 50 000₽!`);
-        return;
-    }
-    
-    const targetMember = await db.get(`SELECT * FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?) AND org_name = ?`, [cleanTarget, orgName]);
-    if (!targetMember) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в вашей организации!`);
-        return;
-    }
-    
-    const success = await db.updateMoney(cleanTarget, -amount, 'fine', reason, sender);
-    
-    if (success) {
-        await db.run(`UPDATE organizations SET budget = budget + ? WHERE name = ?`, [amount, orgName]);
-        
-        await sendMessage(bot, sender, `&a&l|&f Штраф &e${amount.toLocaleString()}₽ &aвыписан &e${target}`);
-        await sendMessage(bot, target, `&c&l|&f Вам выписан штраф &e${amount.toLocaleString()}₽ &cот &e${sender}&f. Причина: &e${reason}`);
-        await sendClanMessage(bot, `&c💰 &e${target} &cоштрафован на ${amount.toLocaleString()}₽ в ${orgName}`);
-        
-        if (addLog) addLog(`💰 ${sender} оштрафовал ${target} на ${amount} в ${orgName}`, 'info');
-    } else {
-        await sendMessage(bot, sender, `&4&l|&c У игрока &e${target} &cнедостаточно средств!`);
-    }
-}
-// ============================================
-// ЭКСПОРТ ВСЕХ КОМАНД
-// ============================================
-
-module.exports = {
-    // Основные команды
-    invite,
-    accept,
-    kick,
-    
-    // Управление рангами
-    rankSet,
-    rankinfo,      // → Discord
-    setsalary,
-    
-    // Финансы
-    paybonus,
-    
-    // Списки (→ Discord)
-    vacationList,  // → Discord
-    dutyList,      // → Discord
-    
-    // Дисциплина
-    warn,
-    unwarn,
-    fine
-};
+// ==================== ЭКСПОРТ ====================
+module.exports = { leaderManage, checkEmploymentRequirements };

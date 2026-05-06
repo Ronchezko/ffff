@@ -1,1 +1,39 @@
-<link rel="icon" type="image/png" href="/images/logo.jpg">
+<nav class="navbar">
+    <a href="/" class="logo"><%= typeof clanName !== 'undefined' ? clanName : 'Resistance' %></a>
+    <div class="nav-links" id="navLinks">
+        <a href="/" class="<%= typeof page !== 'undefined' && page === 'home' ? 'active' : '' %>">🏠 Главная</a>
+        <a href="/top" class="<%= typeof page !== 'undefined' && page === 'top' ? 'active' : '' %>">🏆 Топ</a>
+        <a href="/career" class="<%= typeof page !== 'undefined' && page === 'career' ? 'active' : '' %>">🏛️ Карьера</a>
+        <a href="/properties" class="<%= typeof page !== 'undefined' && page === 'properties' ? 'active' : '' %>">🏠 Недвижимость</a>
+        <% if (typeof locals !== 'undefined' && locals && locals.isAuthenticated) { %>
+            <a href="/admin/dashboard" class="<%= typeof page !== 'undefined' && page === 'dashboard' ? 'active' : '' %>">⚙️ Админ</a>
+        <% } %>
+        <button data-theme-toggle class="btn btn-sm btn-outline" style="margin-left: 8px;" title="Сменить тему">🌙</button>
+    </div>
+    <button class="btn btn-sm btn-outline mobile-menu-btn" onclick="document.getElementById('navLinks').classList.toggle('open')" style="display: none;">
+        ☰
+    </button>
+</nav>
+
+<style>
+    @media (max-width: 768px) {
+        .navbar .nav-links {
+            display: none;
+            flex-direction: column;
+            position: absolute;
+            top: 64px;
+            left: 0;
+            right: 0;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 16px;
+            z-index: 999;
+        }
+        .navbar .nav-links.open {
+            display: flex;
+        }
+        .mobile-menu-btn {
+            display: block !important;
+        }
+    }
+</style>

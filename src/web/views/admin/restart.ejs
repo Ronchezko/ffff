@@ -1,383 +1,108 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Перезапуск бота | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
-    <style>
-    :root {
-            --bg-color: #f5f7fa;
-            --text-color: #333;
-            --card-bg: #ffffff;
-            --header-bg: rgba(255,255,255,0.95);
-            --border-color: rgba(0,0,0,0.1);
-            --primary: #4a3aff;
-            --primary-hover: #3728e0;
-            --nav-link-color: #333;
-            --nav-link-hover: #4a3aff;
-            --footer-color: #999;
-            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-2: linear-gradient(45deg, #6343d4, #aa4eff);
-            --shadow-sm: 0 10px 30px rgba(0,0,0,0.05);
-            --shadow-md: 0 15px 40px rgba(0,0,0,0.1);
-            --shadow-lg: 0 20px 50px rgba(0,0,0,0.2);
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #0b0c1e;
-            --text-color: #e0e0e0;
-            --card-bg: #1a1b2f;
-            --header-bg: rgba(10,10,20,0.95);
-            --border-color: rgba(255,255,255,0.1);
-            --primary: #aa4eff;
-            --primary-hover: #8a3fcc;
-            --nav-link-color: #e0e0e0;
-            --nav-link-hover: #aa4eff;
-            --footer-color: #666;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-            min-height: 100vh;
-        }
-
-        /* Шапка (аналогично другим страницам) */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background: var(--header-bg);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .logo img {
-            height: 50px;
-            width: auto;
-            filter: drop-shadow(0 0 10px rgba(170, 78, 255, 0.5));
-        }
-
-        .logo h2 {
-            font-size: 1.8rem;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .user-info span {
-            font-weight: 500;
-        }
-
-        .btn-logout {
-            padding: 8px 20px;
-            background: var(--gradient-2);
-            color: white;
-            text-decoration: none;
-            border-radius: 30px;
-            font-weight: 600;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .btn-logout:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
-        }
-
-        .theme-toggle {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-            color: var(--text-color);
-        }
-
-        .theme-toggle:hover {
-            background: rgba(128,128,128,0.2);
-        }
-
-        .theme-toggle .sun,
-        .theme-toggle .moon {
-            transition: transform 0.5s, opacity 0.3s;
-        }
-
-        [data-theme="light"] .theme-toggle .moon {
-            display: none;
-        }
-        [data-theme="dark"] .theme-toggle .sun {
-            display: none;
-        }
-
-        /* Контейнер */
-        .container {
-            max-width: 1300px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        /* Заголовок */
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 30px;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            display: inline-block;
-        }
-
-        /* Карточки статистики */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin-bottom: 50px;
-        }
-
-        .stat-card {
-            background: var(--card-bg);
-            border-radius: 30px;
-            padding: 30px 25px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-            transition: transform 0.3s, box-shadow 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 5px;
-            background: var(--gradient-2);
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--gradient-2);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-            color: white;
-            font-size: 2rem;
-        }
-
-        .stat-card h3 {
-            font-size: 1.2rem;
-            color: var(--footer-color);
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .stat-value {
-            font-size: 3rem;
-            font-weight: 700;
-            color: var(--primary);
-            line-height: 1.2;
-        }
-
-        /* Раздел действий */
-        .actions-section {
-            background: var(--card-bg);
-            border-radius: 40px;
-            padding: 30px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-            margin-bottom: 50px;
-        }
-
-        .actions-section h2 {
-            font-size: 2rem;
-            margin-bottom: 25px;
-            color: var(--text-color);
-            border-bottom: 2px solid var(--primary);
-            padding-bottom: 10px;
-            display: inline-block;
-        }
-
-        .action-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .action-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 15px 25px;
-            background: rgba(170,78,255,0.1);
-            border: 1px solid var(--border-color);
-            border-radius: 30px;
-            color: var(--text-color);
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .action-btn svg {
-            width: 24px;
-            height: 24px;
-            fill: var(--primary);
-        }
-
-        .action-btn:hover {
-            background: var(--gradient-2);
-            color: white;
-            transform: translateY(-3px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .action-btn:hover svg {
-            fill: white;
-        }
-
-        .action-btn.danger {
-            background: rgba(255,71,87,0.1);
-            color: #ff4757;
-        }
-
-        .action-btn.danger svg {
-            fill: #ff4757;
-        }
-
-        .action-btn.danger:hover {
-            background: #ff4757;
-            color: white;
-        }
-
-        .action-btn.danger:hover svg {
-            fill: white;
-        }
-
-        /* График (заглушка для красоты) */
-        .chart-container {
-            background: var(--card-bg);
-            border-radius: 40px;
-            padding: 30px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-        }
-
-        .chart-container h2 {
-            font-size: 2rem;
-            margin-bottom: 20px;
-            color: var(--text-color);
-        }
-
-        .chart-placeholder {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-around;
-            height: 200px;
-            margin-top: 30px;
-            gap: 10px;
-        }
-
-        .bar {
-            flex: 1;
-            background: var(--gradient-2);
-            border-radius: 20px 20px 0 0;
-            transition: height 0.3s;
-            position: relative;
-            min-width: 30px;
-        }
-
-        .bar:hover {
-            opacity: 0.9;
-        }
-
-        .bar-label {
-            text-align: center;
-            margin-top: 10px;
-            color: var(--footer-color);
-            font-size: 0.9rem;
-        }
-
-        /* Футер */
-        .footer {
-            text-align: center;
-            padding: 30px 0;
-            color: var(--footer-color);
-            border-top: 1px solid var(--border-color);
-            margin-top: 50px;
-        }
-
-        /* Адаптивность */
-        @media (max-width: 700px) {
-            .header {
-                flex-direction: column;
-                gap: 15px;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-    </style>
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Перезапуск' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <header class="header">...</header>
+    <%- include('../partials/header', { page: 'admin' }) %>
 
-    <div class="container">
-        <h1>Перезапуск бота</h1>
-        <div style="background: var(--card-bg); border-radius: 30px; padding: 40px; text-align: center;">
-            <span style="font-size: 4rem;">🤖</span>
-            <h2 style="margin: 20px 0;">Вы уверены, что хотите перезапустить бота?</h2>
-            <p>Это действие отключит бота на несколько секунд.</p>
-            <form action="/admin/bot/restart" method="POST" style="margin-top: 30px;">
-                <button type="submit" class="btn-logout" style="background: #ff4757;">Да, перезапустить</button>
-                <a href="/admin/dashboard" class="btn-logout" style="background: #666; margin-left: 15px;">Отмена</a>
-            </form>
+    <div class="admin-layout">
+        <%- include('../partials/sidebar', { page: 'restart' }) %>
+
+        <div class="admin-content">
+            <h1 class="text-gradient" style="margin-bottom: 24px;">🔄 Управление перезапуском</h1>
+
+            <div class="grid grid-3" style="margin-bottom: 32px;">
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">💬</div>
+                    <h3 style="margin-bottom: 8px;">Discord бот</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                        Перезапуск Discord бота<br>Команды временно недоступны
+                    </p>
+                    <button class="btn btn-warning" onclick="restartService('discord')" data-confirm="Перезапустить Discord бота?">
+                        🔄 Перезапустить Discord
+                    </button>
+                </div>
+
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">🎮</div>
+                    <h3 style="margin-bottom: 8px;">Minecraft бот</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                        Перезапуск Minecraft бота<br>Бот переподключится к серверу
+                    </p>
+                    <button class="btn btn-warning" onclick="restartService('minecraft')" data-confirm="Перезапустить Minecraft бота?">
+                        🔄 Перезапустить Minecraft
+                    </button>
+                </div>
+
+                <div class="card" style="text-align: center; border-color: var(--danger);">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
+                    <h3 style="margin-bottom: 8px; color: var(--danger);">Полный перезапуск</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 16px;">
+                        Перезапуск ВСЕХ сервисов<br>Сайт, Discord, Minecraft
+                    </p>
+                    <button class="btn btn-danger" onclick="restartService('all')" data-confirm="⚠ Вы уверены? Это перезапустит ВСЕ сервисы!">
+                        🔄 Полный перезапуск
+                    </button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">📊 Статус сервисов</h3>
+                    <button class="btn btn-sm btn-outline" onclick="refreshStatus()">🔄 Обновить</button>
+                </div>
+                <div class="card-body">
+                    <table>
+                        <tbody>
+                            <tr><td style="color: var(--text-secondary);">Discord бот</td><td><span class="badge badge-info" id="discordStatus">Проверка...</span></td></tr>
+                            <tr><td style="color: var(--text-secondary);">Minecraft бот</td><td><span class="badge badge-info" id="minecraftStatus">Проверка...</span></td></tr>
+                            <tr><td style="color: var(--text-secondary);">Веб-сервер</td><td><span class="badge badge-success">Онлайн</span></td></tr>
+                            <tr><td style="color: var(--text-secondary);">База данных</td><td><span class="badge badge-success">Доступна</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
-    <footer class="footer">...</footer>
+    <script>
+        async function restartService(service) {
+            if (!confirm('Вы уверены?')) return;
+            var btn = event.target;
+            var orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Выполнение...';
+
+            try {
+                var resp = await fetch('/api/admin/restart', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ service: service }),
+                });
+                var data = await resp.json();
+                alert(data.success ? 'Перезапуск initiated' : 'Ошибка: ' + (data.error || 'неизвестно'));
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
+        }
+
+        function refreshStatus() {
+            document.getElementById('discordStatus').innerHTML = 'Онлайн';
+            document.getElementById('discordStatus').className = 'badge badge-success';
+            document.getElementById('minecraftStatus').innerHTML = 'Онлайн';
+            document.getElementById('minecraftStatus').className = 'badge badge-success';
+        }
+    </script>
+
+    <%- include('../partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

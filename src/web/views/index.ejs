@@ -1,751 +1,468 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %></title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <meta name="description" content="Resistance City — Свободный Город. Minecraft RolePlay проект с демократическим управлением, экономикой и карьерой.">
+    <meta name="keywords" content="Minecraft, RolePlay, Resistance, клан, экономика, RP, город, свободный, демократия">
+    <meta name="theme-color" content="#6343d4">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:title" content="Resistance City — Свободный Город">
+    <meta property="og:description" content="Minecraft RolePlay проект с уникальной экономикой и системой государственного управления">
+    <meta property="og:type" content="website">
+    <title><%= typeof title !== 'undefined' ? title : 'Resistance City — Свободный Город' %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
     <style>
-        :root {
-            --bg-color: #f8faff;
-            --text-color: #2d3748;
-            --card-bg: rgba(255, 255, 255, 0.8);
-            --card-bg-solid: #ffffff;
-            --header-bg: rgba(255, 255, 255, 0.7);
-            --border-color: rgba(203, 213, 224, 0.3);
-            --primary: #6b46c1;
-            --primary-light: #9f7aea;
-            --primary-soft: #e9d8fd;
-            --primary-hover: #553c9a;
-            --secondary: #38a169;
-            --secondary-light: #9ae6b4;
-            --nav-link-color: #4a5568;
-            --nav-link-hover: #6b46c1;
-            --footer-color: #718096;
-            --hero-overlay: rgba(255, 255, 255, 0.2);
-            --hero-content-bg: rgba(255, 255, 255, 0.15);
-            --gradient-1: linear-gradient(135deg, #e9d8fd 0%, #fed7d7 50%, #c6f6d5 100%);
-            --gradient-2: linear-gradient(45deg, #9f7aea, #f687b3, #fbbf6e);
-            --gradient-soft: linear-gradient(135deg, rgba(159, 122, 234, 0.1), rgba(246, 135, 179, 0.1), rgba(251, 191, 110, 0.1));
-            --shadow-sm: 0 10px 30px rgba(107, 70, 193, 0.05);
-            --shadow-md: 0 15px 40px rgba(107, 70, 193, 0.1);
-            --shadow-lg: 0 20px 60px rgba(107, 70, 193, 0.15);
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #0f0f1a;
-            --text-color: #e2e8f0;
-            --card-bg: rgba(26, 32, 44, 0.8);
-            --card-bg-solid: #1a202c;
-            --header-bg: rgba(17, 17, 27, 0.8);
-            --border-color: rgba(74, 85, 104, 0.3);
-            --primary: #b794f4;
-            --primary-light: #d6bcfa;
-            --primary-soft: rgba(183, 148, 244, 0.15);
-            --primary-hover: #9f7aea;
-            --secondary: #68d391;
-            --secondary-light: #c6f6d5;
-            --nav-link-color: #cbd5e0;
-            --nav-link-hover: #b794f4;
-            --footer-color: #718096;
-            --hero-overlay: rgba(0, 0, 0, 0.3);
-            --hero-content-bg: rgba(26, 32, 44, 0.3);
-            --gradient-1: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1f1f3a 100%);
-            --gradient-2: linear-gradient(45deg, #b794f4, #f687b3, #fbbf6e);
-            --gradient-soft: linear-gradient(135deg, rgba(183, 148, 244, 0.1), rgba(246, 135, 179, 0.1), rgba(251, 191, 110, 0.1));
-            --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 15px 40px rgba(0, 0, 0, 0.4);
-            --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            transition: background-color 0.5s ease, color 0.3s ease;
-            overflow-x: hidden;
-            min-height: 100vh;
-        }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-        .animated-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--gradient-1);
-            background-size: 300% 300%;
-            animation: gradientShift 15s ease infinite;
-            z-index: -2;
-            opacity: 0.8;
-        }
-        @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-
-        .minecraft-characters {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: -1;
-        }
-        .character {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.2));
-            opacity: 0.6;
-            animation: characterFloat 20s infinite ease-in-out;
-        }
-        .character img { width: 100%; height: 100%; image-rendering: pixelated; }
-        .character-1 { top: 15%; left: 5%; animation-duration: 25s; }
-        .character-2 { bottom: 20%; right: 8%; animation-duration: 30s; animation-direction: reverse; }
-        .character-3 { top: 60%; left: 10%; animation-duration: 22s; animation-delay: 2s; }
-        .character-4 { top: 30%; right: 15%; animation-duration: 28s; animation-delay: 1s; }
-        .character-5 { bottom: 10%; left: 20%; animation-duration: 24s; animation-delay: 3s; }
-        @keyframes characterFloat {
-            0%,100% { transform: translateY(0) rotate(0deg); }
-            25% { transform: translateY(-20px) rotate(2deg); }
-            50% { transform: translateY(0) rotate(0deg); }
-            75% { transform: translateY(20px) rotate(-2deg); }
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 40px;
-            background: var(--header-bg);
-            backdrop-filter: blur(15px);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }   
-        .logo { display: flex; align-items: center; gap: 15px; }
-        .logo img { height: 60px; border-radius: 15px; filter: drop-shadow(0 0 20px rgba(107,70,193,0.3)); }
-        .logo h2 {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #6b46c1, #9f7aea, #f687b3);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .nav {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-            justify-content: center;
-            flex: 1;
-        }
-        .nav-center {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .nav-center a {
-            color: var(--nav-link-color);
-            text-decoration: none;
-            font-weight: 500;
-            padding: 10px 20px;
-            border-radius: 40px;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .nav-center a::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        .nav-center a:hover::before { left: 100%; }
-        .nav-center a:hover { background: var(--primary-soft); color: var(--primary); transform: translateY(-2px); }
-        .nav-center a.active { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; box-shadow: 0 10px 25px -5px var(--primary); }
-
-        .header-right { display: flex; align-items: center; gap: 15px; }
-        .theme-toggle {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 40px;
-            width: 70px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: relative;
-            transition: all 0.3s;
-            box-shadow: var(--shadow-sm);
-        }
-        .theme-toggle:hover { transform: scale(1.05); box-shadow: var(--shadow-md); }
-        .theme-toggle .sun, .theme-toggle .moon { width: 24px; height: 24px; z-index: 2; }
-        .theme-toggle .sun { color: #fbbf6e; }
-        .theme-toggle .moon { color: #b794f4; }
-        .theme-toggle::after {
-            content: '';
-            position: absolute;
-            width: 32px;
-            height: 32px;
-            background: white;
-            border-radius: 50%;
-            left: 4px;
-            transition: transform 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 1;
-        }
-        [data-theme="dark"] .theme-toggle::after { transform: translateX(30px); }
-
-        .btn-discord {
-            background: linear-gradient(135deg, #6b46c1, #9f7aea);
-            padding: 10px 25px;
-            border-radius: 40px;
-            color: white !important;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 10px 20px -5px rgba(107,70,193,0.3);
-            text-decoration: none;
-        }
-        .btn-discord:hover { background: linear-gradient(135deg, #553c9a, #805ad5); transform: translateY(-2px); }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: var(--card-bg);
-            padding: 8px 20px;
-            border-radius: 40px;
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(10px);
-            text-decoration: none;
-            color: var(--text-color);
-            transition: all 0.3s;
-        }
-        .user-info:hover { background: var(--primary-soft); transform: translateY(-2px); }
-        .user-avatar { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--primary); }
-        .logout-btn { color: #ff4757; text-decoration: none; padding: 8px 16px; border-radius: 40px; transition: all 0.3s; }
-        .logout-btn:hover { background: rgba(255,71,87,0.1); }
-
-        .hero {
-            position: relative;
-            min-height: 90vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .hero-section {
+            background: linear-gradient(135deg, rgba(99,67,212,0.3) 0%, rgba(22,22,42,0.95) 50%, rgba(170,78,255,0.2) 100%);
+            padding: 80px 24px 100px;
             text-align: center;
-            margin-bottom: 80px;
-            z-index: 1;
-        }
-        .hero-bg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: url('/images/fon.png') center/cover no-repeat;
-            filter: brightness(0.7);
-            z-index: -1;
-        }
-        .hero-content {
-            max-width: 1000px;
-            padding: 60px;
-            background: var(--hero-content-bg);
-            backdrop-filter: blur(20px);
-            border-radius: 50px;
-            border: 1px solid rgba(255,255,255,0.2);
-            animation: floatHero 6s ease-in-out infinite;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.2);
-        }
-        @keyframes floatHero { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-        .hero h1 {
-            font-size: 6rem;
-            margin-bottom: 20px;
-            font-weight: 800;
-            background: linear-gradient(135deg, #fff, #e2e8f0, #cbd5e0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            filter: drop-shadow(0 0 30px rgba(255,255,255,0.3));
-        }
-        .hero p { font-size: 1.8rem; margin-bottom: 30px; color: rgba(255,255,255,0.95); font-weight: 300; }
-        .hero-stats { display: flex; gap: 40px; justify-content: center; margin-top: 40px; }
-        .hero-stat-item { display: flex; flex-direction: column; align-items: center; }
-        .hero-stat-number { font-size: 3rem; font-weight: 700; background: linear-gradient(135deg, #fff, #e2e8f0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .hero-stat-label { font-size: 1.2rem; color: rgba(255,255,255,0.8); text-transform: uppercase; letter-spacing: 2px; }
-
-        .container { max-width: 1400px; margin: 0 auto 80px; padding: 0 20px; position: relative; z-index: 2; }
-        .fade-up { opacity: 0; transform: translateY(50px); transition: opacity 0.8s ease, transform 0.8s ease; }
-        .fade-up.visible { opacity: 1; transform: translateY(0); }
-
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 80px; }
-        .stat-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            border-radius: 40px;
-            padding: 50px 30px;
-            text-align: center;
-            border: 1px solid var(--border-color);
-            transition: all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
-            box-shadow: var(--shadow-md);
             position: relative;
             overflow: hidden;
+            border-bottom: 1px solid var(--border);
         }
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 5px;
-            background: linear-gradient(90deg, var(--primary), var(--primary-light), var(--secondary));
-            transform: translateX(-100%);
-            transition: transform 0.5s;
-        }
-        .stat-card:hover::before { transform: translateX(0); }
-        .stat-card:hover { transform: translateY(-15px) scale(1.02); box-shadow: var(--shadow-lg); background: var(--card-bg-solid); }
-        .stat-number { font-size: 4.5rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 15px; line-height: 1; }
-        .stat-label { font-size: 1.4rem; color: var(--footer-color); text-transform: uppercase; letter-spacing: 2px; font-weight: 300; }
-
-        .clan-info {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            border-radius: 60px;
-            padding: 60px;
-            margin-bottom: 80px;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-lg);
-            position: relative;
-            overflow: hidden;
-        }
-        .clan-info::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: var(--gradient-soft);
-            animation: rotate 20s linear infinite;
-            z-index: 0;
-        }
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .clan-info > * { position: relative; z-index: 1; }
-        .clan-info h2 { font-size: 3rem; margin-bottom: 25px; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: inline-block; }
-        .clan-info p { font-size: 1.3rem; color: var(--text-color); max-width: 900px; opacity: 0.9; line-height: 1.8; }
-        .clan-stats-mini { display: flex; gap: 30px; margin-top: 30px; color: var(--primary-light); font-weight: 600; }
-
-        .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 80px; }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            border-radius: 50px;
-            padding: 40px;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-md);
-            transition: all 0.3s;
-        }
-        .card:hover { transform: translateY(-10px); box-shadow: var(--shadow-lg); background: var(--card-bg-solid); }
-        .card-title { font-size: 2.2rem; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 3px solid transparent; border-image: linear-gradient(90deg, var(--primary), var(--primary-light)); border-image-slice: 1; display: inline-block; color: var(--text-color); font-weight: 600; }
-        .player-list { list-style: none; }
-        .player-item { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border-color); transition: all 0.3s; border-radius: 15px; }
-        .player-item:hover { background: var(--primary-soft); padding-left: 15px; transform: scale(1.02); }
-        .player-avatar { width: 55px; height: 55px; border-radius: 50%; margin-right: 20px; border: 3px solid var(--primary); transition: all 0.3s; }
-        .player-item:hover .player-avatar { transform: rotate(5deg) scale(1.1); }
-        .player-name { font-weight: 600; font-size: 1.2rem; color: var(--text-color); }
-        .player-date { font-size: 0.95rem; color: var(--footer-color); }
-
-        .top-three { display: flex; justify-content: space-around; align-items: flex-end; gap: 25px; margin: 30px 0; }
-        .top-player {
-            text-align: center;
-            flex: 1;
-            background: var(--primary-soft);
-            border-radius: 40px 40px 20px 20px;
-            padding: 30px 15px 25px;
-            position: relative;
-            transition: all 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-        }
-        .top-player:hover { transform: translateY(-20px) scale(1.05); background: linear-gradient(135deg, var(--primary-soft), var(--card-bg)); box-shadow: var(--shadow-lg); }
-        .top-player .crown {
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 70px;
-            height: 70px;
-            background: url('/images/korona.png') center/contain no-repeat;
-            filter: drop-shadow(0 0 15px gold);
-            animation: crownGlow 2s infinite;
-        }
-        @keyframes crownGlow { 0%,100% { filter: drop-shadow(0 0 15px gold); } 50% { filter: drop-shadow(0 0 30px gold); } }
-        .top-player .avatar { width: 110px; height: 110px; border-radius: 50%; border: 4px solid var(--primary); margin: 15px 0; transition: all 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        .top-player:hover .avatar { transform: scale(1.1) rotate(5deg); border-color: var(--secondary); }
-        .top-player .name { font-size: 1.4rem; font-weight: 600; color: var(--text-color); margin: 10px 0 5px; }
-        .top-player .balance { color: var(--primary); font-size: 1.3rem; font-weight: 700; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 30px; display: inline-block; }
-
-        .leaders-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 25px; margin-top: 25px; }
-        .leader-card {
-            display: flex;
-            align-items: center;
-            background: var(--primary-soft);
-            border-radius: 25px;
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .leader-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: rotate(45deg);
-            animation: shine 3s infinite;
-        }
-        @keyframes shine { 0% { transform: translateX(-100%) rotate(45deg); } 20% { transform: translateX(100%) rotate(45deg); } 100% { transform: translateX(100%) rotate(45deg); } }
-        .leader-card:hover { transform: translateX(10px) scale(1.02); background: linear-gradient(135deg, var(--primary-soft), var(--card-bg)); box-shadow: var(--shadow-md); }
-        .leader-avatar { width: 70px; height: 70px; border-radius: 50%; margin-right: 20px; border: 3px solid var(--primary); transition: all 0.3s; }
-        .leader-card:hover .leader-avatar { transform: scale(1.1); }
-        .leader-info h4 { font-size: 1.2rem; margin-bottom: 5px; color: var(--text-color); font-weight: 600; }
-        .leader-info p { font-size: 1rem; color: var(--footer-color); }
-
-        .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; margin: 40px 0; }
-        .gallery-item {
-            border-radius: 25px;
-            overflow: hidden;
-            box-shadow: var(--shadow-lg);
-            transition: all 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
-            aspect-ratio: 16/9;
-            position: relative;
-            cursor: pointer;
-        }
-        .gallery-item::before {
+        .hero-section::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, var(--primary), transparent);
-            opacity: 0;
-            transition: opacity 0.3s;
+            background: 
+                radial-gradient(circle at 30% 50%, rgba(99,67,212,0.2) 0%, transparent 50%),
+                radial-gradient(circle at 70% 50%, rgba(170,78,255,0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 80%, rgba(255,184,0,0.05) 0%, transparent 40%);
+            z-index: 0;
+        }
+        .hero-content {
+            position: relative;
             z-index: 1;
         }
-        .gallery-item:hover::before { opacity: 0.3; }
-        .gallery-item:hover { transform: scale(1.1) rotate(1deg); box-shadow: 0 30px 60px rgba(107,70,193,0.4); z-index: 10; }
-        .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: all 0.5s; }
-        .gallery-item:hover img { transform: scale(1.2); }
-
-        .community-section {
-            background: var(--gradient-soft);
-            border-radius: 60px;
-            padding: 60px;
-            margin: 80px 0;
-            text-align: center;
-            border: 1px solid var(--border-color);
+        .member-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
         }
-        .community-title { font-size: 3rem; margin-bottom: 30px; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .community-stats { display: flex; justify-content: center; gap: 60px; margin: 50px 0; }
-        .community-stat { text-align: center; }
-        .community-number { font-size: 4rem; font-weight: 800; color: var(--primary); line-height: 1; }
-        .community-label { font-size: 1.2rem; color: var(--footer-color); text-transform: uppercase; letter-spacing: 2px; }
-        .community-description { font-size: 1.3rem; max-width: 800px; margin: 0 auto; color: var(--text-color); line-height: 1.8; }
-
-        .players-animation { display: flex; justify-content: center; gap: 15px; margin: 40px 0; flex-wrap: wrap; }
-        .player-icon {
-            width: 50px;
-            height: 50px;
-            background: var(--primary-soft);
+        .member-card:hover {
+            background: rgba(99,67,212,0.08);
+        }
+        .member-avatar {
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-lighter));
             display: flex;
             align-items: center;
             justify-content: center;
-            animation: playerBounce 2s infinite;
-            border: 2px solid var(--primary);
-        }
-        .player-icon:nth-child(2) { animation-delay: 0.2s; }
-        .player-icon:nth-child(3) { animation-delay: 0.4s; }
-        .player-icon:nth-child(4) { animation-delay: 0.6s; }
-        .player-icon:nth-child(5) { animation-delay: 0.8s; }
-        .player-icon:nth-child(6) { animation-delay: 1s; }
-        .player-icon:nth-child(7) { animation-delay: 1.2s; }
-        .player-icon:nth-child(8) { animation-delay: 1.4s; }
-        @keyframes playerBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-        .player-icon img { width: 40px; height: 40px; border-radius: 50%; }
-
-        .footer {
-            text-align: center;
-            padding: 60px 0;
-            background: var(--header-bg);
-            backdrop-filter: blur(10px);
-            border-top: 1px solid var(--border-color);
-            color: var(--footer-color);
-            font-size: 1rem;
-            position: relative;
-            z-index: 2;
-        }
-        .footer-links { display: flex; justify-content: center; gap: 30px; margin: 20px 0; flex-wrap: wrap; }
-        .footer-links a { color: var(--footer-color); text-decoration: none; transition: color 0.3s; }
-        .footer-links a:hover { color: var(--primary); }
-
-        .scroll-top {
-            position: fixed;
-            bottom: 40px;
-            right: 40px;
-            width: 70px;
-            height: 70px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            border: none;
-            border-radius: 50%;
+            font-weight: 700;
             color: white;
-            font-size: 2rem;
-            cursor: pointer;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .top-player-row {
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: var(--shadow-lg);
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.4s;
-            z-index: 99;
-            border: 2px solid rgba(255,255,255,0.3);
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
         }
-        .scroll-top.visible { opacity: 1; transform: translateY(0); }
-        .scroll-top:hover { transform: scale(1.15) rotate(360deg); box-shadow: 0 20px 40px rgba(107,70,193,0.5); }
-
-        @media (max-width: 1200px) { .hero h1 { font-size: 5rem; } .hero p { font-size: 1.5rem; } }
-        @media (max-width: 900px) {
-            .stats-grid, .two-columns { grid-template-columns: 1fr; }
-            .gallery { grid-template-columns: repeat(2, 1fr); }
-            .hero h1 { font-size: 4rem; }
-            .header { flex-direction: column; gap: 20px; }
-            .nav-center { order: 2; width: 100%; }
-            .logo { order: 1; }
-            .header-right { order: 3; }
-            .community-stats { flex-direction: column; gap: 30px; }
+        .top-player-row:hover {
+            background: rgba(99,67,212,0.08);
         }
-        @media (max-width: 600px) {
-            .gallery, .leaders-grid { grid-template-columns: 1fr; }
-            .hero-content { padding: 30px; }
-            .hero h1 { font-size: 3rem; }
-            .hero p { font-size: 1.2rem; }
+        .org-card {
+            text-align: left;
+        }
+        .feature-card {
+            text-align: center;
+            padding: 32px 20px;
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+        .cta-section {
+            text-align: center;
+            padding: 48px 32px;
+            background: linear-gradient(135deg, rgba(99,67,212,0.2), rgba(170,78,255,0.1));
+            border-color: var(--primary);
+            margin-bottom: 40px;
         }
     </style>
 </head>
 <body>
-    <div class="animated-bg"></div>
-    <div class="minecraft-characters">
-        <div class="character character-1"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%236b46c1'/%3E%3Ccircle cx='30' cy='35' r='8' fill='white'/%3E%3Ccircle cx='70' cy='35' r='8' fill='white'/%3E%3Crect x='40' y='60' width='20' height='15' fill='%23f687b3'/%3E%3C/svg%3E" alt="Minecraft Character"></div>
-        <div class="character character-2"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%239f7aea'/%3E%3Ccircle cx='30' cy='35' r='8' fill='white'/%3E%3Ccircle cx='70' cy='35' r='8' fill='white'/%3E%3Crect x='40' y='60' width='20' height='15' fill='%23fbbf6e'/%3E%3C/svg%3E" alt="Minecraft Character"></div>
-        <div class="character character-3"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2338a169'/%3E%3Ccircle cx='30' cy='35' r='8' fill='white'/%3E%3Ccircle cx='70' cy='35' r='8' fill='white'/%3E%3Crect x='40' y='60' width='20' height='15' fill='%239ae6b4'/%3E%3C/svg%3E" alt="Minecraft Character"></div>
-        <div class="character character-4"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f687b3'/%3E%3Ccircle cx='30' cy='35' r='8' fill='white'/%3E%3Ccircle cx='70' cy='35' r='8' fill='white'/%3E%3Crect x='40' y='60' width='20' height='15' fill='%23fbbf6e'/%3E%3C/svg%3E" alt="Minecraft Character"></div>
-        <div class="character character-5"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23b794f4'/%3E%3Ccircle cx='30' cy='35' r='8' fill='white'/%3E%3Ccircle cx='70' cy='35' r='8' fill='white'/%3E%3Crect x='40' y='60' width='20' height='15' fill='%2368d391'/%3E%3C/svg%3E" alt="Minecraft Character"></div>
-    </div>
+    <%- include('partials/header', { page: 'home' }) %>
 
-    <header class="header">
-        <div class="logo">
-            <img src="/images/logo.jpg" alt="Resistance Logo">
-            <h2>Resistance</h2>
-        </div>
-        
-        <nav class="nav-center">
-            <a href="/" class="active">Главная</a>
-            <a href="/top">Топ</a>
-            <a href="/career">Карьера</a>
-            <% if (user) { %><a href="/profile">Профиль</a><% } %>
-            <% if (user && user.isAdmin) { %>
-                <a href="/admin/dashboard">Админ-панель</a>
-            <% } else { %>
-                <a href="/admin/login">Админ-панель</a>
-            <% } %>
-        </nav>
-        
-        <div class="header-right">
-            <button id="theme-toggle" class="theme-toggle" aria-label="Переключить тему">
-                <svg class="sun" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/></svg>
-                <svg class="moon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </button>
-            <% if (user) { %>
-                <a href="/profile" class="user-info">
-                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png?size=40" class="user-avatar" onerror="this.src='/images/player.jpg'">
-                    <span><%= user.username %></span>
+    <!-- ==================== HERO ==================== -->
+    <section class="hero-section">
+        <div class="container hero-content">
+            <div style="margin-bottom: 16px;">
+                <span class="badge badge-info" style="font-size: 0.9rem; padding: 6px 16px;">Minecraft Java Edition 1.20.4</span>
+                <span class="badge badge-success" style="font-size: 0.9rem; padding: 6px 16px; margin-left: 8px;">RolePlay</span>
+                <span class="badge badge-warning" style="font-size: 0.9rem; padding: 6px 16px; margin-left: 8px;">Демократия</span>
+            </div>
+            
+            <h1 class="text-gradient" style="font-size: 3.5rem; margin-bottom: 4px; line-height: 1.2; font-weight: 800;">
+                <%= typeof clanName !== 'undefined' ? clanName : 'Resistance' %>
+            </h1>
+            <p style="font-size: 1.4rem; color: var(--text-secondary); margin-bottom: 8px; font-weight: 300;">
+                Свободный Город «Сопротивление»
+            </p>
+            <p style="font-size: 1.1rem; color: var(--text-muted); max-width: 700px; margin: 0 auto 32px; line-height: 1.8;">
+                Уникальный Minecraft RolePlay проект с демократической формой правления,<br>
+                живой экономикой, конституцией и развитой системой государственных структур.<br>
+                Станьте частью города, где каждый голос имеет значение.
+            </p>
+            
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px;">
+                <a href="/career" class="btn btn-primary btn-lg" style="min-width: 220px;">
+                    🏛️ Государственные структуры
                 </a>
-                <a href="/auth/logout" class="logout-btn">Выйти</a>
-            <% } else { %>
-                <a href="/auth/discord" class="btn-discord">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.33-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.24 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.03.02.03.08-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.06-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z"/></svg>
-                    Войти
+                <a href="/top" class="btn btn-outline btn-lg" style="min-width: 180px;">
+                    🏆 Рейтинг игроков
                 </a>
-            <% } %>
-        </div>
-    </header>
-
-    <section class="hero">
-        <div class="hero-bg"></div>
-        <div class="hero-content">
-            <h1>Resistance</h1>
-            <p>Свободный Город • Демократия • RolePlay</p>
-            <div class="hero-stats">
-                <div class="hero-stat-item"><span class="hero-stat-number"><%= totalPlayers %></span><span class="hero-stat-label">Участников</span></div>
-                <div class="hero-stat-item"><span class="hero-stat-number"><%= rpPlayers %></span><span class="hero-stat-label">RP игроков</span></div>
-                <div class="hero-stat-item"><span class="hero-stat-number">24/7</span><span class="hero-stat-label">Онлайн</span></div>
+                <a href="/properties" class="btn btn-outline btn-lg" style="min-width: 200px;">
+                    🏠 Рынок недвижимости
+                </a>
+            </div>
+            
+            <div style="color: var(--text-muted); font-size: 0.95rem;">
+                IP сервера: 
+                <code style="background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: 6px; color: var(--info); font-size: 1rem; letter-spacing: 1px;">
+                    ru.dexland.org
+                </code>
             </div>
         </div>
     </section>
 
-    <div class="container">
-        <div class="stats-grid">
-            <div class="stat-card fade-up"><div class="stat-number"><%= totalPlayers %></div><div class="stat-label">Участников клана</div></div>
-            <div class="stat-card fade-up"><div class="stat-number"><%= rpPlayers %></div><div class="stat-label">RolePlay игроков</div></div>
-            <div class="stat-card fade-up"><div class="stat-number">24/7</div><div class="stat-label">Работа бота</div></div>
+    <div class="container" style="margin-top: -50px; position: relative; z-index: 2;">
+
+        <!-- ==================== СТАТИСТИКА ==================== -->
+        <div class="grid grid-4" style="margin-bottom: 40px;">
+            <div class="stat-card card-glow">
+                <div class="stat-icon">👥</div>
+                <div class="stat-value"><%= typeof stats !== 'undefined' && stats ? stats.rpCount : 0 %></div>
+                <div class="stat-label">Участников RolePlay</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">активных граждан</div>
+            </div>
+            <div class="stat-card card-glow">
+                <div class="stat-icon">⚔️</div>
+                <div class="stat-value"><%= typeof stats !== 'undefined' && stats ? stats.clanCount : 0 %></div>
+                <div class="stat-label">В клане Resistance</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">членов клана</div>
+            </div>
+            <div class="stat-card card-glow">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-value"><%= typeof stats !== 'undefined' && stats ? stats.onlineCount : 0 %></div>
+                <div class="stat-label">В городе сейчас</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">на дежурстве / на связи</div>
+            </div>
+            <div class="stat-card card-glow">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value">
+                    <% 
+                        var totalMoney = (typeof stats !== 'undefined' && stats && stats.totalMoney) ? stats.totalMoney : 0;
+                    %>
+                    <%= Math.floor(totalMoney / 1000000) %>M
+                </div>
+                <div class="stat-label">В экономике</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">общий капитал игроков</div>
+            </div>
         </div>
 
-        <div class="clan-info fade-up">
-            <h2>О клане <%= clanInfo.name %></h2>
-            <p><%= clanInfo.description || 'Свободный город с демократическим укладом, развитой экономикой и системой государственных структур. Присоединяйся к нам!' %></p>
-            <div class="clan-stats-mini"><span>⚔️ PvP арена</span><span>🏰 100+ построек</span><span>💎 Экономика</span></div>
-        </div>
-
-        <div class="two-columns">
-            <div class="card fade-up">
-                <h2 class="card-title">🌟 Последние новички</h2>
-                <ul class="player-list">
-                    <% if (recentPlayers && recentPlayers.length > 0) { %>
-                        <% recentPlayers.forEach(player => { %>
-                            <li class="player-item">
-                                <img src="https://mc-heads.net/avatar/<%= player.minecraft_nick %>/55" class="player-avatar" onerror="this.src='/images/player.jpg'">
-                                <div class="player-info"><div class="player-name"><%= player.minecraft_nick %></div><div class="player-date"><%= new Date(player.joined_at).toLocaleDateString('ru-RU') %></div></div>
-                            </li>
-                        <% }) %>
-                    <% } else { %><li class="player-item">Пока нет новичков</li><% } %>
-                </ul>
+        <!-- ==================== НОВЫЕ УЧАСТНИКИ + ТОП БАЛАНС ==================== -->
+        <div class="grid grid-2" style="margin-bottom: 40px;">
+            
+            <!-- Новые участники -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">👋 Новые участники клана</h3>
+                    <a href="/top" class="btn btn-sm btn-outline">Все игроки</a>
+                </div>
+                <div class="card-body">
+                    <% if (typeof recentJoins !== 'undefined' && recentJoins && recentJoins.length > 0) { %>
+                        <% for (var i = 0; i < recentJoins.length; i++) { 
+                            var member = recentJoins[i];
+                        %>
+                            <div class="member-card">
+                                <div class="member-avatar">
+                                    <%= member.username ? member.username.charAt(0).toUpperCase() : '?' %>
+                                </div>
+                                <div style="flex: 1;">
+                                    <a href="/profile/<%= member.username %>" style="font-weight: 600; color: var(--text-bright); font-size: 1.05rem;">
+                                        <%= member.username %>
+                                    </a>
+                                    <div style="display: flex; gap: 16px; margin-top: 2px;">
+                                        <span style="font-size: 0.8rem; color: var(--text-muted);">
+                                            📅 <%= member.joined_at ? new Date(member.joined_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' %>
+                                        </span>
+                                        <% if (member.kills && member.kills > 0) { %>
+                                            <span style="font-size: 0.8rem; color: var(--danger);">
+                                                ⚔ <%= member.kills %> убийств
+                                            </span>
+                                        <% } %>
+                                    </div>
+                                </div>
+                                <a href="/profile/<%= member.username %>" style="color: var(--text-muted); text-decoration: none; font-size: 1.2rem;" title="Профиль">→</a>
+                            </div>
+                        <% } %>
+                    <% } else { %>
+                        <div style="text-align: center; padding: 30px 20px; color: var(--text-muted);">
+                            <div style="font-size: 2rem; margin-bottom: 8px;">📭</div>
+                            <p>Пока нет новых участников</p>
+                            <p style="font-size: 0.85rem;">Станьте первым! Присоединяйтесь к Resistance.</p>
+                        </div>
+                    <% } %>
+                </div>
             </div>
 
-            <div class="card fade-up">
-                <h2 class="card-title">💰 Топ-3 богачей</h2>
-                <div class="top-three">
-                    <% if (topBalance && topBalance.length > 0) { %>
-                        <% topBalance.forEach((player, index) => { %>
-                            <div class="top-player">
-                                <% if (index === 0) { %><div class="crown"></div><% } %>
-                                <img src="https://mc-heads.net/avatar/<%= player.minecraft_nick %>/110" class="avatar" onerror="this.src='/images/player.jpg'">
-                                <div class="name"><%= player.minecraft_nick %></div>
-                                <div class="balance"><%= player.money.toLocaleString('ru-RU') %> ₽</div>
+            <!-- Топ-5 по балансу -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">💰 Богатейшие граждане</h3>
+                    <a href="/top?type=balance" class="btn btn-sm btn-outline">Полный топ</a>
+                </div>
+                <div class="card-body">
+                    <% if (typeof topBalance !== 'undefined' && topBalance && topBalance.length > 0) { %>
+                        <% for (var j = 0; j < topBalance.length; j++) { 
+                            var player = topBalance[j];
+                            var medal = j === 0 ? '🥇' : j === 1 ? '🥈' : j === 2 ? '🥉' : (j + 1);
+                        %>
+                            <div class="top-player-row">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span style="font-weight: 700; font-size: 1.2rem; min-width: 36px; text-align: center; color: var(--primary-lighter);">
+                                        <%= medal %>
+                                    </span>
+                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, rgba(99,67,212,0.3), rgba(170,78,255,0.2)); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--text-bright); flex-shrink: 0;">
+                                        <%= player.username ? player.username.charAt(0).toUpperCase() : '?' %>
+                                    </div>
+                                    <a href="/profile/<%= player.username %>" style="font-weight: 600; color: var(--text-bright);">
+                                        <%= player.username %>
+                                    </a>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-weight: 700; color: var(--success); font-size: 1.05rem;">
+                                        <%= (player.balance || 0).toLocaleString() %> ₽
+                                    </span>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">наличные</div>
+                                </div>
                             </div>
-                        <% }) %>
-                    <% } else { %><p>Нет данных</p><% } %>
+                        <% } %>
+                    <% } else { %>
+                        <div style="text-align: center; padding: 30px 20px; color: var(--text-muted);">
+                            <div style="font-size: 2rem; margin-bottom: 8px;">💸</div>
+                            <p>Нет данных о балансе</p>
+                            <p style="font-size: 0.85rem;">Экономика города ждёт вас!</p>
+                        </div>
+                    <% } %>
+                </div>
+                <% if (typeof topBalance !== 'undefined' && topBalance && topBalance.length >= 5) { 
+                    var totalTopBalance = 0;
+                    for (var k = 0; k < topBalance.length; k++) {
+                        totalTopBalance += (topBalance[k].balance || 0);
+                    }
+                %>
+                    <div class="card-footer" style="text-align: center;">
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+                            Общий капитал топ-5: <strong style="color: var(--success);"><%= totalTopBalance.toLocaleString() %> ₽</strong>
+                        </p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- ==================== ОРГАНИЗАЦИИ ==================== -->
+        <div style="margin-bottom: 40px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h2 class="text-gradient" style="margin-bottom: 4px;">🏛️ Государственные структуры</h2>
+                    <p style="color: var(--text-secondary);">Основа Resistance — система государственного управления</p>
+                </div>
+                <a href="/career" class="btn btn-outline">Подробнее о карьере →</a>
+            </div>
+            <div class="grid grid-3">
+                <% if (typeof organizations !== 'undefined' && organizations && organizations.length > 0) { %>
+                    <% for (var o = 0; o < organizations.length; o++) { 
+                        var org = organizations[o];
+                        var orgIcons = {
+                            'police': '🚔',
+                            'army': '🛡️',
+                            'hospital': '🏥',
+                            'academy': '🎓',
+                            'government': '🏛️'
+                        };
+                        var orgIcon = orgIcons[org.key] || '📌';
+                        
+                        // Заранее вычисляем стиль
+                        var orgCardStyle = '';
+                        if (org.isFrozen) {
+                            orgCardStyle = 'opacity: 0.6; border-color: var(--danger);';
+                        }
+                    %>
+                        <div class="card card-glow org-card"<%- org.isFrozen ? ' style="opacity: 0.6; border-color: var(--danger);"' : '' %>>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                                <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), var(--primary-lighter)); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+                                    <%= orgIcon %>
+                                </div>
+                                <div>
+                                    <h4 style="margin-bottom: 0px;"><%= org.name %></h4>
+                                    <% if (org.isFrozen) { %>
+                                        <span class="badge badge-danger">Заморожена</span>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Сотрудников</span>
+                                    <span style="font-weight: 600; color: var(--info); font-size: 1.1rem;"><%= org.employees %></span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Бюджет</span>
+                                    <span style="font-weight: 600; color: var(--success); font-size: 1.1rem;">
+                                        <%= org.budget >= 1000000 ? (org.budget / 1000000).toFixed(1) + 'M' : Math.floor(org.budget / 1000) + 'K' %> ₽
+                                    </span>
+                                </div>
+                            </div>
+                            <a href="/career" class="btn btn-sm btn-outline" style="width: 100%;">Подробнее</a>
+                        </div>
+                    <% } %>
+                <% } else { %>
+                    <div class="card" style="text-align: center; grid-column: 1 / -1;">
+                        <p style="color: var(--text-muted); padding: 20px;">Нет данных об организациях</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- ==================== ТОП-5 УБИЙСТВ ==================== -->
+        <div class="card" style="margin-bottom: 40px;">
+            <div class="card-header">
+                <h3 class="card-title">⚔️ Лучшие воины Resistance</h3>
+                <a href="/top?type=kills" class="btn btn-sm btn-outline">Полный рейтинг</a>
+            </div>
+            <div class="card-body">
+                <% if (typeof topKills !== 'undefined' && topKills && topKills.length > 0) { %>
+                    <div class="grid grid-5">
+                        <% for (var w = 0; w < topKills.length; w++) { 
+                            var warrior = topKills[w];
+                            var warMedal = w === 0 ? '🥇' : w === 1 ? '🥈' : w === 2 ? '🥉' : '🎯';
+                        %>
+                            <div style="text-align: center; padding: 20px 10px; border-radius: 12px; transition: all 0.2s ease;">
+                                <div style="font-size: 2rem; margin-bottom: 8px;"><%= warMedal %></div>
+                                <a href="/profile/<%= warrior.username %>" style="font-weight: 600; color: var(--text-bright); display: block; margin-bottom: 8px;">
+                                    <%= warrior.username %>
+                                </a>
+                                <div style="font-weight: 700; color: var(--danger); font-size: 1.4rem;"><%= warrior.kills || 0 %></div>
+                                <div style="color: var(--text-muted); font-size: 0.8rem;">убийств</div>
+                                <% if (warrior.deaths && warrior.deaths > 0) { %>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                        K/D: <span style="color: var(--info);"><%= (warrior.kills / warrior.deaths).toFixed(2) %></span>
+                                    </div>
+                                <% } %>
+                            </div>
+                        <% } %>
+                    </div>
+                <% } else { %>
+                    <div style="text-align: center; padding: 30px; color: var(--text-muted);">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🕊️</div>
+                        <p>Пока нет данных об убийствах</p>
+                        <p style="font-size: 0.85rem;">В городе царит мир... пока что.</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- ==================== ОСОБЕННОСТИ ==================== -->
+        <div style="margin-bottom: 40px;">
+            <h2 class="text-gradient" style="text-align: center; margin-bottom: 8px;">🌟 Особенности Resistance</h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Что делает наш город уникальным</p>
+            <div class="grid grid-3">
+                <div class="card card-glow feature-card">
+                    <div class="feature-icon">🏛️</div>
+                    <h4 style="margin-bottom: 8px;">Демократия</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                        Конституция, выборы, мэр и министры.<br>
+                        Каждый гражданин имеет право голоса<br>
+                        и может влиять на жизнь города.
+                    </p>
+                </div>
+                <div class="card card-glow feature-card">
+                    <div class="feature-icon">💰</div>
+                    <h4 style="margin-bottom: 8px;">Экономика</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                        Рынок недвижимости, бизнесы,<br>
+                        банковская система, кредиты,<br>
+                        зарплаты и налоги.
+                    </p>
+                </div>
+                <div class="card card-glow feature-card">
+                    <div class="feature-icon">⚖️</div>
+                    <h4 style="margin-bottom: 8px;">Законы</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7;">
+                        Сводный кодекс, полиция,<br>
+                        судебная система, тюрьма.<br>
+                        Порядок и справедливость.
+                    </p>
                 </div>
             </div>
         </div>
 
-        <div class="card fade-up" style="margin-bottom: 40px;">
-            <h2 class="card-title">👑 Лидеры города</h2>
-            <div class="leaders-grid">
-                <% if (leaders && leaders.length > 0) { %>
-                    <% leaders.forEach(leader => { %>
-                        <div class="leader-card">
-                            <img src="https://mc-heads.net/avatar/<%= leader.minecraft_nick %>/70" class="leader-avatar" onerror="this.src='/images/player.jpg'">
-                            <div class="leader-info"><h4><%= leader.minecraft_nick %></h4><p><%= leader.structure || 'Структура' %> • <%= leader.rank || 'Лидер' %></p></div>
-                        </div>
-                    <% }) %>
-                <% } else { %><p>Лидеры пока не назначены</p><% } %>
+        <!-- ==================== ДОП. СТАТИСТИКА ==================== -->
+        <div class="grid grid-3" style="margin-bottom: 40px;">
+            <div class="stat-card">
+                <div class="stat-icon">🏠</div>
+                <div class="stat-value"><%= typeof stats !== 'undefined' && stats ? stats.propertiesOwned : 0 %></div>
+                <div class="stat-label">Объектов недвижимости</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">куплено гражданами</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔒</div>
+                <div class="stat-value" style="color: var(--danger);"><%= typeof stats !== 'undefined' && stats ? stats.jailedCount : 0 %></div>
+                <div class="stat-label">В тюрьме</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">отбывают наказание</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-value"><%= typeof organizations !== 'undefined' && organizations ? organizations.length : 0 %></div>
+                <div class="stat-label">Госструктур</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">для службы и карьеры</div>
             </div>
         </div>
 
-        <div class="community-section fade-up">
-            <h2 class="community-title">Наше комьюнити</h2>
-            <div class="community-stats">
-                <div class="community-stat"><div class="community-number">500+</div><div class="community-label">Игроков</div></div>
-                <div class="community-stat"><div class="community-number">50+</div><div class="community-label">Онлайн ежедневно</div></div>
-                <div class="community-stat"><div class="community-number">1000+</div><div class="community-label">Сообщений в день</div></div>
+        <!-- ==================== CTA ==================== -->
+        <div class="card cta-section">
+            <h2 class="text-gradient" style="font-size: 2rem; margin-bottom: 12px;">Готовы стать частью Resistance?</h2>
+            <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 32px; font-size: 1.05rem; line-height: 1.8;">
+                Присоединяйтесь к нашему сообществу! Развивайте карьеру в государственных структурах,
+                создавайте бизнес, участвуйте в экономике и влияйте на будущее города.
+            </p>
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="#" class="btn btn-primary btn-lg" style="min-width: 200px;">
+                    🎮 Играть на сервере
+                </a>
+                <a href="#" class="btn btn-outline btn-lg" style="min-width: 200px;">
+                    💬 Discord сервер
+                </a>
+                <a href="/career" class="btn btn-outline btn-lg" style="min-width: 200px;">
+                    🏛️ Карьера
+                </a>
             </div>
-            <div class="players-animation">
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-                <div class="player-icon"><img src="/images/player.jpg" alt="player"></div>
-            </div>
-            <p class="community-description">Присоединяйся к нашему дружному сообществу! У нас ты найдешь не просто игру, а настоящих друзей. Вместе мы строим, сражаемся и развиваемся. Каждый день новые события, ивенты и приключения!</p>
-        </div>
-
-        <div class="card fade-up">
-            <h2 class="card-title">📸 Моменты города</h2>
-            <div class="gallery">
-                <% for (let i = 1; i <= 9; i++) { %>
-                <div class="gallery-item"><img src="/images/<%= i %>.png" alt="screenshot <%= i %>" loading="lazy" onerror="this.style.display='none'"></div>
-                <% } %>
-            </div>
+            <p style="color: var(--text-muted); margin-top: 20px; font-size: 0.85rem;">
+                IP: <code style="background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 4px; color: var(--info);">ru.dexland.org</code>
+                • Версия 1.20.4 • Java Edition
+            </p>
         </div>
     </div>
 
-    <footer class="footer">
-        <div class="footer-links">
-            <a href="/">Главная</a>
-            <a href="/top">Топ</a>
-            <a href="/career">Карьера</a>
-            <% if (user) { %><a href="/profile">Профиль</a><% } %>
-            <a href="/admin/login">Админ-панель</a>
-        </div>
-        <p>Resistance City Project • 2026 • Все права защищены</p>
-        <p style="margin-top: 10px; font-size: 0.9rem;">Сделано с ❤️ для настоящих фанатов Minecraft</p>
-    </footer>
-
-    <button class="scroll-top" id="scrollTop" title="Наверх">↑</button>
-
-    <script>
-        (function() {
-            const themeToggle = document.getElementById('theme-toggle');
-            if (!themeToggle) return;
-            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-            else if (savedTheme === 'dark' || (!savedTheme && prefersDark)) document.documentElement.setAttribute('data-theme', 'dark');
-            else document.documentElement.setAttribute('data-theme', 'light');
-            themeToggle.addEventListener('click', () => {
-                const current = document.documentElement.getAttribute('data-theme');
-                const newTheme = current === 'light' ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                themeToggle.style.transform = 'scale(1.2)';
-                setTimeout(() => { themeToggle.style.transform = 'scale(1)'; }, 200);
-            });
-        })();
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
-        }, { threshold: 0.2 });
-        document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
-
-        const scrollBtn = document.getElementById('scrollTop');
-        window.addEventListener('scroll', () => { if (window.scrollY > 400) scrollBtn.classList.add('visible'); else scrollBtn.classList.remove('visible'); });
-        scrollBtn.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
-        
-        const galleryItems = document.querySelectorAll('.gallery-item');
-        galleryItems.forEach((item, index) => { item.style.animationDelay = `${index * 0.1}s`; });
-    </script>
+    <%- include('partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

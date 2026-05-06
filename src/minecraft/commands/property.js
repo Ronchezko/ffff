@@ -1,424 +1,512 @@
-// src/minecraft/commands/property.js
-// Команды для управления имуществом
+// src/minecraft/commands/property.js — Управление имуществом Resistance City v5.0.0
+// /im — квартиры, дома, порты
+// /biz — бизнесы
+// /office, /of — офисы
 
+'use strict';
+
+const config = require('../../config');
+const db = require('../../database');
 const utils = require('../../shared/utils');
-const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-function sendMessage(bot, target, message) {
-    bot.chat(`/msg ${target} ${message}`);
+const permissions = require('../../shared/permissions');
+const { logger } = require('../../shared/logger');
+
+function msg(bot, user, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/msg ' + user + ' ' + text); } catch(e) {}
 }
 
-// ============================================
-// /im [buy/info/sell] [id] - Управление имуществом
-// ============================================
+const TYPE_NAMES = { apartment: 'Квартира', house: 'Дом', office: 'Офис', business: 'Бизнес', port: 'Порт' };
+const TYPE_EMOJI = { apartment: '🏢', house: '🏠', office: '🏛️', business: '🏪', port: '🚢' };
 
-// /im [buy/in/sell] [id] - Управление имуществом
-async function im(bot, sender, args, db, addLog) {
-    if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/im [buy/in/sell] [id]`);
-        await sendMessage(bot, sender, `&7&l|&f Также: &e/imflag, /imm, /imnalog`);
+// ==================== /IM ====================
+function propertyManage(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /im <buy|sell|info|addm|dellm|flag|nalog|list|my|find|price>');
+
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    // ==================== BUY ====================
+    if (sub === 'buy') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /im buy <id>');
+        const propertyId = subArgs[0];
+        if (!utils.isValidPropertyId(propertyId)) return msg(bot, username, '&#CA4E4E❌ Неверный ID. /im list — список');
+
+        const propertyConfig = config.getPropertyInfo(propertyId);
+        const existing = db.properties.get(propertyId);
+        if (existing && existing.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' занято (' + existing.owner + ')');
+
+        const rpMember = db.rpMembers.get(username);
+        if (!rpMember || rpMember.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Вы не в RP');
+        if (rpMember.balance < propertyConfig.price) {
+            return msg(bot, username, '&#CA4E4E❌ Недостаточно средств! Цена: &#76C519' + utils.formatMoney(propertyConfig.price) + ' &#D4D4D4| Баланс: &#76C519' + utils.formatMoney(rpMember.balance));
+        }
+
+        if (propertyConfig.type === 'business' && !db.licenses.hasActive(username, 'business')) {
+            return msg(bot, username, '&#CA4E4E❌ Нужна лицензия предпринимателя! /license buy business');
+        }
+        if (propertyConfig.type === 'office' && !db.licenses.hasActive(username, 'office')) {
+            return msg(bot, username, '&#CA4E4E❌ Нужна лицензия на офис! /license buy office');
+        }
+
+        const currentProps = db.properties.getOwned(username);
+        const ownedCount = currentProps.filter(p => p.owner_lower === username.toLowerCase()).length;
+        if (ownedCount >= 5 && !permissions.isAdmin(username, db)) {
+            return msg(bot, username, '&#CA4E4E❌ Лимит имущества (5). Продайте что-нибудь.');
+        }
+
+        db.rpMembers.updateBalance(username, -propertyConfig.price, 'property_buy', 'Покупка #' + propertyId, 'SYSTEM');
+        db.properties.buy(propertyId, username, propertyConfig.price, propertyConfig.type);
+        const regionName = config.clan.regionPrefix + propertyId;
+        bot.chat('/rg addmember ' + regionName + ' ' + username);
+
+        logger.info(username + ' купил #' + propertyId + ' (' + propertyConfig.type + ') за ' + utils.formatMoney(propertyConfig.price));
+
+        msg(bot, username, '&#76C519✅ ' + (TYPE_NAMES[propertyConfig.type] || propertyConfig.type) + ' #' + propertyId + ' куплен за &#FFB800' + utils.formatMoney(propertyConfig.price));
+        msg(bot, username, '&#D4D4D4Регион: &#76C519' + regionName + ' &#D4D4D4| Налог: /im nalog dep ' + propertyId + ' &#D4D4D4| Флаги: /im flag');
         return;
     }
-    
-    const action = args[0].toLowerCase();
-    const propertyId = args[1];
-    
-    switch(action) {
-        case 'buy':
-            await buyProperty(bot, sender, propertyId, db, addLog);
-            break;
-        case 'in':
-            await propertyInfo(bot, sender, propertyId, db);
-            break;
-        case 'sell':
-            await sellProperty(bot, sender, propertyId, db, addLog);
-            break;
-        default:
-            await sendMessage(bot, sender, `&4&l|&c Неизвестное действие. Используйте: &ebuy, in, sell`);
+
+    // ==================== SELL ====================
+    if (sub === 'sell') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /im sell <id> [confirm]');
+        const propertyId = subArgs[0];
+        const confirm = subArgs[1]?.toLowerCase();
+        const property = db.properties.get(propertyId);
+        if (!property || !property.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+        if (property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Вы не владелец');
+
+        const sellPrice = property.price || config.getPropertyInfo(propertyId)?.price || 0;
+        const refund = Math.floor(sellPrice * 0.5);
+
+        if (confirm !== 'confirm' && confirm !== 'yes' && confirm !== 'да') {
+            return msg(bot, username, '&#FFB800⚠ Продажа #' + propertyId + ' — возврат &#76C519' + utils.formatMoney(refund) + ' (50%). Для подтверждения: &#FFB800/im sell ' + propertyId + ' confirm');
+        }
+
+        const regionName = property.region_name || config.clan.regionPrefix + propertyId;
+        if (property.owner) bot.chat('/rg removemember ' + regionName + ' ' + property.owner);
+        if (property.co_owner_1) bot.chat('/rg removemember ' + regionName + ' ' + property.co_owner_1);
+        if (property.co_owner_2) bot.chat('/rg removemember ' + regionName + ' ' + property.co_owner_2);
+
+        db.rpMembers.updateBalance(username, refund, 'property_sell', 'Продажа #' + propertyId, 'SYSTEM');
+        db.properties.remove(propertyId);
+
+        logger.info(username + ' продал #' + propertyId + ' за ' + utils.formatMoney(refund));
+        msg(bot, username, '&#76C519✅ Продано! Возврат: &#FFB800' + utils.formatMoney(refund));
+        return;
     }
+
+    // ==================== INFO ====================
+    if (sub === 'info') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /im info <id>');
+        const propertyId = subArgs[0];
+        const prop = db.properties.get(propertyId);
+        const propConfig = config.getPropertyInfo(propertyId);
+        if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Не найдено');
+
+        if (prop && prop.is_owned) {
+            msg(bot, username, '&#80C4C5🏠 #' + propertyId + ' ' + (TYPE_NAMES[propConfig.type] || propConfig.type) + ' &#D4D4D4| Владелец: &#76C519' + prop.owner);
+            if (prop.co_owner_1 || prop.co_owner_2) msg(bot, username, '&#D4D4D4Сожители: ' + [prop.co_owner_1, prop.co_owner_2].filter(Boolean).join(', '));
+            const taxExpired = !prop.tax_paid_until || new Date(prop.tax_paid_until) < new Date();
+            msg(bot, username, '&#D4D4D4Налог: ' + (taxExpired ? '&#CA4E4EНе оплачен!' : '&#76C519Оплачен до ' + utils.formatDate(prop.tax_paid_until)) + ' &#D4D4D4| Регион: &#76C519' + (prop.region_name || config.clan.regionPrefix + propertyId));
+        } else {
+            msg(bot, username, '&#80C4C5🏠 #' + propertyId + ' ' + (TYPE_NAMES[propConfig.type] || propConfig.type) + ' &#76C519Свободно &#D4D4D4| Цена: &#76C519' + utils.formatMoney(propConfig.price));
+        }
+        return;
+    }
+
+    // ==================== ADDM ====================
+    if (sub === 'addm') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /im addm <id> <ник>');
+        const propertyId = subArgs[0];
+        const target = subArgs[1];
+        const property = db.properties.get(propertyId);
+        if (!property || !property.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+        if (property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Только владелец');
+        if (property.property_type !== 'apartment' && property.property_type !== 'house') return msg(bot, username, '&#CA4E4E❌ Сожители только в квартиры/дома');
+        if (target.toLowerCase() === username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Вы уже владелец');
+
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+        if (tm.is_in_jail) return msg(bot, username, '&#CA4E4E❌ Игрок в тюрьме');
+        if (property.co_owner_1_lower === target.toLowerCase() || property.co_owner_2_lower === target.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Уже сожитель');
+        if (property.co_owner_1 && property.co_owner_2) return msg(bot, username, '&#CA4E4E❌ Нет мест (макс 2)');
+
+        const result = db.properties.addCoOwner(propertyId, target);
+        if (result.success) {
+            const regionName = property.region_name || config.clan.regionPrefix + propertyId;
+            bot.chat('/rg addmember ' + regionName + ' ' + target);
+            msg(bot, username, '&#76C519✅ ' + target + ' добавлен как сожитель (слот ' + result.slot + ')');
+            try { bot.chat('/msg ' + target + ' &#76C519✅ Вы добавлены как сожитель в имущество #' + propertyId); } catch(e) {}
+        } else {
+            msg(bot, username, '&#CA4E4E❌ ' + (result.reason === 'no_free_slots' ? 'Нет мест' : 'Ошибка'));
+        }
+        return;
+    }
+
+    // ==================== DELLM ====================
+    if (sub === 'dellm') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /im dellm <id> <ник>');
+        const propertyId = subArgs[0];
+        const target = subArgs[1];
+        const property = db.properties.get(propertyId);
+        if (!property || !property.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+
+        const isOwner = property.owner_lower === username.toLowerCase();
+        const isSelf = target.toLowerCase() === username.toLowerCase();
+        if (!isOwner && !isSelf) return msg(bot, username, '&#CA4E4E❌ Только владелец или вы сами');
+
+        const result = db.properties.removeCoOwner(propertyId, target);
+        if (result.success) {
+            const regionName = property.region_name || config.clan.regionPrefix + propertyId;
+            bot.chat('/rg removemember ' + regionName + ' ' + target);
+            msg(bot, username, '&#76C519✅ ' + target + ' удалён из сожителей');
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВы удалены из сожителей имущества #' + propertyId); } catch(e) {}
+        } else {
+            msg(bot, username, '&#CA4E4E❌ Ошибка');
+        }
+        return;
+    }
+
+    // ==================== FLAG ====================
+    if (sub === 'flag') {
+        if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /im flag <id> <use|item-drop|pvp|chest-access|door> <allow|deny>');
+        const propertyId = subArgs[0];
+        const flag = subArgs[1].toLowerCase();
+        const value = subArgs[2].toLowerCase();
+        const validFlags = ['use', 'item-drop', 'pvp', 'chest-access', 'door'];
+
+        if (!validFlags.includes(flag)) return msg(bot, username, '&#CA4E4E❌ Флаги: ' + validFlags.join(', '));
+        if (!['allow', 'deny'].includes(value)) return msg(bot, username, '&#CA4E4E❌ allow или deny');
+
+        const property = db.properties.get(propertyId);
+        if (!property || !property.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+
+        const isOwner = property.owner_lower === username.toLowerCase();
+        const isCoOwner = property.co_owner_1_lower === username.toLowerCase() || property.co_owner_2_lower === username.toLowerCase();
+        if (!isOwner && !isCoOwner) return msg(bot, username, '&#CA4E4E❌ Нет прав');
+        if (!isOwner && ['build', 'break'].includes(flag)) return msg(bot, username, '&#CA4E4E❌ Только владелец');
+
+        const regionName = property.region_name || config.clan.regionPrefix + propertyId;
+        bot.chat('/rg flag ' + regionName + ' ' + flag + ' ' + value);
+        msg(bot, username, '&#76C519✅ Флаг ' + flag + ' = ' + value);
+        return;
+    }
+
+    // ==================== NALOG ====================
+    if (sub === 'nalog') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /im nalog <info|dep> <id> [сумма]');
+        const nalogAction = subArgs[0].toLowerCase();
+        const propertyId = subArgs[1];
+        const property = db.properties.get(propertyId);
+        if (!property || !property.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+        if (property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Только владелец');
+
+        const propConfig = config.getPropertyInfo(propertyId);
+        if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Конфигурация не найдена');
+
+        const taxRate = config.economy.taxRate;
+        const weeklyTax = Math.floor(propConfig.price * taxRate);
+
+        if (nalogAction === 'info') {
+            const isExpired = !property.tax_paid_until || new Date(property.tax_paid_until) < new Date();
+            msg(bot, username, '&#80C4C5💰 Налог #' + propertyId + ' &#D4D4D4| Ставка: &#FFB800' + (taxRate * 100).toFixed(1) + '% &#D4D4D4| Сумма: &#76C519' + utils.formatMoney(weeklyTax) + '/нед');
+            msg(bot, username, (isExpired ? '&#CA4E4E⚠ Налог не оплачен! ' : '&#76C519✅ Оплачен до ') + (property.tax_paid_until ? utils.formatDate(property.tax_paid_until) : '—') + ' &#D4D4D4| /im nalog dep ' + propertyId + ' ' + weeklyTax);
+            return;
+        }
+
+        if (nalogAction === 'dep') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ Укажите сумму. Минимум: ' + utils.formatMoney(weeklyTax));
+            const amount = parseFloat(subArgs[2]);
+            if (isNaN(amount) || amount < weeklyTax) return msg(bot, username, '&#CA4E4E❌ Минимум: ' + utils.formatMoney(weeklyTax));
+
+            const rpMember = db.rpMembers.get(username);
+            if (!rpMember || rpMember.balance < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно средств');
+
+            db.rpMembers.updateBalance(username, -amount, 'tax_payment', 'Налог #' + propertyId, 'SYSTEM');
+            const newTaxDate = new Date();
+            if (property.tax_paid_until && new Date(property.tax_paid_until) > new Date()) {
+                newTaxDate.setTime(new Date(property.tax_paid_until).getTime());
+            }
+            newTaxDate.setDate(newTaxDate.getDate() + 7);
+            db.properties.setTaxPaid(propertyId, newTaxDate.toISOString());
+
+            msg(bot, username, '&#76C519✅ Налог оплачен! Сумма: &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4| До: ' + utils.formatDate(newTaxDate));
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /im nalog <info|dep>');
+        return;
+    }
+
+    // ==================== LIST ====================
+    if (sub === 'list') {
+        const allConfigs = Object.entries(config.propertyPrices);
+        const allProps = db.properties.getAll();
+        let freeList = allConfigs.filter(([id]) => !allProps.find(p => p.property_id === id && p.is_owned));
+        freeList.sort((a, b) => a[1].price - b[1].price);
+        const items = freeList.slice(0, 15).map(([id, info]) => '&#FFB800#' + id + ' &#D4D4D4' + (TYPE_NAMES[info.type] || info.type) + ' &#76C519' + utils.formatMoney(info.price)).join(' &#D4D4D4| ');
+
+        msg(bot, username, '&#80C4C5🏠 Рынок недвижимости (' + freeList.length + ' свободно):');
+        msg(bot, username, items || '&#D4D4D4Нет свободного имущества');
+        msg(bot, username, '&#D4D4D4Просмотр: /idim <номер> | Поиск: /im find [тип] [макс_цена]');
+        return;
+    }
+
+    // ==================== MY ====================
+    if (sub === 'my') {
+        const props = db.properties.getOwned(username);
+        if (props.length === 0) return msg(bot, username, '&#D4D4D4У вас нет имущества. /im list — рынок');
+        const owned = props.filter(p => p.owner_lower === username.toLowerCase());
+        const coOwned = props.filter(p => p.owner_lower !== username.toLowerCase());
+
+        msg(bot, username, '&#80C4C5🔑 Имущество (' + props.length + '):');
+        if (owned.length > 0) {
+            const list = owned.map(p => '&#FFB800#' + p.property_id + ' &#D4D4D4' + (TYPE_NAMES[p.property_type] || p.property_type)).join(' &#D4D4D4| ');
+            msg(bot, username, list);
+        }
+        if (coOwned.length > 0) {
+            const list = coOwned.map(p => '&#D4D4D4#' + p.property_id + ' ' + p.property_type + ' (владелец: &#76C519' + p.owner + '&#D4D4D4)').join(' &#D4D4D4| ');
+            msg(bot, username, list);
+        }
+        return;
+    }
+
+    // ==================== FIND / PRICE ====================
+    if (sub === 'find') {
+        const searchType = subArgs[0]?.toLowerCase();
+        const maxPrice = parseFloat(subArgs[1]) || Infinity;
+        const allConfigs = Object.entries(config.propertyPrices);
+        const allProps = db.properties.getAll();
+
+        let filtered = allConfigs.filter(([id, info]) => {
+            if (allProps.find(p => p.property_id === id && p.is_owned)) return false;
+            if (searchType && searchType !== 'all' && info.type !== searchType) return false;
+            if (info.price > maxPrice) return false;
+            return true;
+        });
+        filtered.sort((a, b) => a[1].price - b[1].price);
+
+        if (filtered.length === 0) return msg(bot, username, '&#D4D4D4Ничего не найдено');
+        const list = filtered.slice(0, 10).map(([id, info]) => (TYPE_EMOJI[info.type] || '📍') + ' &#FFB800#' + id + ' &#D4D4D4' + (TYPE_NAMES[info.type] || info.type) + ' &#76C519' + utils.formatMoney(info.price)).join(' &#D4D4D4| ');
+        msg(bot, username, '&#80C4C5🔍 Найдено (' + filtered.length + '): ' + list);
+        return;
+    }
+
+    if (sub === 'price') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /im price <id>');
+        const propConfig = config.getPropertyInfo(subArgs[0]);
+        if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Не найдено');
+        const weeklyTax = Math.floor(propConfig.price * config.economy.taxRate);
+        msg(bot, username, '&#80C4C5💰 #' + subArgs[0] + ' ' + (TYPE_NAMES[propConfig.type] || propConfig.type) + ' &#D4D4D4| Цена: &#76C519' + utils.formatMoney(propConfig.price) + ' &#D4D4D4| Налог: &#76C519' + utils.formatMoney(weeklyTax) + '/нед');
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /im <buy|sell|info|addm|dellm|flag|nalog|list|my|find|price>');
 }
 
-async function buyProperty(bot, sender, propertyId, db, addLog) {
-    if (!propertyId) {
-        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества! Используйте &e/idim`);
+// ==================== /BIZ ====================
+function businessManage(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /biz <flag|nalog|fin|info>');
+
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    if (sub === 'flag') {
+        if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /biz flag <id> <use|item-drop|chest-access|door> <allow|deny>');
+        const propertyId = subArgs[0];
+        const flag = subArgs[1].toLowerCase();
+        const value = subArgs[2].toLowerCase();
+
+        if (!['use', 'item-drop', 'chest-access', 'door'].includes(flag)) return msg(bot, username, '&#CA4E4E❌ Флаги: use, item-drop, chest-access, door');
+        if (!['allow', 'deny'].includes(value)) return msg(bot, username, '&#CA4E4E❌ allow или deny');
+
+        const property = db.properties.get(propertyId);
+        if (!property || property.property_type !== 'business') return msg(bot, username, '&#CA4E4E❌ Не бизнес');
+        if (property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Только владелец');
+
+        const regionName = property.region_name || config.clan.regionPrefix + propertyId;
+        bot.chat('/rg flag ' + regionName + ' ' + flag + ' ' + value);
+        msg(bot, username, '&#76C519✅ Флаг ' + flag + ' = ' + value);
         return;
     }
-    
-    const property = await db.getProperty(propertyId);
-    if (!property) {
-        sendMessage(bot, sender, `&4&l|&c Имущество с ID &e${propertyId} &cне найдено`);
-        return;
-    }
-    
-    if (!property.is_available) {
-        sendMessage(bot, sender, `&4&l|&c Имущество #&e${propertyId} &cуже занято`);
-        return;
-    }
-    
-    const profile = await db.getRPProfile(sender);
-    if (!profile) {
-        sendMessage(bot, sender, `&4&l|&c Сначала зарегистрируйтесь в RolePlay через &e/rp`);
-        return;
-    }
-    
-    // Проверка лицензии для бизнеса/офиса
-    if (property.type === 'business') {
-        const license = await db.get(`SELECT * FROM licenses WHERE owner_nick = ? AND type = 'business' AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP`, [sender]);
-        if (!license) {
-            sendMessage(bot, sender, `&4&l|&c Для покупки бизнеса нужна лицензия! Оформите в Discord`);
+
+    if (sub === 'nalog') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /biz nalog <info|dep> <id> [сумма]');
+        const property = db.properties.get(subArgs[1]);
+        if (!property || property.property_type !== 'business') return msg(bot, username, '&#CA4E4E❌ Не бизнес');
+
+        const nalogAction = subArgs[0].toLowerCase();
+        const propConfig = config.getPropertyInfo(subArgs[1]);
+        if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Конфигурация не найдена');
+
+        const taxRate = db.settings.getNumber('business_tax_rate') || 0.02;
+        const weeklyTax = Math.floor(propConfig.price * taxRate);
+
+        if (nalogAction === 'info') {
+            const isExpired = !property.tax_paid_until || new Date(property.tax_paid_until) < new Date();
+            msg(bot, username, '&#80C4C5💰 Налог бизнеса #' + subArgs[1] + ' &#D4D4D4| Ставка: &#FFB800' + (taxRate * 100).toFixed(1) + '% &#D4D4D4| Сумма: &#76C519' + utils.formatMoney(weeklyTax) + '/нед');
+            msg(bot, username, (isExpired ? '&#CA4E4E⚠ Не оплачен! ' : '&#76C519✅ Оплачен ') + '/biz nalog dep ' + subArgs[1] + ' ' + weeklyTax);
             return;
         }
-    }
-    
-    if (property.type === 'office') {
-        const license = await db.get(`SELECT * FROM licenses WHERE owner_nick = ? AND type = 'office' AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP`, [sender]);
-        if (!license) {
-            sendMessage(bot, sender, `&4&l|&c Для покупки офиса нужна лицензия! Оформите в Discord`);
+        if (nalogAction === 'dep') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ Укажите сумму');
+            const amount = parseFloat(subArgs[2]);
+            if (isNaN(amount) || amount < weeklyTax) return msg(bot, username, '&#CA4E4E❌ Минимум: ' + utils.formatMoney(weeklyTax));
+
+            const rpMember = db.rpMembers.get(username);
+            if (!rpMember || rpMember.balance < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно средств');
+
+            db.rpMembers.updateBalance(username, -amount, 'tax_payment', 'Налог бизнес #' + subArgs[1], 'SYSTEM');
+            const newTaxDate = new Date();
+            if (property.tax_paid_until && new Date(property.tax_paid_until) > new Date()) {
+                newTaxDate.setTime(new Date(property.tax_paid_until).getTime());
+            }
+            newTaxDate.setDate(newTaxDate.getDate() + 7);
+            db.properties.setTaxPaid(subArgs[1], newTaxDate.toISOString());
+
+            msg(bot, username, '&#76C519✅ Налог оплачен! &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4| До: ' + utils.formatDate(newTaxDate));
             return;
         }
-    }
-    
-    if (profile.money < property.price) {
-        sendMessage(bot, sender, `&4&l|&c Недостаточно средств! Нужно &e${property.price.toLocaleString()}₽`);
         return;
     }
-    
-    const result = await db.buyProperty(propertyId, sender);
-    
-    if (result.success) {
-        const regionName = `TRTR${propertyId}`;
-        bot.chat(`/rg addmember ${regionName} ${sender}`);
-        
-        sendMessage(bot, sender, `&a&l|&f Вы приобрели ${property.type} #&e${propertyId} &aза &e${property.price.toLocaleString()}₽`);
-        bot.chat(`/cc &a🏠 ${sender} приобрёл ${property.type} #${propertyId}`);
-        if (addLog) addLog(`🏠 ${sender} купил ${property.type} #${propertyId} за ${property.price}`, 'success');
-    } else {
-        sendMessage(bot, sender, `&4&l|&c Ошибка покупки: ${result.reason}`);
+
+    if (sub === 'fin') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /biz fin <id> <1h|1d|1w|all>');
+        const propertyId = subArgs[0];
+        const period = subArgs[1]?.toLowerCase();
+        if (!['1h', '1d', '1w', 'all'].includes(period)) return msg(bot, username, '&#CA4E4E❌ Период: 1h, 1d, 1w, all');
+
+        const property = db.properties.get(propertyId);
+        if (!property || property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Не ваш бизнес');
+
+        const business = db.get('SELECT * FROM businesses WHERE property_id = ?', [propertyId]);
+        if (!business) return msg(bot, username, '&#D4D4D4Нет данных');
+
+        let earnings = 0, periodName = '';
+        if (period === '1h') { earnings = (business.earnings_today || 0) / 24; periodName = 'за час'; }
+        else if (period === '1d') { earnings = business.earnings_today || 0; periodName = 'за день'; }
+        else if (period === '1w') { earnings = business.earnings_week || 0; periodName = 'за неделю'; }
+        else { earnings = business.earnings_total || 0; periodName = 'за всё время'; }
+
+        msg(bot, username, '&#80C4C5📊 Бизнес #' + propertyId + ' &#D4D4D4| Доход ' + periodName + ': &#76C519' + utils.formatMoney(earnings));
+        return;
     }
+
+    if (sub === 'info') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /biz info <id>');
+        const propertyId = subArgs[0];
+        const property = db.properties.get(propertyId);
+        if (!property || property.property_type !== 'business') return msg(bot, username, '&#CA4E4E❌ Не бизнес');
+
+        const business = db.get('SELECT * FROM businesses WHERE property_id = ?', [propertyId]);
+        msg(bot, username, '&#80C4C5🏪 Бизнес #' + propertyId + ' &#D4D4D4| Владелец: &#76C519' + property.owner);
+        if (business) {
+            msg(bot, username, '&#D4D4D4Доход: сегодня &#76C519' + utils.formatMoney(business.earnings_today || 0) + ' &#D4D4D4| неделя &#76C519' + utils.formatMoney(business.earnings_week || 0) + ' &#D4D4D4| всего &#76C519' + utils.formatMoney(business.earnings_total || 0));
+        }
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /biz <flag|nalog|fin|info>');
 }
 
-async function propertyInfo(bot, sender, propertyId, db) {
-    if (!propertyId) {
-        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества`);
+// ==================== /OFFICE (/OF) ====================
+function officeManage(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /office <nalog|fin|info|type>');
+
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    if (sub === 'nalog') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /office nalog <info|dep> <id> [сумма]');
+        const property = db.properties.get(subArgs[1]);
+        if (!property || property.property_type !== 'office') return msg(bot, username, '&#CA4E4E❌ Не офис');
+
+        const nalogAction = subArgs[0].toLowerCase();
+        const propConfig = config.getPropertyInfo(subArgs[1]);
+        if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Конфигурация не найдена');
+
+        const taxRate = config.economy.taxRate;
+        const weeklyTax = Math.floor(propConfig.price * taxRate);
+
+        if (nalogAction === 'info') {
+            const isExpired = !property.tax_paid_until || new Date(property.tax_paid_until) < new Date();
+            msg(bot, username, '&#80C4C5💰 Налог офиса #' + subArgs[1] + ' &#D4D4D4| Сумма: &#76C519' + utils.formatMoney(weeklyTax) + '/нед');
+            msg(bot, username, (isExpired ? '&#CA4E4E⚠ Не оплачен! ' : '&#76C519✅ Оплачен ') + '/office nalog dep ' + subArgs[1] + ' ' + weeklyTax);
+            return;
+        }
+        if (nalogAction === 'dep') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ Укажите сумму');
+            const amount = parseFloat(subArgs[2]);
+            if (isNaN(amount) || amount < weeklyTax) return msg(bot, username, '&#CA4E4E❌ Минимум: ' + utils.formatMoney(weeklyTax));
+
+            const rpMember = db.rpMembers.get(username);
+            if (!rpMember || rpMember.balance < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно средств');
+
+            db.rpMembers.updateBalance(username, -amount, 'tax_payment', 'Налог офис #' + subArgs[1], 'SYSTEM');
+            const newTaxDate = new Date();
+            if (property.tax_paid_until && new Date(property.tax_paid_until) > new Date()) {
+                newTaxDate.setTime(new Date(property.tax_paid_until).getTime());
+            }
+            newTaxDate.setDate(newTaxDate.getDate() + 7);
+            db.properties.setTaxPaid(subArgs[1], newTaxDate.toISOString());
+
+            msg(bot, username, '&#76C519✅ Налог оплачен! &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4| До: ' + utils.formatDate(newTaxDate));
+            return;
+        }
         return;
     }
-    
-    const property = await db.getProperty(propertyId);
-    if (!property) {
-        sendMessage(bot, sender, `&4&l|&c Имущество с ID &e${propertyId} &cне найдено`);
+
+    if (sub === 'fin') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /office fin <id> <1h|1d|1w|all>');
+        const propertyId = subArgs[0];
+        const period = subArgs[1]?.toLowerCase();
+        if (!['1h', '1d', '1w', 'all'].includes(period)) return msg(bot, username, '&#CA4E4E❌ 1h, 1d, 1w, all');
+
+        const property = db.properties.get(propertyId);
+        if (!property || property.owner_lower !== username.toLowerCase()) return msg(bot, username, '&#CA4E4E❌ Не ваш офис');
+
+        const office = db.get('SELECT * FROM offices WHERE property_id = ?', [propertyId]);
+        if (!office) return msg(bot, username, '&#D4D4D4Нет данных');
+
+        const baseEarnings = office.level * 500;
+        let earnings = 0, periodName = '';
+        if (period === '1h') { earnings = baseEarnings; periodName = 'за час'; }
+        else if (period === '1d') { earnings = baseEarnings * 24; periodName = 'за день'; }
+        else if (period === '1w') { earnings = baseEarnings * 24 * 7; periodName = 'за неделю'; }
+        else { earnings = office.earnings_total || 0; periodName = 'за всё время'; }
+
+        msg(bot, username, '&#80C4C5📊 Офис #' + propertyId + ' (ур.' + office.level + ') &#D4D4D4| Доход ' + periodName + ': &#76C519' + utils.formatMoney(earnings));
         return;
     }
-    
-    const taxRate = await db.getSetting('property_tax_rate') || 0.01;
-    const monthlyTax = property.price * taxRate / 12;
-    
-    sendMessage(bot, sender, `&a&l|&f Имущество #&e${property.id} &7| ${property.type}`);
-    sendMessage(bot, sender, `&7&l|&f Цена: &e${property.price.toLocaleString()}₽ &7| Налог: &e${monthlyTax.toLocaleString()}₽/мес`);
-    sendMessage(bot, sender, `&7&l|&f Владелец: &e${property.owner_nick || 'Свободно'}`);
+
+    if (sub === 'info') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /office info <id>');
+        const propertyId = subArgs[0];
+        const property = db.properties.get(propertyId);
+        if (!property || property.property_type !== 'office') return msg(bot, username, '&#CA4E4E❌ Не офис');
+
+        const office = db.get('SELECT * FROM offices WHERE property_id = ?', [propertyId]);
+        if (!office) return msg(bot, username, '&#D4D4D4Нет данных. Требуется настройка.');
+
+        const nextLevel = office.level + 1;
+        const questionsNeeded = nextLevel <= 10 ? nextLevel * 3 : 0;
+        const correctNeeded = Math.ceil(questionsNeeded * 0.6);
+
+        msg(bot, username, '&#80C4C5🏛️ Офис #' + propertyId + ' &#D4D4D4| Тип: &#FFB800' + (office.office_type || '—') + ' &#D4D4D4| Уровень: &#76C519' + office.level + '/10');
+        if (office.level < 10) {
+            msg(bot, username, '&#D4D4D4Для ур.' + nextLevel + ': ответов &#FFB800' + questionsNeeded + ' &#D4D4D4| правильно &#FFB800' + correctNeeded);
+        }
+        msg(bot, username, '&#D4D4D4Отвечено: &#76C519' + (office.questions_answered || 0) + ' &#D4D4D4| Правильно: &#76C519' + (office.correct_answers || 0));
+        return;
+    }
+
+    if (sub === 'type') {
+        const types = (config.officeTypes || []).map(t => '&#FFB800' + t.key + ' &#D4D4D4— ' + t.name).join(' | ');
+        msg(bot, username, '&#80C4C5📋 Типы офисов: ' + types);
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /office <nalog|fin|info|type>');
 }
 
-async function sellProperty(bot, sender, propertyId, db, addLog) {
-    if (!propertyId) {
-        sendMessage(bot, sender, `&4&l|&c Укажите ID имущества`);
-        return;
-    }
-    
-    const property = await db.getProperty(propertyId);
-    if (!property || property.owner_nick !== sender) {
-        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
-        return;
-    }
-    
-    const refund = Math.floor(property.price * 0.7);
-    await db.updateMoney(sender, refund, 'property_sell', `Продажа имущества #${propertyId}`, 'system');
-    await db.run(`UPDATE property SET owner_nick = NULL, is_available = 1, co_owner1 = NULL, co_owner2 = NULL WHERE id = ?`, [propertyId]);
-    
-    const regionName = `TRTR${propertyId}`;
-    bot.chat(`/rg removemember ${regionName} ${sender}`);
-    
-    sendMessage(bot, sender, `&a&l|&f Вы продали ${property.type} #&e${propertyId} &aза &e${refund.toLocaleString()}₽`);
-    bot.chat(`/cc &a🏠 ${sender} продал ${property.type} #${propertyId}`);
-    if (addLog) addLog(`🏠 ${sender} продал ${property.type} #${propertyId} за ${refund}`, 'info');
-}
-
-// ============================================
-// /imflag [флаг] [on/off] - Управление флагами
-// ============================================
-
-async function imflag(bot, sender, args, db) {
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/imflag [флаг] [on/off]`);
-        sendMessage(bot, sender, `&7&l|&f Доступные флаги: &euse, item-drop`);
-        return;
-    }
-    
-    const properties = await db.getPlayerProperties(sender);
-    if (!properties || properties.length === 0) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет имущества`);
-        return;
-    }
-    
-    const property = properties[0];
-    const regionName = `TRTR${property.id}`;
-    const flag = args[0].toLowerCase();
-    const state = args[1].toLowerCase();
-    const allowDeny = state === 'on' ? 'allow' : 'deny';
-    
-    if (flag === 'use' || flag === 'item-drop') {
-        bot.chat(`/rg f ${regionName} ${flag} ${allowDeny}`);
-        sendMessage(bot, sender, `&a&l|&f Флаг &e${flag} &aустановлен в &e${state.toUpperCase()}`);
-    } else {
-        sendMessage(bot, sender, `&4&l|&c Неизвестный флаг. Доступно: &euse, item-drop`);
-    }
-}
-
-// ============================================
-// /imm [add/del] [id] [ник] - Сожители
-// ============================================
-
-async function imm(bot, sender, args, db, addLog) {
-    if (args.length < 3) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/imm [add/del] [id] [ник]`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    const propertyId = args[1];
-    const target = args[2];
-    
-    const property = await db.getProperty(propertyId);
-    if (!property || property.owner_nick !== sender) {
-        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
-        return;
-    }
-    
-    if (property.type !== 'apartment' && property.type !== 'house') {
-        sendMessage(bot, sender, `&4&l|&c Сожителей можно добавлять только в квартиры и дома`);
-        return;
-    }
-    
-    if (action === 'add') {
-        const clanMember = await db.getClanMember(target);
-        const rpProfile = await db.getRPProfile(target);
-        
-        if (!clanMember) {
-            sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в клане`);
-            return;
-        }
-        if (!rpProfile) {
-            sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне зарегистрирован в RolePlay`);
-            return;
-        }
-        
-        const residents = await db.all(`SELECT resident_nick FROM property_residents WHERE property_id = ?`, [propertyId]);
-        if (residents.length >= 2) {
-            sendMessage(bot, sender, `&4&l|&c Нельзя добавить более 2 сожителей`);
-            return;
-        }
-        
-        await db.run(`INSERT OR REPLACE INTO property_residents (property_id, resident_nick, added_by, is_active) VALUES (?, ?, ?, 1)`, [propertyId, target, sender]);
-        bot.chat(`/rg addmember TRTR${propertyId} ${target}`);
-        
-        sendMessage(bot, sender, `&a&l|&f ${target} &aдобавлен как сожитель в имущество #&e${propertyId}`);
-        sendMessage(bot, target, `&a&l|&f ${sender} добавил вас как сожителя в имущество #&e${propertyId}`);
-        if (addLog) addLog(`🏠 ${sender} добавил сожителя ${target} в #${propertyId}`, 'info');
-        
-    } else if (action === 'del') {
-        await db.run(`DELETE FROM property_residents WHERE property_id = ? AND resident_nick = ?`, [propertyId, target]);
-        bot.chat(`/rg removemember TRTR${propertyId} ${target}`);
-        
-        sendMessage(bot, sender, `&a&l|&f ${target} &aудалён из сожителей имущества #&e${propertyId}`);
-        sendMessage(bot, target, `&c&l|&f ${sender} удалил вас из сожителей имущества #&e${propertyId}`);
-        if (addLog) addLog(`🏠 ${sender} удалил сожителя ${target} из #${propertyId}`, 'info');
-    }
-}
-
-// ============================================
-// /imnalog [info/dep] [id] [сумма] - Налог
-// ============================================
-
-async function imnalog(bot, sender, args, db, addLog) {
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/imnalog [info/dep] [id] [сумма]`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    const propertyId = args[1];
-    const amount = parseFloat(args[2]);
-    
-    const property = await db.getProperty(propertyId);
-    if (!property || property.owner_nick !== sender) {
-        sendMessage(bot, sender, `&4&l|&c Вы не являетесь владельцем этого имущества`);
-        return;
-    }
-    
-    const taxRate = await db.getSetting('property_tax_rate') || 0.01;
-    const monthlyTax = property.price * taxRate / 12;
-    
-    if (action === 'info') {
-        sendMessage(bot, sender, `&a&l|&f Налог на имущество #&e${propertyId}`);
-        sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
-        sendMessage(bot, sender, `&7&l|&f Долг: &e${(property.tax_accumulated || 0).toLocaleString()}₽`);
-    } else if (action === 'dep') {
-        if (isNaN(amount) || amount <= 0) {
-            sendMessage(bot, sender, `&4&l|&c Укажите сумму для оплаты`);
-            return;
-        }
-        
-        const profile = await db.getRPProfile(sender);
-        if (!profile || profile.money < amount) {
-            sendMessage(bot, sender, `&4&l|&c Недостаточно средств`);
-            return;
-        }
-        
-        await db.updateMoney(sender, -amount, 'tax', `Оплата налога за имущество #${propertyId}`, 'system');
-        
-        const currentDebt = property.tax_accumulated || 0;
-        const newDebt = Math.max(0, currentDebt - amount);
-        await db.run(`UPDATE property SET tax_accumulated = ?, last_tax_pay = CURRENT_TIMESTAMP WHERE id = ?`, [newDebt, propertyId]);
-        
-        sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aв счёт налога за имущество #&e${propertyId}`);
-        if (newDebt === 0) sendMessage(bot, sender, `&a&l|&f Налог полностью погашен`);
-        if (addLog) addLog(`💰 ${sender} оплатил налог ${amount} за #${propertyId}`, 'info');
-    }
-}
-
-// ============================================
-// /biz - Команды для бизнеса
-// ============================================
-
-async function biz(bot, sender, args, db, addLog) {
-    if (args.length < 1) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/biz [flag/nalog/fin] [параметры]`);
-        return;
-    }
-    
-    const properties = await db.getPlayerProperties(sender);
-    const business = properties?.find(p => p.type === 'business');
-    
-    if (!business) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет бизнеса`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    
-    if (action === 'flag') {
-        if (args.length < 3) {
-            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz flag [флаг] [on/off]`);
-            return;
-        }
-        const flag = args[1];
-        const state = args[2];
-        const regionName = `TRTR${business.id}`;
-        const allowDeny = state === 'on' ? 'allow' : 'deny';
-        bot.chat(`/rg f ${regionName} ${flag} ${allowDeny}`);
-        sendMessage(bot, sender, `&a&l|&f Флаг &e${flag} &aустановлен в &e${state.toUpperCase()}`);
-        
-    } else if (action === 'nalog') {
-        if (args.length < 2) {
-            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz nalog [info/dep] [сумма]`);
-            return;
-        }
-        const subAction = args[1];
-        const amount = parseFloat(args[2]);
-        
-        if (subAction === 'info') {
-            const taxRate = await db.getSetting('business_tax_rate') || 0.02;
-            const monthlyTax = business.price * taxRate / 12;
-            sendMessage(bot, sender, `&a&l|&f Налог на бизнес #&e${business.id}`);
-            sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
-        } else if (subAction === 'dep' && !isNaN(amount)) {
-            await db.updateMoney(sender, -amount, 'tax', `Оплата налога за бизнес #${business.id}`, 'system');
-            sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aналога за бизнес`);
-        }
-        
-    } else if (action === 'fin') {
-        if (args.length < 3) {
-            sendMessage(bot, sender, `&4&l|&c Использование: &e/biz fin [id] [время]`);
-            sendMessage(bot, sender, `&7&l|&f Время: &e1h, 1d, 1w, all`);
-            return;
-        }
-        const bizId = args[1];
-        const period = args[2];
-        
-        const businessData = await db.get(`SELECT total_income FROM businesses WHERE property_id = ?`, [bizId]);
-        sendMessage(bot, sender, `&a&l|&f Финансы бизнеса #&e${bizId} &7(${period})`);
-        sendMessage(bot, sender, `&7&l|&f Доход: &e${businessData?.total_income?.toLocaleString() || 0}₽`);
-    }
-}
-
-// ============================================
-// /office - Команды для офисов
-// ============================================
-
-async function office(bot, sender, args, db, addLog) {
-    if (args.length < 1) {
-        sendMessage(bot, sender, `&4&l|&c Использование: &e/office [nalog/fin/info] [параметры]`);
-        return;
-    }
-    
-    const properties = await db.getPlayerProperties(sender);
-    const officeProp = properties?.find(p => p.type === 'office');
-    
-    if (!officeProp) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет офиса`);
-        return;
-    }
-    
-    const officeData = await db.get(`SELECT * FROM offices WHERE property_id = ?`, [officeProp.id]);
-    const action = args[0].toLowerCase();
-    
-    if (action === 'nalog') {
-        if (args.length < 2) {
-            sendMessage(bot, sender, `&4&l|&c Использование: &e/office nalog [info/dep] [сумма]`);
-            return;
-        }
-        const subAction = args[1];
-        const amount = parseFloat(args[2]);
-        
-        if (subAction === 'info') {
-            const taxRate = await db.getSetting('office_tax_rate') || 0.015;
-            const monthlyTax = officeProp.price * taxRate / 12;
-            sendMessage(bot, sender, `&a&l|&f Налог на офис #&e${officeProp.id}`);
-            sendMessage(bot, sender, `&7&l|&f Ставка: &e${(taxRate * 100)}% &7| Налог в месяц: &e${monthlyTax.toLocaleString()}₽`);
-        } else if (subAction === 'dep' && !isNaN(amount)) {
-            await db.updateMoney(sender, -amount, 'tax', `Оплата налога за офис #${officeProp.id}`, 'system');
-            sendMessage(bot, sender, `&a&l|&f Оплачено &e${amount.toLocaleString()}₽ &aналога за офис`);
-        }
-        
-    } else if (action === 'fin') {
-        if (args.length < 3) {
-            sendMessage(bot, sender, `&4&l|&c Использование: &e/office fin [id] [время]`);
-            return;
-        }
-        const officeId = args[1];
-        const period = args[2];
-        
-        sendMessage(bot, sender, `&a&l|&f Финансы офиса #&e${officeId} &7(${period})`);
-        sendMessage(bot, sender, `&7&l|&f Доход: &e${officeData?.total_income?.toLocaleString() || 0}₽`);
-        sendMessage(bot, sender, `&7&l|&f Уровень: &e${officeData?.level || 4}/10`);
-        
-    } else if (action === 'info') {
-        sendMessage(bot, sender, `&a&l|&f Офис #&e${officeProp.id}`);
-        sendMessage(bot, sender, `&7&l|&f Тип: &e${officeData?.office_type || 'Не выбран'} &7| Уровень: &e${officeData?.level || 4}/10`);
-        sendMessage(bot, sender, `&7&l|&f Доход всего: &e${officeData?.total_income?.toLocaleString() || 0}₽`);
-        
-        const nextLevel = (officeData?.level || 4) + 1;
-        const questionsNeeded = nextLevel * 5;
-        sendMessage(bot, sender, `&7&l|&f Для повышения до ${nextLevel} уровня нужно: &e${questionsNeeded} &7правильных ответов`);
-    }
-}
-
-// ============================================
-// ЭКСПОРТ
-// ============================================
-
-module.exports = {
-    im,
-    imflag,
-    imm,
-    imnalog,
-    biz,
-    office
-};
+// ==================== ЭКСПОРТ ====================
+module.exports = { propertyManage, businessManage, officeManage };

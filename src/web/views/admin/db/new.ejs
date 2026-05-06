@@ -1,36 +1,71 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Новая запись | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
-    <style>
-        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; padding: 40px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h1 { color: #4a3aff; margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; }
-        input { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 10px; }
-        .btn { padding: 10px 25px; background: #4a3aff; color: white; border: none; border-radius: 30px; cursor: pointer; }
-        .btn:hover { background: #3728e0; }
-    </style>
+    <meta name="robots" content="noindex, nofollow">
+    <title>Новая запись — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Новая запись в таблице <%= table %></h1>
-        <form method="POST" action="/admin/db/<%= table %>/new">
-            <% columns.forEach(col => { %>
-                <% if (col.name !== 'id') { %>
-                    <div class="form-group">
-                        <label for="<%= col.name %>"><%= col.name %></label>
-                        <input type="text" id="<%= col.name %>" name="<%= col.name %>" value="">
-                    </div>
-                <% } %>
-            <% }) %>
-            <button type="submit" class="btn">Создать</button>
-            <a href="/admin/db/<%= table %>" class="btn" style="background:#999;">Отмена</a>
-        </form>
+    <%- include('../../partials/header', { page: 'admin' }) %>
+
+    <div class="admin-layout">
+        <%- include('../../partials/sidebar', { page: 'database' }) %>
+
+        <div class="admin-content">
+            <div class="table-nav" style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+                <a href="/admin/db" style="color: var(--text-secondary);">🗄️ БД</a>
+                <span style="color: var(--text-muted);">/</span>
+                <a href="/admin/db/table/<%= typeof tableName !== 'undefined' ? tableName : '' %>" style="color: var(--text-secondary);"><%= typeof tableName !== 'undefined' ? tableName : '' %></a>
+                <span style="color: var(--text-muted);">/</span>
+                <strong style="color: var(--text-bright);">Новая запись</strong>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">➕ Новая запись</h3>
+                    <span class="badge badge-info">Таблица: <%= typeof tableName !== 'undefined' ? tableName : '' %></span>
+                </div>
+                <div class="card-body">
+                    <% if (typeof error !== 'undefined' && error) { %>
+                        <div style="background: rgba(202,78,78,0.1); border: 1px solid var(--danger); border-radius: 8px; padding: 12px 16px; color: var(--danger); margin-bottom: 16px;">
+                            <%= error %>
+                        </div>
+                    <% } %>
+
+                    <% if (typeof success !== 'undefined' && success) { %>
+                        <div style="background: rgba(118,197,25,0.1); border: 1px solid var(--success); border-radius: 8px; padding: 12px 16px; color: var(--success); margin-bottom: 16px;">
+                            <%= success %>
+                        </div>
+                    <% } %>
+
+                    <form method="POST" action="/admin/db/new/<%= typeof tableName !== 'undefined' ? tableName : '' %>">
+                        <% if (typeof columns !== 'undefined' && columns && columns.length > 0) { %>
+                            <% for (var i = 0; i < columns.length; i++) { 
+                                var col = columns[i];
+                                if (col === 'id') continue;
+                            %>
+                                <div class="form-group">
+                                    <label class="form-label"><%= col %></label>
+                                    <input type="text" name="<%= col %>" class="form-input" placeholder="Введите <%= col %>">
+                                </div>
+                            <% } %>
+                        <% } else { %>
+                            <p style="color: var(--text-muted);">Нет информации о структуре таблицы</p>
+                        <% } %>
+
+                        <div style="display: flex; gap: 12px; margin-top: 24px;">
+                            <button type="submit" class="btn btn-primary">➕ Создать</button>
+                            <a href="/admin/db/table/<%= typeof tableName !== 'undefined' ? tableName : '' %>" class="btn btn-outline">← Назад</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <%- include('../../partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

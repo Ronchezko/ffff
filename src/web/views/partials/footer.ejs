@@ -1,0 +1,39 @@
+<footer style="
+    margin-top: 64px;
+    padding: 32px 24px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    text-align: center;
+">
+    <div class="container">
+        <div style="display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 16px;">
+            <a href="/" style="color: var(--text-secondary); text-decoration: none;">🏠 Главная</a>
+            <a href="/top" style="color: var(--text-secondary); text-decoration: none;">🏆 Топ</a>
+            <a href="/career" style="color: var(--text-secondary); text-decoration: none;">🏛️ Карьера</a>
+            <a href="/properties" style="color: var(--text-secondary); text-decoration: none;">🏠 Недвижимость</a>
+            <% if (typeof locals !== 'undefined' && locals && locals.isAuthenticated) { %>
+                <a href="/admin/dashboard" style="color: var(--text-secondary); text-decoration: none;">⚙️ Админ-панель</a>
+            <% } %>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+            &copy; <%= typeof currentYear !== 'undefined' ? currentYear : '2024' %> Resistance City. Свободный Город «Сопротивление».<br>
+            Minecraft RolePlay проект. Не является официальным продуктом Mojang AB.
+        </p>
+        <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 8px;">
+            Версия 5.0.0 • IP: ru.dexland.org • <span id="themeIndicator">Тема: dark</span>
+        </p>
+    </div>
+</footer>
+
+<script>
+    if (document.getElementById('themeIndicator')) {
+        var savedTheme = localStorage.getItem('resistance_theme') || 'dark';
+        document.getElementById('themeIndicator').textContent = 'Тема: ' + savedTheme;
+        
+        window.addEventListener('themechange', function(e) {
+            if (e.detail && e.detail.theme) {
+                document.getElementById('themeIndicator').textContent = 'Тема: ' + e.detail.theme;
+            }
+        });
+    }
+</script>

@@ -1,663 +1,78 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход в админ-панель | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Вход' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
     <style>
-        /* ===== MINECRAFT СТИЛЬ ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Minecraft', 'Segoe UI', Roboto, sans-serif;
-        }
-
-        @font-face {
-            font-family: 'Minecraft';
-            src: url('https://fonts.cdnfonts.com/css/minecraft-4') format('woff2');
-        }
-
-        :root {
-            --bg-color: #1a1a1a;
-            --text-color: #ffffff;
-            --card-bg: rgba(0, 0, 0, 0.8);
-            --border-color: #4a4a4a;
-            --primary: #6b4aff;
-            --primary-hover: #8a6bff;
-            --success: #00d25b;
-            --danger: #ff4757;
-            --warning: #ffaa00;
-            --gradient-2: linear-gradient(45deg, #6b4aff, #aa4eff);
-            --shadow-sm: 0 4px 0 #2a2a2a;
-            --shadow-md: 0 6px 0 #2a2a2a;
-            --shadow-lg: 0 8px 0 #2a2a2a;
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #0b0c1e;
-            --text-color: #e0e0e0;
-            --card-bg: rgba(10, 10, 20, 0.95);
-            --border-color: rgba(255,255,255,0.1);
-            --primary: #aa4eff;
-            --primary-hover: #8a3fcc;
-        }
-
         body {
-            background: linear-gradient(135deg, #1a2a3a 0%, #0a1a2a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            transition: background 0.3s;
-            color: var(--text-color);
-            overflow: hidden;
+            background: radial-gradient(circle at 50% 50%, rgba(99,67,212,0.15) 0%, var(--bg-primary) 70%);
         }
-
-        /* ===== АНИМИРОВАННЫЙ MINECRAFT ФОН ===== */
-        .minecraft-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
+        .login-card-wrapper {
             width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .grass-block {
-            position: absolute;
-            width: 100%;
-            height: 100px;
-            background: repeating-linear-gradient(
-                45deg,
-                #4a6b3a 0px,
-                #4a6b3a 20px,
-                #3a5a2a 20px,
-                #3a5a2a 40px
-            );
-            bottom: 0;
-            left: 0;
-            animation: wave 3s ease-in-out infinite;
-        }
-
-        @keyframes wave {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
-        }
-
-        .floating-block {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: #8b6b4a;
-            border: 2px solid #6b4a2a;
-            transform: rotate(45deg);
-            animation: float 6s ease-in-out infinite;
-            opacity: 0.3;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: rotate(45deg) translateY(0); }
-            50% { transform: rotate(45deg) translateY(-20px); }
-        }
-
-        .block-1 { top: 10%; left: 5%; animation-delay: 0s; }
-        .block-2 { top: 20%; right: 10%; animation-delay: 1s; background: #aa6b4a; }
-        .block-3 { bottom: 20%; left: 15%; animation-delay: 2s; background: #6b8b4a; }
-        .block-4 { top: 40%; right: 20%; animation-delay: 3s; background: #4a6b8b; }
-
-        /* ===== КНОПКИ ===== */
-        .back-home-btn {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 200;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 25px;
-            background: var(--card-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 5px;
-            color: var(--text-color);
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.1s;
-            box-shadow: var(--shadow-sm);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-size: 14px;
-        }
-
-        .back-home-btn:hover {
-            transform: translateY(2px);
-            box-shadow: var(--shadow-md);
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-        .back-home-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 200;
-            background: var(--card-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 5px;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.1s;
-            color: var(--text-color);
-            font-size: 1.5rem;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .theme-toggle:hover {
-            transform: translateY(2px);
-            box-shadow: var(--shadow-md);
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-
-        /* ===== КАРТОЧКА ===== */
-        .login-container {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 450px;
+            max-width: 420px;
             padding: 20px;
-            animation: slideUp 0.5s ease-out;
+            animation: fadeInUp 0.6s ease forwards;
         }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
-        .login-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(10px);
-            border-radius: 10px;
+        .login-card-inner {
             padding: 40px;
-            box-shadow: var(--shadow-lg);
-            border: 2px solid var(--border-color);
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
+            border-radius: var(--radius-xl);
         }
-
-        .login-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 5px;
-            background: var(--gradient-2);
-        }
-
-        .login-card.blocked {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .blocked-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 20;
-            border-radius: 10px;
-            flex-direction: column;
-            gap: 20px;
-            color: white;
+        .login-logo-area {
             text-align: center;
-            padding: 20px;
-            animation: pulse 2s infinite;
+            margin-bottom: 32px;
         }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 0.9; }
-            50% { opacity: 1; }
-        }
-
-        .blocked-overlay svg {
-            width: 60px;
-            height: 60px;
-            fill: var(--danger);
-        }
-
-        .blocked-overlay h3 {
-            font-size: 2rem;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .blocked-overlay p {
-            font-size: 1rem;
-            opacity: 0.9;
-            max-width: 300px;
-        }
-
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .logo img {
-            height: 80px;
-            width: auto;
-            filter: drop-shadow(0 0 20px rgba(170,78,255,0.5));
-            animation: spin 10s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotateY(0deg); }
-            to { transform: rotateY(360deg); }
-        }
-
-        .logo h2 {
-            font-size: 2rem;
-            margin-top: 10px;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        h1 {
-            font-size: 1.5rem;
-            text-align: center;
-            margin-bottom: 30px;
-            color: var(--text-color);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        /* ===== УВЕДОМЛЕНИЯ ===== */
-        .notification {
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            z-index: 9999;
-            padding: 15px 25px;
-            border-radius: 5px;
-            background: var(--card-bg);
-            border: 2px solid;
-            animation: slideInRight 0.3s;
-            max-width: 350px;
-            backdrop-filter: blur(10px);
-            box-shadow: var(--shadow-md);
-        }
-        .notification.success { 
-            border-color: var(--success); 
-            background: rgba(0,210,75,0.1); 
-            color: var(--success); 
-        }
-        .notification.error { 
-            border-color: var(--danger); 
-            background: rgba(255,71,87,0.1); 
-            color: var(--danger); 
-        }
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* ===== ФОРМА ===== */
-        .error-message {
-            background: rgba(255,71,87,0.1);
-            border: 2px solid var(--danger);
+        .login-error-box {
+            background: rgba(202,78,78,0.1);
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
             color: var(--danger);
-            padding: 12px;
-            border-radius: 5px;
             text-align: center;
-            margin-bottom: 20px;
-            font-weight: 600;
-            backdrop-filter: blur(5px);
-            animation: shake 0.5s;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-            20%, 40%, 60%, 80% { transform: translateX(5px); }
-        }
-
-        .attempts-counter {
-            text-align: center;
-            margin: 15px 0;
-            padding: 10px;
-            background: rgba(255,170,0,0.1);
-            border: 2px solid var(--warning);
-            border-radius: 5px;
-            color: var(--warning);
-            font-weight: 600;
-            animation: glow 1.5s infinite;
-        }
-
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 5px var(--warning); }
-            50% { box-shadow: 0 0 20px var(--warning); }
-        }
-
-        .blocked-message {
-            text-align: center;
-            margin: 15px 0;
-            padding: 10px;
-            background: rgba(255,71,87,0.1);
-            border: 2px solid var(--danger);
-            border-radius: 5px;
-            color: var(--danger);
-            font-weight: 600;
-        }
-
-        .form-group {
-            margin-bottom: 25px;
-            position: relative;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--text-color);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 15px;
-            width: 20px;
-            height: 20px;
-            fill: var(--primary);
-            opacity: 0.7;
-        }
-
-        .input-wrapper input {
-            width: 100%;
-            padding: 15px 15px 15px 45px;
-            border: 2px solid var(--border-color);
-            background: rgba(255,255,255,0.1);
-            border-radius: 5px;
-            font-size: 1rem;
-            color: var(--text-color);
-            transition: all 0.3s;
-            font-family: 'Minecraft', monospace;
-        }
-
-        .input-wrapper input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(170,78,255,0.2);
-            transform: translateY(-2px);
-        }
-
-        .input-wrapper input:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-login {
-            width: 100%;
-            padding: 15px;
-            background: var(--gradient-2);
-            border: none;
-            border-radius: 5px;
-            color: white;
-            font-size: 1.2rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.1s;
-            margin-top: 20px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            box-shadow: var(--shadow-sm);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-login::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn-login:hover::before {
-            left: 100%;
-        }
-
-        .btn-login:hover:not(:disabled) {
-            transform: translateY(2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .btn-login:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .back-link {
-            display: block;
-            text-align: center;
-            margin-top: 25px;
-            color: var(--text-color);
-            text-decoration: none;
-            opacity: 0.7;
-            transition: opacity 0.3s;
-            text-transform: uppercase;
-            font-size: 0.9rem;
-        }
-
-        .back-link:hover {
-            opacity: 1;
-            color: var(--primary);
-        }
-
-        /* ===== АДАПТИВНОСТЬ ===== */
-        @media (max-width: 500px) {
-            .login-card {
-                padding: 25px;
-            }
-            .back-home-btn {
-                padding: 8px 15px;
-                font-size: 0.9rem;
-            }
+            margin-bottom: 16px;
         }
     </style>
 </head>
 <body>
-    <!-- MINECRAFT ФОН -->
-    <div class="minecraft-bg">
-        <div class="grass-block"></div>
-        <div class="floating-block block-1"></div>
-        <div class="floating-block block-2"></div>
-        <div class="floating-block block-3"></div>
-        <div class="floating-block block-4"></div>
-    </div>
-
-    <!-- Кнопка "На главную" -->
-    <a href="/" class="back-home-btn">
-        <svg viewBox="0 0 24 24">
-            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-        </svg>
-        <span>На главную</span>
-    </a>
-
-    <!-- Переключатель темы -->
-    <div class="theme-toggle" id="theme-toggle">🌙</div>
-
-    <!-- Уведомления -->
-    <% if (typeof success !== 'undefined' && success) { %>
-    <div class="notification success" id="notification">
-        <span style="cursor:pointer; float:right; margin-left:10px;" onclick="this.parentElement.remove()">×</span>
-        <%= success %>
-    </div>
-    <% } %>
-    
-    <% if (typeof error !== 'undefined' && error) { %>
-    <div class="notification error" id="notification">
-        <span style="cursor:pointer; float:right; margin-left:10px;" onclick="this.parentElement.remove()">×</span>
-        <%= error %>
-    </div>
-    <% } %>
-
-    <div class="login-container">
-        <!-- Класс карточки с проверкой существования blocked -->
-        <div class="login-card <%= (typeof blocked !== 'undefined' && blocked) ? 'blocked' : '' %>">
-            
-            <!-- Оверлей блокировки -->
-            <% if (typeof blocked !== 'undefined' && blocked) { %>
-            <div class="blocked-overlay">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-                </svg>
-                <h3>ДОСТУП ЗАПРЕЩЁН</h3>
-                <p>IP-адрес заблокирован на 15 минут из-за превышения лимита попыток.</p>
-                <p>Пожалуйста, обратитесь к администратору.</p>
+    <div class="login-card-wrapper">
+        <div class="card login-card-inner" style="box-shadow: var(--shadow-lg);">
+            <div class="login-logo-area">
+                <h1 class="text-gradient" style="font-size: 2rem;"><%= typeof clanName !== 'undefined' ? clanName : 'Resistance' %></h1>
+                <p style="color: var(--text-secondary); font-size: 0.95rem;">Админ-панель</p>
             </div>
-            <% } %>
 
-            <div class="logo">
-                <img src="/images/logo.jpg" alt="Resistance Logo">
-                <h2>Resistance</h2>
-            </div>
-            <h1>Админ-панель</h1>
-
-            <!-- Сообщение об ошибке (только если не заблокировано) -->
             <% if (typeof error !== 'undefined' && error) { %>
-                <% if (typeof blocked === 'undefined' || !blocked) { %>
-                <div class="error-message">
-                    <%= error %>
-                </div>
-                <% } %>
+                <div class="login-error-box">⚠ <%= error %></div>
             <% } %>
 
-            <!-- Счётчик попыток -->
-            <% if (typeof attemptsLeft !== 'undefined' && attemptsLeft >= 0 && attemptsLeft < 5) { %>
-                <% if (typeof blocked === 'undefined' || !blocked) { %>
-                <div class="attempts-counter">
-                    ⚔️ Осталось попыток: <%= attemptsLeft %> ⚔️
-                </div>
-                <% } %>
-            <% } %>
-
-            <!-- Сообщение о блокировке -->
-            <% if (typeof blocked !== 'undefined' && blocked) { %>
-            <div class="blocked-message">
-                ⚠️ IP ЗАБЛОКИРОВАН НА 15 МИНУТ ⚠️
-            </div>
-            <% } %>
-
-            <form method="POST" action="/admin/login">
+            <form method="POST" action="/admin/login" autocomplete="off">
                 <div class="form-group">
-                    <label for="username">Игровой ник</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24">
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                        <input type="text" id="username" name="username" placeholder="Введите ник" required <%= (typeof blocked !== 'undefined' && blocked) ? 'disabled' : '' %>>
-                    </div>
+                    <label class="form-label" for="username">Логин</label>
+                    <input type="text" id="username" name="username" class="form-input" placeholder="Введите логин" required autofocus>
                 </div>
                 <div class="form-group">
-                    <label for="password">Пароль</label>
-                    <div class="input-wrapper">
-                        <svg class="input-icon" viewBox="0 0 24 24">
-                            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
-                        </svg>
-                        <input type="password" id="password" name="password" placeholder="Введите пароль" required <%= (typeof blocked !== 'undefined' && blocked) ? 'disabled' : '' %>>
-                    </div>
+                    <label class="form-label" for="password">Пароль</label>
+                    <input type="password" id="password" name="password" class="form-input" placeholder="Введите пароль" required>
                 </div>
-                <button type="submit" class="btn-login" <%= (typeof blocked !== 'undefined' && blocked) ? 'disabled' : '' %>>Войти</button>
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 8px;">🔐 Войти</button>
             </form>
 
-            <a href="/" class="back-link">← Вернуться на главную</a>
+            <div style="text-align: center; margin-top: 24px; color: var(--text-muted); font-size: 0.85rem;">
+                <a href="/" style="color: var(--text-secondary);">← На главную</a>
+            </div>
         </div>
     </div>
 
-    <script>
-        // === Генерация дополнительных частиц ===
-        (function() {
-            for (let i = 0; i < 20; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'floating-block';
-                particle.style.width = Math.random() * 20 + 10 + 'px';
-                particle.style.height = particle.style.width;
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.top = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 5 + 's';
-                particle.style.opacity = '0.1';
-                document.querySelector('.minecraft-bg').appendChild(particle);
-            }
-        })();
-
-        // === Переключение темы ===
-        (function() {
-            const toggle = document.getElementById('theme-toggle');
-            const savedTheme = localStorage.getItem('theme');
-            
-            if (savedTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                toggle.textContent = '☀️';
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-                toggle.textContent = '🌙';
-            }
-            
-            toggle.onclick = function() {
-                const current = document.documentElement.getAttribute('data-theme');
-                const newTheme = current === 'light' ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
-            };
-        })();
-
-        // === Авто-скрытие уведомлений ===
-        setTimeout(() => {
-            const notifications = document.querySelectorAll('.notification');
-            notifications.forEach(el => el.remove());
-        }, 5000);
-    </script>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

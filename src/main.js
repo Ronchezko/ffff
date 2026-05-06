@@ -1,348 +1,635 @@
-// src/main.js
-// Единая точка входа для Resistance Bot
-// Запускает Minecraft бота, Discord бота и Web-сервер с изоляцией ошибок
+// src/main.js — Главный оркестратор экосистемы Resistance City v5.0.0
+// Запускает и управляет всеми дочерними процессами: Discord бот, Minecraft бот, Веб-сервер
+// Обеспечивает graceful shutdown, автоматический перезапуск при падениях и изоляцию процессов
 
+'use strict';
+
+// ==================== ЗАГРУЗКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ====================
+require('dotenv').config();
+
+// ==================== ИМПОРТЫ ====================
+const { fork } = require('child_process');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
-global.cleanNick = function(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-};
-const logger = require('./shared/logger');
-const database = require('./database');
-
-
-
-// Глобальное состояние для отслеживания компонентов
-global.botComponents = {
-    minecraft: null,
-    discord: null,
-    web: null
-};
-const originalConsoleWarn = console.warn;
-console.warn = function(...args) {
-    if (args[0]?.includes?.('Ignoring block entities')) return;
-    originalConsoleWarn.apply(console, args);
-};
-// Глобальные логи для веб-интерфейса
-global.botLogs = [];
-global.systemLogs = [];
-
-// Функция добавления логов в глобальный массив
-function addBotLog(message, type = 'info') {
-    const logEntry = {
-        timestamp: new Date().toLocaleTimeString('ru-RU', { hour12: false }),
-        type,
-        message
+const fs = require('fs');
+let chalk;
+try {
+    chalk = require('chalk');
+} catch (e) {
+    // Fallback если chalk v5+ (ESM)
+    chalk = {
+        gray: (text) => `\x1b[90m${text}\x1b[0m`,
+        blue: (text) => `\x1b[34m${text}\x1b[0m`,
+        yellow: (text) => `\x1b[33m${text}\x1b[0m`,
+        red: (text) => `\x1b[31m${text}\x1b[0m`,
+        green: (text) => `\x1b[32m${text}\x1b[0m`,
+        magenta: (text) => `\x1b[35m${text}\x1b[0m`,
+        cyan: (text) => `\x1b[36m${text}\x1b[0m`,
+        white: (text) => `\x1b[37m${text}\x1b[0m`,
+        bgRed: { white: (text) => `\x1b[41m\x1b[37m${text}\x1b[0m` },
     };
-    global.botLogs.unshift(logEntry);
-    if (global.botLogs.length > 1000) global.botLogs.pop();
-    
-    // Также пишем в консоль с цветом
-    switch(type) {
-        case 'error': logger.error(message); break;
-        case 'warn': logger.warn(message); break;
-        case 'success': logger.success(message); break;
-        default: logger.info(message);
-    }
 }
 
-// Глобальная обработка не пойманных ошибок
-process.on('uncaughtException', (err) => {
-    // Игнорируем ошибки скинов (известная проблема mineflayer)
-    if (err.message?.includes('skin') || err.message?.includes('textures')) {
-        logger.debug('⚠️ Игнорируем ошибку скина:', err.message);
-        return;
-    }
-    logger.error('❌ Непойманная ошибка:', err);
-    addBotLog(`Критическая ошибка: ${err.message}`, 'error');
-});
+// ==================== КОНСТАНТЫ ====================
+const LOGS_DIR = path.join(__dirname, '..', 'logs');
+const PROCESS_RESTART_WINDOW_MS = 60000; // Окно для подсчёта перезапусков (1 минута)
+const MAX_RESTARTS_IN_WINDOW = 5; // Максимум перезапусков в окне
+const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 15000; // Таймаут для принудительного завершения
 
-process.on('unhandledRejection', (reason) => {
-    if (reason?.message?.includes('skin') || reason?.message?.includes('textures')) {
-        logger.debug('⚠️ Игнорируем reject скина');
-        return;
-    }
-    logger.error('❌ Необработанный reject:', reason);
-    addBotLog(`Необработанная ошибка: ${reason?.message || reason}`, 'error');
-});
+// ==================== СОЗДАНИЕ ПАПКИ ДЛЯ ЛОГОВ ====================
+if (!fs.existsSync(LOGS_DIR)) {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+    console.log(chalk.green(`[ORCHESTRATOR] Создана папка логов: ${LOGS_DIR}`));
+}
 
-// Патч для JSON.parse для игнорирования ошибок скинов
-const originalJSONParse = JSON.parse;
-JSON.parse = function(text, reviver) {
-    try {
-        return originalJSONParse(text, reviver);
-    } catch (err) {
-        if (text && (text.includes('textures') || text.includes('SKIN') || text.includes('skin'))) {
-            return {};
+// ==================== ЛОГГЕР ГЛАВНОГО ПРОЦЕССА ====================
+const logger = {
+    _log(level, color, tag, ...args) {
+        const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const prefix = `${chalk.gray(`[${timestamp}]`)} ${color(`[${tag}]`)}`;
+        console.log(prefix, ...args);
+
+        // Запись в файл
+        const logFile = path.join(LOGS_DIR, `orchestrator-${new Date().toISOString().substring(0, 10)}.log`);
+        const logLine = `[${timestamp}] [${tag}] [${level}] ${args.join(' ')}\n`;
+        fs.appendFileSync(logFile, logLine);
+    },
+    info(...args) {
+        this._log('INFO', chalk.blue, 'ORCHESTRATOR', ...args);
+    },
+    warn(...args) {
+        this._log('WARN', chalk.yellow, 'ORCHESTRATOR', ...args);
+    },
+    error(...args) {
+        this._log('ERROR', chalk.red, 'ORCHESTRATOR', ...args);
+    },
+    success(...args) {
+        this._log('SUCCESS', chalk.green, 'ORCHESTRATOR', ...args);
+    },
+    debug(...args) {
+        if (process.env.NODE_ENV === 'development') {
+            this._log('DEBUG', chalk.magenta, 'ORCHESTRATOR', ...args);
         }
-        throw err;
-    }
+    },
 };
 
-// ============================================
-// ЗАПУСК КОМПОНЕНТА С ИЗОЛЯЦИЕЙ ОШИБОК
-// ============================================
+// ==================== КОНФИГУРАЦИЯ ПРОЦЕССОВ ====================
+const PROCESS_DEFINITIONS = {
+    DISCORD: {
+        name: 'DiscordBot',
+        description: 'Discord бот для команд, верификации и логирования',
+        path: path.join(__dirname, 'discord', 'index.js'),
+        restartDelayMs: 10000,
+        critical: true,
+        autoRestart: true,
+    },
+    MINECRAFT: {
+        name: 'MinecraftBot',
+        description: 'Minecraft бот на Mineflayer для внутриигрового взаимодействия',
+        path: path.join(__dirname, 'minecraft', 'index.js'),
+        restartDelayMs: 30000,
+        critical: true,
+        autoRestart: true,
+    },
+    WEBSERVER: {
+        name: 'WebServer',
+        description: 'Веб-сервер с админ-панелью и публичным сайтом',
+        path: path.join(__dirname, 'web', 'server.js'),
+        restartDelayMs: 5000,
+        critical: false,
+        autoRestart: true,
+    },
+};
 
-async function startComponent(name, startFunction, ...args) {
+// ==================== СОСТОЯНИЕ ПРОЦЕССОВ ====================
+const processState = {};
+const children = {};
+const restartHistory = {};
+let isShuttingDown = false;
+
+// Инициализация состояния для каждого процесса
+Object.values(PROCESS_DEFINITIONS).forEach((def) => {
+    processState[def.name] = {
+        status: 'stopped',
+        pid: null,
+        startCount: 0,
+        crashCount: 0,
+        lastStartTime: null,
+        lastCrashTime: null,
+        lastCrashReason: null,
+    };
+    restartHistory[def.name] = [];
+});
+
+// ==================== ФУНКЦИИ УПРАВЛЕНИЯ ПРОЦЕССАМИ ====================
+
+/**
+ * Проверяет, не превышен ли лимит перезапусков в заданном окне
+ */
+function isRestartLimitExceeded(processName) {
+    const now = Date.now();
+    const windowStart = now - PROCESS_RESTART_WINDOW_MS;
+
+    // Очищаем старые записи
+    restartHistory[processName] = restartHistory[processName].filter(
+        (timestamp) => timestamp > windowStart
+    );
+
+    // Добавляем текущую
+    restartHistory[processName].push(now);
+
+    // Проверяем лимит
+    if (restartHistory[processName].length > MAX_RESTARTS_IN_WINDOW) {
+        logger.error(
+            `${processName}: превышен лимит перезапусков ` +
+            `(${restartHistory[processName].length}/${MAX_RESTARTS_IN_WINDOW} за ${PROCESS_RESTART_WINDOW_MS / 1000}с)`
+        );
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Запускает дочерний процесс
+ */
+function startProcess(processName) {
+    if (isShuttingDown) {
+        logger.warn(`Пропуск запуска ${processName} — выполняется завершение системы`);
+        return;
+    }
+
+    const def = PROCESS_DEFINITIONS[Object.keys(PROCESS_DEFINITIONS).find(
+        (key) => PROCESS_DEFINITIONS[key].name === processName
+    )];
+
+    if (!def) {
+        logger.error(`Неизвестный процесс: ${processName}`);
+        return;
+    }
+
+    // Проверка, не запущен ли уже
+    if (children[processName] && children[processName].connected) {
+        logger.warn(`${processName} уже запущен (PID: ${children[processName].pid}). Пропускаем.`);
+        return;
+    }
+
+    // Проверка лимита перезапусков
+    if (isRestartLimitExceeded(processName)) {
+        logger.error(`${processName}: ПРЕВЫШЕН ЛИМИТ ПЕРЕЗАПУСКОВ. Требуется ручное вмешательство.`);
+        processState[processName].status = 'failed';
+        return;
+    }
+
+    // Проверка существования файла
+    if (!fs.existsSync(def.path)) {
+        logger.error(`${processName}: файл не найден: ${def.path}`);
+        processState[processName].status = 'error';
+        return;
+    }
+
+    logger.info(`Запуск ${processName} (${def.description})...`);
+
     try {
-        logger.info(`🚀 Запуск компонента: ${name}`);
-        addBotLog(`Запуск ${name}...`, 'info');
-        
-        const component = await startFunction(...args);
-        
-        logger.success(`✅ Компонент ${name} запущен`);
-        addBotLog(`✅ ${name} успешно запущен`, 'success');
-        
-        return component;
+        const child = fork(def.path, [], {
+            silent: true,
+            env: {
+                ...process.env,
+                PROCESS_NAME: processName,
+                PROCESS_START_TIME: new Date().toISOString(),
+            },
+            stdio: 'pipe',
+        });
+
+        // Сохраняем ссылку
+        children[processName] = child;
+
+        // Обновляем состояние
+        processState[processName] = {
+            ...processState[processName],
+            status: 'running',
+            pid: child.pid,
+            startCount: processState[processName].startCount + 1,
+            lastStartTime: new Date().toISOString(),
+            lastCrashReason: null,
+        };
+
+        logger.success(`${processName} запущен (PID: ${child.pid})`);
+
+        // Обработка stdout
+        if (child.stdout) {
+            child.stdout.on('data', (data) => {
+                const lines = data.toString().trim().split('\n');
+                lines.forEach((line) => {
+                    if (line) {
+                        console.log(chalk.cyan(`[${processName}]`) + ` ${line}`);
+                    }
+                });
+            });
+        }
+
+        // Обработка stderr
+        if (child.stderr) {
+            child.stderr.on('data', (data) => {
+                const lines = data.toString().trim().split('\n');
+                lines.forEach((line) => {
+                    if (line) {
+                        console.log(chalk.red(`[${processName}:STDERR]`) + ` ${line}`);
+                    }
+                });
+            });
+        }
+
+        // Обработка сообщений от дочернего процесса (IPC)
+        child.on('message', (message) => {
+            handleChildMessage(processName, message);
+        });
+
+        // Обработка завершения процесса
+        child.on('exit', (code, signal) => {
+            handleChildExit(processName, code, signal, def);
+        });
+
+        // Обработка ошибок процесса
+        child.on('error', (err) => {
+            logger.error(`${processName}: ошибка запуска — ${err.message}`);
+            processState[processName].status = 'error';
+            processState[processName].lastCrashReason = err.message;
+        });
+
+        // Отправляем приветственное сообщение дочернему процессу
+        child.send({
+            type: 'init',
+            processName: processName,
+            timestamp: new Date().toISOString(),
+        });
+
     } catch (error) {
-        logger.error(`❌ Ошибка запуска ${name}:`, error);
-        addBotLog(`❌ Ошибка запуска ${name}: ${error.message}`, 'error');
-        
-        // Не выбрасываем ошибку дальше — позволяем другим компонентам запуститься
-        return null;
+        logger.error(`${processName}: исключение при запуске — ${error.message}`);
+        logger.error(error.stack);
+        processState[processName].status = 'error';
+        processState[processName].lastCrashReason = error.message;
     }
 }
 
-// ============================================
-// ОСТАНОВКА КОМПОНЕНТА
-// ============================================
+/**
+ * Обрабатывает IPC-сообщения от дочернего процесса
+ */
+function handleChildMessage(processName, message) {
+    if (!message || !message.type) return;
 
-async function stopComponent(name, component) {
-    if (!component) return;
-    
-    try {
-        logger.info(`🛑 Остановка компонента: ${name}`);
-        
-        if (typeof component.stop === 'function') {
-            await component.stop();
-        } else if (typeof component.destroy === 'function') {
-            await component.destroy();
-        } else if (typeof component.close === 'function') {
-            await component.close();
-        }
-        
-        logger.success(`✅ Компонент ${name} остановлен`);
-    } catch (error) {
-        logger.error(`❌ Ошибка остановки ${name}:`, error);
+    logger.debug(`${processName}: получено IPC-сообщение типа "${message.type}"`);
+
+    switch (message.type) {
+        case 'ready':
+            logger.success(`${processName}: подтвердил готовность к работе`);
+            processState[processName].status = 'ready';
+            break;
+
+        case 'shutdown':
+            logger.warn(`${processName}: запросил graceful shutdown (причина: ${message.reason || 'не указана'})`);
+            stopProcess(processName, false);
+            break;
+
+        case 'restart':
+            logger.warn(`${processName}: запросил перезапуск (причина: ${message.reason || 'не указана'})`);
+            stopProcess(processName, true);
+            break;
+
+        case 'heartbeat':
+            // Обновляем время последней активности
+            processState[processName].lastHeartbeat = new Date().toISOString();
+            break;
+
+        case 'error':
+            logger.error(`${processName}: сообщил об ошибке — ${message.data || message.error || 'неизвестная ошибка'}`);
+            processState[processName].lastError = message.data || message.error;
+            break;
+
+        case 'log':
+            if (message.level === 'error') {
+                logger.error(`[${processName}:IPC] ${message.data}`);
+            } else if (message.level === 'warn') {
+                logger.warn(`[${processName}:IPC] ${message.data}`);
+            } else {
+                logger.info(`[${processName}:IPC] ${message.data}`);
+            }
+            break;
+
+        case 'stats':
+            // Получаем статистику от дочернего процесса
+            if (message.data) {
+                processState[processName].stats = message.data;
+            }
+            break;
+
+        default:
+            logger.debug(`${processName}: неизвестный тип IPC-сообщения: ${message.type}`);
     }
 }
 
-// ============================================
-// ПЕРЕЗАПУСК КОМПОНЕНТА
-// ============================================
+/**
+ * Обрабатывает завершение дочернего процесса
+ */
+function handleChildExit(processName, code, signal, def) {
+    const exitReason = signal
+        ? `сигнал ${signal}`
+        : `код ${code}`;
 
-async function restartComponent(name, startFunction, ...args) {
-    logger.warn(`🔄 Перезапуск компонента: ${name}`);
-    addBotLog(`🔄 Перезапуск ${name}...`, 'warn');
-    
-    const oldComponent = global.botComponents[name.toLowerCase()];
-    await stopComponent(name, oldComponent);
-    
-    // Ждём 2 секунды перед перезапуском
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const newComponent = await startComponent(name, startFunction, ...args);
-    global.botComponents[name.toLowerCase()] = newComponent;
-    
-    return newComponent;
+    if (code === 0 && !signal) {
+        logger.info(`${processName}: завершился нормально (${exitReason})`);
+    } else {
+        logger.warn(`${processName}: аварийное завершение (${exitReason})`);
+        processState[processName].crashCount++;
+        processState[processName].lastCrashTime = new Date().toISOString();
+        processState[processName].lastCrashReason = exitReason;
+    }
+
+    processState[processName].status = 'stopped';
+    processState[processName].pid = null;
+    delete children[processName];
+
+    // Автоматический перезапуск
+    if (!isShuttingDown && def.autoRestart && !shutdownFlags[processName]) {
+        const delay = def.restartDelayMs;
+        logger.warn(`${processName}: перезапуск через ${delay / 1000}с...`);
+        setTimeout(() => startProcess(processName), delay);
+    }
 }
 
-// ============================================
-// МОНИТОРИНГ СОСТОЯНИЯ КОМПОНЕНТОВ
-// ============================================
+/**
+ * Останавливает дочерний процесс
+ */
+function stopProcess(processName, restart = false) {
+    const child = children[processName];
+    if (!child || !child.connected) {
+        logger.warn(`${processName}: не запущен, остановка не требуется`);
+        delete children[processName];
+        return;
+    }
 
-function startHealthCheck() {
-    setInterval(async () => {
-        // Проверка Minecraft бота
-        const mcBot = global.botComponents.minecraft;
-        if (mcBot && mcBot.bot) {
-            if (!mcBot.bot._client || !mcBot.bot._client.socket || mcBot.bot._client.socket.destroyed) {
-                logger.warn('⚠️ Minecraft бот отключён, перезапуск...');
-                addBotLog('Minecraft бот отключён, перезапуск...', 'warn');
-                
-                const minecraft = require('./minecraft');
-                await restartComponent('MinecraftBot', minecraft.start, database, addBotLog);
-            }
-        }
-        
-        // Проверка Discord бота
-        const discordBot = global.botComponents.discord;
-        if (discordBot && discordBot.client) {
-            if (!discordBot.client.isReady()) {
-                logger.warn('⚠️ Discord бот отключён, перезапуск...');
-                addBotLog('Discord бот отключён, перезапуск...', 'warn');
-                
-                const discord = require('./discord');
-                await restartComponent('DiscordBot', discord.start, database);
-            }
-        }
-        
-        // Проверка Web сервера
-        const webServer = global.botComponents.web;
-        if (webServer && webServer.server) {
-            if (!webServer.server.listening) {
-                logger.warn('⚠️ Web сервер остановлен, перезапуск...');
-                addBotLog('Web сервер остановлен, перезапуск...', 'warn');
-                
-                const web = require('./web/server');
-                const newWeb = await restartComponent('WebServer', web.start, database);
-                if (newWeb && web.setBot) web.setBot(global.botComponents.minecraft);
-            }
-        }
-    }, 30000); // Проверка каждые 30 секунд
-}
+    logger.info(`Остановка ${processName}${restart ? ' (с последующим перезапуском)' : ''}...`);
 
-// ============================================
-// ОБРАБОТКА ПЕРЕЗАГРУЗКИ СЕРВЕРА MINECRAFT
-// ============================================
+    if (!restart) {
+        shutdownFlags[processName] = true;
+    }
 
-function scheduleMinecraftRestartHandler() {
-    // Проверяем каждую минуту, не наступило ли 3:00 МСК
-    setInterval(() => {
-        const now = new Date();
-        const mskTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
-        const hours = mskTime.getHours();
-        const minutes = mskTime.getMinutes();
-        
-        // В 3:00 сервер перезагружается, бот будет выкинут
-        // Флаг, что мы ждём перезагрузку
-        if (hours === 3 && minutes >= 0 && minutes <= 10) {
-            const mcBot = global.botComponents.minecraft;
-            if (mcBot && mcBot.setRestartMode) {
-                mcBot.setRestartMode(true);
-            }
-        } else {
-            const mcBot = global.botComponents.minecraft;
-            if (mcBot && mcBot.setRestartMode) {
-                mcBot.setRestartMode(false);
-            }
-        }
-    }, 60000);
-}
-
-// ============================================
-// ГЛАВНАЯ ФУНКЦИЯ
-// ============================================
-
-async function main() {
     try {
-        logger.info('═══════════════════════════════════════════════');
-        logger.info('🏙️  RESISTANCE CITY BOT v6.0');
-        logger.info('═══════════════════════════════════════════════');
-        addBotLog('Запуск Resistance Bot...', 'info');
-        
-        // 1. Инициализация базы данных
-        logger.info('📦 Инициализация базы данных...');
-        await database.initialize();
-        logger.success('💾 База данных готова');
-        addBotLog('База данных подключена', 'success');
-        
-        // 2. Запуск Minecraft бота
-        logger.info('🤖 Запуск Minecraft бота...');
-        const minecraft = require('./minecraft');
-        const mcBot = await startComponent('MinecraftBot', minecraft.start, database, addBotLog);
-        global.botComponents.minecraft = mcBot;
-        
-        // 3. Запуск Discord бота
-        logger.info('💬 Запуск Discord бота...');
-        const discord = require('./discord');
-        const dcBot = await startComponent('DiscordBot', discord.start, database);
-        global.botComponents.discord = dcBot;
-        
-        // 4. Запуск Web сервера (немного позже, чтобы боты успели инициализироваться)
-        setTimeout(async () => {
-            logger.info('🌐 Запуск Web сервера...');
-            const web = require('./web/server');
-            const webServer = await startComponent('WebServer', web.start, database);
-            global.botComponents.web = webServer;
-            
-            // Передаём ссылку на Minecraft бота для веб-интерфейса
-            if (webServer && web.setBot) {
-                web.setBot(global.botComponents.minecraft);
+        // Отправляем запрос на graceful shutdown
+        child.send({
+            type: 'graceful_shutdown',
+            restart: restart,
+            timestamp: new Date().toISOString(),
+        });
+
+        // Если процесс не завершился за 10 секунд — принудительно
+        const forceKillTimeout = setTimeout(() => {
+            if (children[processName] && children[processName].connected) {
+                logger.warn(`${processName}: принудительное завершение (SIGTERM)...`);
+                child.kill('SIGTERM');
+
+                // Ещё через 5 секунд — SIGKILL
+                setTimeout(() => {
+                    if (children[processName] && children[processName].connected) {
+                        logger.warn(`${processName}: жёсткое завершение (SIGKILL)...`);
+                        child.kill('SIGKILL');
+                    }
+                }, 5000);
             }
-        }, 5000);
-        
-        // 5. Запуск мониторинга здоровья
-        startHealthCheck();
-        
-        // 6. Запуск обработчика перезагрузки сервера
-        scheduleMinecraftRestartHandler();
-        
-        logger.success('═══════════════════════════════════════════════');
-        logger.success('🎉 ВСЕ КОМПОНЕНТЫ ЗАПУЩЕНЫ!');
-        logger.success('🏙️  Проект Resistance готов к работе');
-        logger.success('═══════════════════════════════════════════════');
-        addBotLog('✅ Все компоненты успешно запущены', 'success');
-        
+        }, 10000);
+
+        // Очищаем таймер при нормальном завершении
+        child.once('exit', () => {
+            clearTimeout(forceKillTimeout);
+        });
+
     } catch (error) {
-        logger.error('❌ Критическая ошибка при запуске:', error);
-        addBotLog(`Критическая ошибка: ${error.message}`, 'error');
-        
-        // Пытаемся запустить хотя бы web-интерфейс для диагностики
+        logger.error(`${processName}: ошибка при остановке — ${error.message}`);
         try {
-            logger.info('🌐 Пытаемся запустить только Web интерфейс для диагностики...');
-            const web = require('./web/server');
-            const webServer = await web.start(database);
-            global.botComponents.web = webServer;
-            logger.warn('⚠️ Запущен только Web интерфейс. Боты не работают.');
-            addBotLog('⚠️ Запущен только Web интерфейс. Проверьте логи.', 'warn');
-        } catch (webError) {
-            logger.error('❌ Не удалось запустить даже Web интерфейс:', webError);
+            child.kill('SIGKILL');
+        } catch (e) {
+            // Игнорируем ошибки принудительного завершения
         }
     }
 }
 
-// ============================================
-// ОБРАБОТКА ЗАВЕРШЕНИЯ ПРОЦЕССА
-// ============================================
+// Объект для флагов завершения (не перезапускать)
+const shutdownFlags = {};
 
-async function gracefulShutdown(signal) {
-    logger.info(`\n📡 Получен сигнал ${signal}`);
-    addBotLog(`Получен сигнал завершения ${signal}`, 'warn');
-    logger.info('🛑 Начинаю корректное завершение...');
-    
-    // Останавливаем компоненты в обратном порядке
-    await stopComponent('WebServer', global.botComponents.web);
-    await stopComponent('DiscordBot', global.botComponents.discord);
-    await stopComponent('MinecraftBot', global.botComponents.minecraft);
-    
-    // Закрываем соединение с БД
-    try {
-        const db = database.getDb();
-        if (db && typeof db.close === 'function') {
-            await db.close();
-            logger.info('💾 Соединение с БД закрыто');
-        }
-    } catch (err) {
-        logger.error('Ошибка при закрытии БД:', err);
-    }
-    
-    logger.success('✅ Корректное завершение выполнено');
-    addBotLog('Бот остановлен', 'info');
-    process.exit(0);
+// ==================== ЗАПУСК ВСЕХ ПРОЦЕССОВ ====================
+function startAllProcesses() {
+    logger.success('══════════════════════════════════════════════');
+    logger.success('  RESISTANCE CITY ECOSYSTEM v5.0.0');
+    logger.success('  Свободный Город «Сопротивление»');
+    logger.success('  Запуск экосистемы...');
+    logger.success('══════════════════════════════════════════════');
+
+    const processList = Object.values(PROCESS_DEFINITIONS);
+
+    // Сбрасываем флаги
+    Object.keys(shutdownFlags).forEach((key) => delete shutdownFlags[key]);
+
+    // Сбрасываем историю перезапусков
+    Object.keys(restartHistory).forEach((key) => {
+        restartHistory[key] = [];
+    });
+
+    // Последовательный запуск с задержкой для предотвращения конфликтов
+    processList.forEach((def, index) => {
+        const delay = index * 2000; // 2 секунды между запусками
+        logger.info(`Планирование запуска ${def.name} через ${delay / 1000}с...`);
+        setTimeout(() => startProcess(def.name), delay);
+    });
+
+    logger.info('Все процессы запланированы к запуску');
 }
 
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// ==================== GRACEFUL SHUTDOWN ====================
+function gracefulShutdownAll(signal) {
+    if (isShuttingDown) {
+        logger.warn('Завершение уже выполняется...');
+        return;
+    }
 
-// ============================================
-// ЗАПУСК
-// ============================================
+    isShuttingDown = true;
+    logger.warn(`╔══════════════════════════════════════════╗`);
+    logger.warn(`║  Получен сигнал ${signal}. Завершение...     ║`);
+    logger.warn(`╚══════════════════════════════════════════╝`);
 
-// Экспортируем функции для использования в других модулях
+    const processNames = Object.keys(children);
+
+    if (processNames.length === 0) {
+        logger.info('Нет активных процессов. Завершение.');
+        process.exit(0);
+    }
+
+    logger.info(`Активных процессов для остановки: ${processNames.length}`);
+
+    // Останавливаем все процессы
+    processNames.forEach((name) => {
+        logger.info(`Отправка сигнала остановки для ${name}...`);
+        stopProcess(name, false);
+    });
+
+    // Таймер принудительного завершения
+    logger.warn(`Принудительное завершение основного процесса через ${GRACEFUL_SHUTDOWN_TIMEOUT_MS / 1000}с, если процессы не остановятся...`);
+
+    const forceExitTimeout = setTimeout(() => {
+        const remainingProcesses = Object.keys(children).filter(
+            (name) => children[name] && children[name].connected
+        );
+        if (remainingProcesses.length > 0) {
+            logger.warn(`Принудительное завершение. Осталось процессов: ${remainingProcesses.join(', ')}`);
+            remainingProcesses.forEach((name) => {
+                try {
+                    children[name].kill('SIGKILL');
+                } catch (e) {
+                    // Игнорируем
+                }
+            });
+        }
+        process.exit(0);
+    }, GRACEFUL_SHUTDOWN_TIMEOUT_MS);
+
+    // Не блокируем выход
+    forceExitTimeout.unref();
+}
+
+// ==================== ОБРАБОТЧИКИ СИГНАЛОВ ====================
+process.on('SIGINT', () => {
+    logger.warn('Получен SIGINT (Ctrl+C)');
+    gracefulShutdownAll('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+    logger.warn('Получен SIGTERM');
+    gracefulShutdownAll('SIGTERM');
+});
+
+process.on('SIGQUIT', () => {
+    logger.warn('Получен SIGQUIT');
+    gracefulShutdownAll('SIGQUIT');
+});
+
+// ==================== ОБРАБОТЧИКИ НЕОБРАБОТАННЫХ ОШИБОК ====================
+process.on('uncaughtException', (err) => {
+    logger.error('╔════════ НЕОБРАБОТАННОЕ ИСКЛЮЧЕНИЕ ════════╗');
+    logger.error(`║  ${err.message}`);
+    if (err.stack) {
+        err.stack.split('\n').forEach((line) => logger.error(`║  ${line.trim()}`));
+    }
+    logger.error('╚══════════════════════════════════════════╝');
+
+    // Записываем в файл
+    const crashLogFile = path.join(LOGS_DIR, `crash-${new Date().toISOString().replace(/:/g, '-')}.log`);
+    fs.writeFileSync(crashLogFile, `Uncaught Exception:\n${err.stack || err.message}\n\n`);
+    logger.error(`Детали записаны в: ${crashLogFile}`);
+
+    // Не завершаем процесс, но логируем
+    // process.exit(1); // Раскомментировать для строгого режима
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('╔════ НЕОБРАБОТАННЫЙ PROMISE REJECTION ════╗');
+    logger.error(`║  Reason: ${reason}`);
+    if (reason && reason.stack) {
+        reason.stack.split('\n').forEach((line) => logger.error(`║  ${line.trim()}`));
+    }
+    logger.error('╚══════════════════════════════════════════╝');
+
+    const crashLogFile = path.join(LOGS_DIR, `rejection-${new Date().toISOString().replace(/:/g, '-')}.log`);
+    fs.writeFileSync(crashLogFile,
+        `Unhandled Rejection:\n${reason?.stack || reason}\n\nPromise: ${promise}\n`);
+});
+
+process.on('warning', (warning) => {
+    logger.warn(`Process Warning: ${warning.name} - ${warning.message}`);
+    if (warning.stack) {
+        logger.debug(warning.stack);
+    }
+});
+
+// ==================== МОНИТОРИНГ ПРОЦЕССОВ ====================
+setInterval(() => {
+    const runningProcesses = Object.keys(children).filter(
+        (name) => children[name] && children[name].connected
+    );
+
+    // Отправляем heartbeat всем дочерним процессам
+    runningProcesses.forEach((name) => {
+        try {
+            children[name].send({
+                type: 'heartbeat',
+                timestamp: new Date().toISOString(),
+            });
+        } catch (e) {
+            // Процесс мог упасть между проверкой и отправкой
+            logger.debug(`${name}: ошибка heartbeat — ${e.message}`);
+        }
+    });
+
+    // Проверяем критические процессы
+    Object.values(PROCESS_DEFINITIONS).forEach((def) => {
+        if (def.critical && processState[def.name].status !== 'running' &&
+            processState[def.name].status !== 'ready' && !isShuttingDown && !shutdownFlags[def.name]) {
+            logger.warn(`${def.name}: критический процесс не запущен. Попытка восстановления...`);
+            startProcess(def.name);
+        }
+    });
+}, 30000); // Каждые 30 секунд
+
+// ==================== API ДЛЯ ВНЕШНЕГО УПРАВЛЕНИЯ ====================
+
+/**
+ * Получить состояние всех процессов
+ */
+function getProcessesStatus() {
+    const status = {};
+    Object.keys(processState).forEach((name) => {
+        status[name] = {
+            ...processState[name],
+            isRunning: !!(children[name] && children[name].connected),
+            pid: children[name] ? children[name].pid : null,
+        };
+    });
+    return status;
+}
+
+/**
+ * Перезапустить конкретный процесс
+ */
+function restartProcess(processName) {
+    logger.info(`Запрошен перезапуск процесса: ${processName}`);
+    if (children[processName] && children[processName].connected) {
+        stopProcess(processName, true);
+    } else {
+        startProcess(processName);
+    }
+}
+
+/**
+ * Полностью остановить систему
+ */
+function shutdown() {
+    gracefulShutdownAll('API_REQUEST');
+}
+
+// ==================== СТАРТ СИСТЕМЫ ====================
+logger.info('Оркестратор Resistance City инициализирован');
+logger.info(`Окружение: ${process.env.NODE_ENV || 'development'}`);
+logger.info(`Временная зона: ${process.env.TIMEZONE || 'не указана'}`);
+logger.info(`Путь к БД: ${process.env.DB_PATH || './data/hohols.db'}`);
+
+startAllProcesses();
+
+// ==================== ЭКСПОРТЫ ====================
 module.exports = {
-    main,
-    addBotLog,
-    restartComponent,
-    stopComponent
+    startProcess,
+    stopProcess,
+    restartProcess,
+    startAllProcesses,
+    gracefulShutdownAll,
+    shutdown,
+    getProcessesStatus,
+    getChildren: () => children,
+    getProcessState: () => processState,
+    logger,
 };
-
-// Запускаем, если файл выполняется напрямую
-if (require.main === module) {
-    main();
-}

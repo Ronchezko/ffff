@@ -1,0 +1,182 @@
+[2026-05-02 19:00:23.243] [ERROR] [DiscordBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:23.245] [ERROR] [DiscordBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:33.573] [ERROR] [DiscordBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:33.575] [ERROR] [DiscordBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:43.903] [ERROR] [DiscordBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:43.904] [ERROR] [DiscordBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:53.111] [ERROR] [DiscordBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:53.113] [ERROR] [DiscordBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:54.220] [ERROR] [DiscordBot] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:54.222] [ERROR] [DiscordBot] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:03:14.838] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:03:14.840] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:03:14.877] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:03:14.878] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:03:14.878] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:03:14.882] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:03:14.908] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:03:15.842] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:03:15.981] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:03:15.981] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:03:15.981] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:03:15.982] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:03:16.182] [ERROR] [DiscordBot] Ошибка регистрации команд: Invalid Form Body
+guild_id[NUMBER_TYPE_COERCE]: Value "Zvm_Z0Q9PE0LtIOuAI15iMuM7RRQuh51" is not snowflake.
+[2026-05-02 19:03:16.182] [ERROR] [DiscordBot] DiscordAPIError[50035]: Invalid Form Body
+guild_id[NUMBER_TYPE_COERCE]: Value "Zvm_Z0Q9PE0LtIOuAI15iMuM7RRQuh51" is not snowflake.
+    at handleErrors (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\@discordjs\rest\dist\index.js:762:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async SequentialHandler.runRequest (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\@discordjs\rest\dist\index.js:1163:23)
+    at async SequentialHandler.queueRequest (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\@discordjs\rest\dist\index.js:994:14)
+    at async _REST.request (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\@discordjs\rest\dist\index.js:1307:22)
+    at async registerSlashCommands (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\discord\index.js:158:13)
+    at async Client.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\discord\index.js:189:5)
+[2026-05-02 19:03:16.183] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:05:53.186] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:05:53.188] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:05:53.211] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:05:53.211] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:05:53.211] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:05:53.215] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:05:53.242] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:05:54.108] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:05:54.229] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:05:54.229] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:05:54.230] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:05:54.230] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:05:54.519] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:05:54.520] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:07:06.047] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:07:06.049] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:07:06.070] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:07:06.071] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:07:06.071] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:07:06.075] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:07:06.101] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:07:07.023] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:07:07.215] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:07:07.215] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:07:07.216] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:07:07.217] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:07:07.476] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:07:07.477] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:08:51.877] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:08:51.879] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:08:51.898] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:08:51.899] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:08:51.899] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:08:51.903] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:08:51.930] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:08:52.808] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:08:52.929] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:08:52.930] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:08:52.930] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:08:52.931] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:08:53.203] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:08:53.203] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:25:14.794] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:25:14.795] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:25:14.815] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:25:14.816] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:25:14.816] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:25:14.820] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:25:14.846] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:25:15.704] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:25:15.820] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:25:15.821] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:25:15.822] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:25:15.823] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:25:16.042] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:25:16.043] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:29:51.502] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:29:51.503] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:29:51.523] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:29:51.524] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:29:51.524] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:29:51.528] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:29:51.553] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:29:52.523] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:29:52.648] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:29:52.649] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:29:52.650] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:29:52.650] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:29:52.877] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:29:52.878] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:31:39.531] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:31:39.533] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:31:39.555] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:31:39.556] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:31:39.556] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:31:39.559] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:31:39.590] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:31:40.472] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:31:40.595] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:31:40.596] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:31:40.596] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:31:40.597] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:31:40.818] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:31:40.819] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены
+[2026-05-02 19:34:08.713] [SUCCESS] [DiscordBot] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:34:08.715] [SUCCESS] [DiscordBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:34:08.738] [INFO] [DiscordBot] ╔══════════════════════════════════════════╗
+[2026-05-02 19:34:08.738] [INFO] [DiscordBot] ║  DISCORD BOT — RESISTANCE CITY v5.0.0   ║
+[2026-05-02 19:34:08.739] [INFO] [DiscordBot] ╚══════════════════════════════════════════╝
+[2026-05-02 19:34:08.742] [SUCCESS] [DiscordBot] Загружено 9 команд
+[2026-05-02 19:34:08.769] [INFO] [DiscordBot] Получено init-сообщение от оркестратора
+[2026-05-02 19:34:09.617] [INFO] [DiscordBot] Подключение к Discord API...
+[2026-05-02 19:34:09.734] [SUCCESS] [DiscordBot] Discord бот Resistance#3415 запущен!
+[2026-05-02 19:34:09.734] [INFO] [DiscordBot] Серверов: 2
+[2026-05-02 19:34:09.734] [INFO] [DiscordBot] Пользователей: 13
+[2026-05-02 19:34:09.735] [INFO] [DiscordBot] Регистрация 9 слеш-команд...
+[2026-05-02 19:34:09.984] [SUCCESS] [DiscordBot] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-02 19:34:09.985] [SUCCESS] [DiscordBot] Периодические задачи Discord запущены

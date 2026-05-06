@@ -1,0 +1,160 @@
+[2026-05-02 19:00:26.983] [ERROR] [WebServer] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:26.985] [ERROR] [WebServer] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:32.117] [ERROR] [WebServer] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:32.119] [ERROR] [WebServer] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:37.250] [ERROR] [WebServer] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:37.252] [ERROR] [WebServer] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:42.381] [ERROR] [WebServer] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:42.383] [ERROR] [WebServer] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:00:47.515] [ERROR] [WebServer] КРИТИЧЕСКАЯ ошибка инициализации БД: no such column: username_lower
+[2026-05-02 19:00:47.517] [ERROR] [WebServer] SqliteError: no such column: username_lower
+    at Database.exec (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\better-sqlite3\lib\methods\wrappers.js:9:14)
+    at initDatabase (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:35:16)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\database\index.js:1420:5)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+[2026-05-02 19:03:18.683] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:03:18.685] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:03:18.702] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:03:18.703] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:03:18.703] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:03:18.704] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:03:18.704] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:03:18.704] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:03:18.705] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:05:57.000] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:05:57.002] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:05:57.017] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:05:57.018] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:05:57.018] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:05:57.019] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:05:57.019] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:05:57.019] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:05:57.020] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:07:09.869] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:07:09.871] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:07:09.886] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:07:09.886] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:07:09.887] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:07:09.887] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:07:09.888] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:07:09.888] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:07:09.889] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:08:55.685] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:08:55.687] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:08:55.702] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:08:55.702] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:08:55.703] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:08:55.703] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:08:55.704] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:08:55.704] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:08:55.705] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:25:18.620] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:25:18.623] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:25:18.640] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:25:18.641] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:25:18.641] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:25:18.642] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:25:18.642] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:25:18.642] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:25:18.643] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:27:40.322] [INFO] [WebServer] 127.0.0.1 - GET / 200 7.056 ms
+[2026-05-02 19:27:40.383] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 2.086 ms
+[2026-05-02 19:27:40.515] [INFO] [WebServer] 127.0.0.1 - GET /img/favicon.svg 404 0.468 ms
+[2026-05-02 19:27:54.735] [INFO] [WebServer] 127.0.0.1 - GET / 200 0.873 ms
+[2026-05-02 19:27:54.778] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.543 ms
+[2026-05-02 19:27:56.392] [INFO] [WebServer] 127.0.0.1 - GET /top 200 2.076 ms
+[2026-05-02 19:27:56.432] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.512 ms
+[2026-05-02 19:27:56.473] [INFO] [WebServer] 127.0.0.1 - GET /favicon.ico 404 0.649 ms
+[2026-05-02 19:27:58.083] [INFO] [WebServer] 127.0.0.1 - GET /top?type=kills 200 0.671 ms
+[2026-05-02 19:27:58.139] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.709 ms
+[2026-05-02 19:27:59.204] [INFO] [WebServer] 127.0.0.1 - GET /career 200 13.559 ms
+[2026-05-02 19:27:59.260] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.657 ms
+[2026-05-02 19:28:09.407] [INFO] [WebServer] 127.0.0.1 - GET /top 304 0.497 ms
+[2026-05-02 19:28:09.475] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.287 ms
+[2026-05-02 19:28:11.033] [INFO] [WebServer] 127.0.0.1 - GET /top?type=kills 304 0.683 ms
+[2026-05-02 19:28:11.082] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.334 ms
+[2026-05-02 19:28:11.518] [INFO] [WebServer] 127.0.0.1 - GET /top?type=hours 200 0.335 ms
+[2026-05-02 19:28:11.567] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.230 ms
+[2026-05-02 19:28:11.913] [INFO] [WebServer] 127.0.0.1 - GET /top?type=payday 200 0.603 ms
+[2026-05-02 19:28:11.973] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.529 ms
+[2026-05-02 19:28:12.346] [INFO] [WebServer] 127.0.0.1 - GET /top?type=properties 200 0.350 ms
+[2026-05-02 19:28:12.402] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.407 ms
+[2026-05-02 19:28:13.500] [INFO] [WebServer] 127.0.0.1 - GET /properties 404 0.429 ms
+[2026-05-02 19:28:13.544] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.239 ms
+[2026-05-02 19:28:17.675] [INFO] [WebServer] 127.0.0.1 - GET / 304 0.782 ms
+[2026-05-02 19:28:17.729] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.230 ms
+[2026-05-02 19:28:44.144] [INFO] [WebServer] 127.0.0.1 - GET /career 304 0.733 ms
+[2026-05-02 19:28:44.200] [INFO] [WebServer] 127.0.0.1 - GET /js/theme.js 404 0.367 ms
+[2026-05-02 19:29:55.317] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:29:55.319] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:29:55.334] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:29:55.335] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:29:55.335] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:29:55.336] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:29:55.336] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:29:55.337] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:29:55.338] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:31:43.332] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:31:43.334] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:31:43.350] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:31:43.351] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:31:43.352] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:31:43.352] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:31:43.352] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:31:43.352] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:31:43.353] [INFO] [WebServer] Получено init-сообщение от оркестратора
+[2026-05-02 19:34:12.521] [SUCCESS] [WebServer] База данных успешно инициализирована из schema.sql
+[2026-05-02 19:34:12.523] [SUCCESS] [WebServer] Модуль базы данных полностью загружен и готов к работе
+[2026-05-02 19:34:12.538] [SUCCESS] [WebServer] ╔══════════════════════════════════════════╗
+[2026-05-02 19:34:12.539] [SUCCESS] [WebServer] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-02 19:34:12.540] [SUCCESS] [WebServer] ╠══════════════════════════════════════════╣
+[2026-05-02 19:34:12.540] [SUCCESS] [WebServer] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-02 19:34:12.540] [SUCCESS] [WebServer] ║  Режим: production                    ║
+[2026-05-02 19:34:12.540] [SUCCESS] [WebServer] ╚══════════════════════════════════════════╝
+[2026-05-02 19:34:12.541] [INFO] [WebServer] Получено init-сообщение от оркестратора

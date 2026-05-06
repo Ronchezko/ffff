@@ -1,727 +1,746 @@
-// src/web/server.js
+// src/web/server.js — Веб-сервер Resistance City v5.0.0
+// Express сервер с EJS шаблонами, админ-панелью, API и статикой
+
+'use strict';
+
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
 const path = require('path');
-const logger = require('../shared/logger');
-const authRoutes = require('./auth');
-const ipWhitelist = require('./middleware/ipWhitelist');
+const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const bodyParser = require('body-parser');
+const morgan = require('morgan');
+const { logger, createLogger } = require('../shared/logger');
+const config = require('../config');
+const db = require('../database');
 
-global.botComponents = global.botComponents || { minecraft: null };
-let server = null;
-let app = null;
-let activeBot = null;
+const webLogger = createLogger('WebServer');
 
-// Массив для хранения логов администраторов
-global.adminLogs = [];
-let globalLogs = [];
+// ==================== КОНСТАНТЫ ====================
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'default_secret_change_me_123456789';
+const SESSION_MAX_AGE = parseInt(process.env.SESSION_MAX_AGE) || 86400000;
 
-// Функция для добавления лога
-function addAdminLog(username, action, success, req) {
-    const ip = req?.headers['x-forwarded-for'] || req?.socket?.remoteAddress || 'unknown';
-    global.adminLogs.push({
-        timestamp: new Date().toLocaleString('ru-RU'),
-        username,
-        ip,
-        action,
-        success
-    });
-    if (global.adminLogs.length > 100) global.adminLogs.shift();
+// ==================== СОЗДАНИЕ ПРИЛОЖЕНИЯ ====================
+const app = express();
+
+// ==================== НАСТРОЙКА БЕЗОПАСНОСТИ ====================
+
+// Helmet (защитные заголовки)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"],
+        },
+    },
+    crossOriginEmbedderPolicy: false,
+}));
+
+// Rate Limiting
+const limiter = rateLimit({
+    windowMs: parseInt(process.env.WEB_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 минут
+    max: parseInt(process.env.WEB_RATE_LIMIT_MAX) || 100,
+    message: 'Слишком много запросов. Попробуйте позже.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', limiter);
+
+// Более строгий лимит для логина
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Слишком много попыток входа. Попробуйте через 15 минут.',
+});
+app.use('/admin/login', loginLimiter);
+app.use('/api/login', loginLimiter);
+
+// ==================== НАСТРОЙКА СЕССИЙ ====================
+const sessionStore = new SQLiteStore({
+    db: 'sessions.db',
+    dir: path.join(__dirname, '..', '..', 'data'),
+    table: 'sessions',
+});
+
+app.use(session({
+    store: sessionStore,
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: SESSION_MAX_AGE,
+        sameSite: 'lax',
+    },
+}));
+
+// ==================== НАСТРОЙКА ШАБЛОНИЗАТОРА ====================
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// ==================== НАСТРОЙКА СТАТИКИ ====================
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
+app.use('/img', express.static(path.join(__dirname, 'public', 'img')));
+app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts')));
+
+// ==================== НАСТРОЙКА ПАРСИНГА ====================
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// ==================== ЛОГИРОВАНИЕ ЗАПРОСОВ ====================
+if (NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+} else {
+    // Кастомный формат для продакшена
+    app.use(morgan(':remote-addr - :method :url :status :response-time ms', {
+        stream: {
+            write: (message) => webLogger.info(message.trim()),
+        },
+    }));
 }
 
-function addWebLog(msg, type = 'info') {
-    globalLogs.unshift({ 
-        timestamp: new Date().toLocaleTimeString('ru-RU', { hour12: false }), 
-        type, 
-        message: msg 
-    });
-    if (globalLogs.length > 500) globalLogs.pop();
-}
+// ==================== ПЕРЕДАЧА ДАННЫХ В ШАБЛОНЫ ====================
+app.use((req, res, next) => {
+    res.locals.user = req.session.user || null;
+    res.locals.isAuthenticated = !!req.session.user;
+    res.locals.isAdmin = req.session.user?.role === 'admin';
+    res.locals.NODE_ENV = NODE_ENV;
+    res.locals.currentYear = new Date().getFullYear();
+    res.locals.config = {
+        clanName: config.clan.name,
+        clanColor: config.clan.fullColor,
+    };
+    next();
+});
 
-function setBot(botInstance) {
-    activeBot = botInstance;
-    logger.info('🤖 Ссылка на бота передана в веб-сервер');
-}
+// ==================== МАРШРУТЫ ====================
 
-function start(database) {
-    if (server) {
-        logger.warn('⚠️ Веб-сервер уже запущен, повторный запуск игнорируется');
-        return server;
-    }
-
+// Главная страница
+app.get('/', async (req, res) => {
     try {
-        logger.info('🚀 Запуск веб-сервера...');
-        
-        app = express();
-        const PORT = process.env.WEB_PORT || 3000;
-        
-        app.set('view engine', 'ejs');
-        app.set('views', path.join(__dirname, 'views'));
-        app.disable('view cache');
-        
-        app.use(express.static(path.join(__dirname, 'public')));
-        app.use('/images', express.static(path.join(__dirname, 'images')));
-        
-        app.use(express.json());
-        app.use(express.urlencoded({ extended: true }));
-        
-        app.use(session({
-            secret: process.env.SESSION_SECRET || 'resistance-secret-key',
-            resave: false,
-            saveUninitialized: false,
-            cookie: { 
-                httpOnly: true,
-                secure: false,
-                maxAge: 24 * 60 * 60 * 1000,
-                sameSite: 'lax'
-            },
-            name: 'resistance.sid'
-        }));
-        
-        app.use('/auth', authRoutes(database));
-        app.use('/admin', ipWhitelist);
+        const stats = {
+            rpCount: db.rpMembers.count(),
+            clanCount: db.members.count(),
+            onlineCount: db.rpMembers.countOnline(),
+            propertiesCount: db.properties.getAll().filter(p => p.is_owned).length,
+            organizations: db.orgBudgets.getAll().map(o => ({
+                name: o.name,
+                budget: o.budget,
+                employees: db.all(
+                    'SELECT COUNT(*) as count FROM rp_members WHERE organization = ? AND is_active = 1',
+                    [o.name]
+                )[0]?.count || 0,
+            })),
+        };
 
-        // ========== ПУБЛИЧНЫЕ МАРШРУТЫ ==========
-
-        app.get('/', (req, res) => {
-            try {
-                const db = database.getDb();
-                const totalPlayers = db.prepare('SELECT COUNT(*) as count FROM clan_members').get().count;
-                const rpPlayers = db.prepare('SELECT COUNT(*) as count FROM rp_players').get().count;
-                const recentPlayers = db.prepare('SELECT minecraft_nick, joined_at FROM clan_members ORDER BY joined_at DESC LIMIT 5').all();
-                const topBalance = db.prepare('SELECT rp.minecraft_nick, rp.money FROM rp_players rp ORDER BY rp.money DESC LIMIT 3').all();
-                const leaders = db.prepare(`
-                    SELECT sm.minecraft_nick, sm.structure, sm.rank
-                    FROM structure_members sm
-                    WHERE sm.rank LIKE '%Глав%' OR sm.rank LIKE '%Мэр%' OR sm.rank LIKE '%Директор%'
-                    LIMIT 4
-                `).all();
-                
-                res.render('index', { 
-                    title: 'Resistance City',
-                    totalPlayers,
-                    rpPlayers,
-                    recentPlayers,
-                    topBalance,
-                    leaders,
-                    clanInfo: { name: 'Resistance', description: 'Свободный город с демократическим укладом', founded: '2025' },
-                    user: req.session.user || null,
-                    currentPage: 'home'
-                });
-            } catch (error) {
-                logger.error('Ошибка главной:', error);
-                res.render('index', { 
-                    title: 'Resistance City',
-                    totalPlayers: 0,
-                    rpPlayers: 0,
-                    recentPlayers: [],
-                    topBalance: [],
-                    leaders: [],
-                    clanInfo: {},
-                    user: null,
-                    currentPage: 'home'
-                });
-            }
+        res.render('index', {
+            title: 'Resistance City',
+            stats,
+            page: 'home',
         });
+    } catch (error) {
+        webLogger.error(`Ошибка главной страницы: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Произошла ошибка при загрузке страницы',
+            type: 'error',
+        });
+    }
+});
 
-        app.get('/career', (req, res) => {
-            res.render('career', { 
-                title: 'Карьера в Resistance',
-                user: req.session.user || null,
-                currentPage: 'career'
+// Профиль игрока
+app.get('/profile/:username', async (req, res) => {
+    try {
+        const username = req.params.username;
+        const rpMember = db.rpMembers.get(username);
+        const clanMember = db.members.get(username);
+
+        if (!rpMember || !clanMember) {
+            return res.status(404).render('message', {
+                title: 'Не найдено',
+                message: 'Игрок не найден',
+                type: 'error',
             });
+        }
+
+        const properties = db.properties.getOwned(username);
+        const bankAccount = db.bank.getAccount(username);
+
+        res.render('profile', {
+            title: `Профиль: ${username}`,
+            username,
+            rpMember,
+            clanMember,
+            properties,
+            bankAccount,
+            page: 'profile',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка профиля: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки профиля',
+            type: 'error',
+        });
+    }
+});
+
+// Топ игроков
+app.get('/top', async (req, res) => {
+    try {
+        const type = req.query.type || 'balance';
+        let title, results;
+
+        switch (type) {
+            case 'balance':
+                title = 'Топ по балансу';
+                results = db.all(
+                    'SELECT username, balance FROM rp_members WHERE is_active = 1 ORDER BY balance DESC LIMIT 20'
+                );
+                break;
+            case 'kills':
+                title = 'Топ по убийствам';
+                results = db.all(
+                    'SELECT username, kills, deaths FROM members WHERE is_in_clan = 1 ORDER BY kills DESC LIMIT 20'
+                );
+                break;
+            case 'hours':
+                title = 'Топ по часам';
+                results = db.all(
+                    'SELECT username, total_hours FROM rp_members WHERE is_active = 1 ORDER BY total_hours DESC LIMIT 20'
+                );
+                break;
+            default:
+                title = 'Топ по балансу';
+                results = db.all(
+                    'SELECT username, balance FROM rp_members WHERE is_active = 1 ORDER BY balance DESC LIMIT 20'
+                );
+        }
+
+        res.render('top', {
+            title,
+            type,
+            results,
+            page: 'top',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка топа: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки рейтинга',
+            type: 'error',
+        });
+    }
+});
+
+// Карьера (информация об организациях)
+app.get('/career', async (req, res) => {
+    try {
+        const organizations = [];
+        for (const [key, org] of Object.entries(config.organizations)) {
+            const budget = db.orgBudgets.get(key);
+            const employees = db.all(
+                'SELECT COUNT(*) as count FROM rp_members WHERE organization = ? AND is_active = 1',
+                [org.name]
+            )[0]?.count || 0;
+
+            organizations.push({
+                key,
+                name: org.name,
+                budget: budget?.budget || org.budget,
+                employees,
+                ranks: Object.entries(org.ranks).map(([name, info]) => ({
+                    name,
+                    salary: info.salary,
+                    level: info.level,
+                    category: info.category,
+                })),
+            });
+        }
+
+        res.render('career', {
+            title: 'Карьера в Resistance',
+            organizations,
+            page: 'career',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка страницы карьеры: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки',
+            type: 'error',
+        });
+    }
+});
+
+// ==================== АДМИН-ПАНЕЛЬ ====================
+
+// Middleware проверки авторизации для админ-панели
+function requireAuth(req, res, next) {
+    if (req.session.user && req.session.user.role === 'admin') {
+        return next();
+    }
+    res.redirect('/admin/login');
+}
+
+// Страница логина
+app.get('/admin/login', (req, res) => {
+    if (req.session.user && req.session.user.role === 'admin') {
+        return res.redirect('/admin/dashboard');
+    }
+    res.render('admin/login', {
+        title: 'Вход в админ-панель',
+        error: null,
+        layout: false,
+    });
+});
+
+// Обработка логина
+app.post('/admin/login', (req, res) => {
+    const { username, password } = req.body;
+    const adminUsername = process.env.ADMIN_USERNAME || config.web.adminUsername;
+    const adminPassword = process.env.ADMIN_PASSWORD || config.web.adminPassword;
+
+    if (username === adminUsername && password === adminPassword) {
+        req.session.user = {
+            username: adminUsername,
+            role: 'admin',
+            loginTime: new Date().toISOString(),
+        };
+
+        webLogger.info(`Администратор ${username} вошёл в панель`);
+
+        // Перенаправление на дашборд
+        const redirectTo = req.session.returnTo || '/admin/dashboard';
+        delete req.session.returnTo;
+        return res.redirect(redirectTo);
+    }
+
+    webLogger.warn(`Неудачная попытка входа: ${username}`);
+
+    res.render('admin/login', {
+        title: 'Вход в админ-панель',
+        error: 'Неверный логин или пароль',
+        layout: false,
+    });
+});
+
+// Выход
+app.get('/admin/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/admin/login');
+});
+
+// Защищённые маршруты админ-панели
+app.get('/admin/dashboard', requireAuth, async (req, res) => {
+    try {
+        const stats = {
+            rpCount: db.rpMembers.count(),
+            clanCount: db.members.count(),
+            onlineCount: db.rpMembers.countOnline(),
+            jailedCount: db.all(
+                "SELECT COUNT(*) as count FROM rp_members WHERE is_in_jail = 1 AND is_active = 1"
+            )[0]?.count || 0,
+            sickCount: db.all(
+                "SELECT COUNT(*) as count FROM rp_members WHERE is_sick = 1 AND is_active = 1"
+            )[0]?.count || 0,
+            totalMoney: db.all(
+                'SELECT SUM(balance) as total FROM rp_members WHERE is_active = 1'
+            )[0]?.total || 0,
+            propertiesOwned: db.properties.getAll().filter(p => p.is_owned).length,
+            punishmentCount: db.all(
+                "SELECT COUNT(*) as count FROM punishment_logs WHERE is_active = 1"
+            )[0]?.count || 0,
+        };
+
+        res.render('admin/dashboard', {
+            title: 'Админ-панель',
+            stats,
+            page: 'dashboard',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка дашборда: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки дашборда',
+            type: 'error',
+        });
+    }
+});
+
+// Консоль управления
+app.get('/admin/console', requireAuth, (req, res) => {
+    res.render('admin/console', {
+        title: 'Консоль управления',
+        page: 'console',
+    });
+});
+
+// Управление игроками
+app.get('/admin/players', requireAuth, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const search = req.query.search || '';
+        const perPage = 20;
+
+        let query, countQuery, params;
+
+        if (search) {
+            query = 'SELECT * FROM rp_members WHERE username_lower LIKE ? AND is_active = 1 ORDER BY username LIMIT ? OFFSET ?';
+            countQuery = 'SELECT COUNT(*) as count FROM rp_members WHERE username_lower LIKE ? AND is_active = 1';
+            params = [`%${search.toLowerCase()}%`];
+        } else {
+            query = 'SELECT * FROM rp_members WHERE is_active = 1 ORDER BY username LIMIT ? OFFSET ?';
+            countQuery = 'SELECT COUNT(*) as count FROM rp_members WHERE is_active = 1';
+            params = [];
+        }
+
+        const totalCount = db.get(countQuery, params)?.count || 0;
+        const totalPages = Math.ceil(totalCount / perPage);
+        const currentPage = Math.min(page, Math.max(1, totalPages));
+
+        const players = db.all(
+            query,
+            search ? [...params, perPage, (currentPage - 1) * perPage] : [perPage, (currentPage - 1) * perPage]
+        );
+
+        res.render('admin/players', {
+            title: 'Управление игроками',
+            players,
+            search,
+            pagination: {
+                page: currentPage,
+                totalPages,
+                totalCount,
+                perPage,
+            },
+            page: 'players',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка списка игроков: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки списка игроков',
+            type: 'error',
+        });
+    }
+});
+
+// Управление имуществом
+app.get('/admin/properties', requireAuth, async (req, res) => {
+    try {
+        const properties = db.properties.getAll();
+
+        // Обогащение данными из конфига
+        const enrichedProperties = properties.map(p => ({
+            ...p,
+            configInfo: config.getPropertyInfo(p.property_id),
+        }));
+
+        res.render('admin/properties', {
+            title: 'Управление имуществом',
+            properties: enrichedProperties,
+            page: 'properties',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка списка имущества: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки имущества',
+            type: 'error',
+        });
+    }
+});
+
+// Просмотр логов
+app.get('/admin/logs', requireAuth, async (req, res) => {
+    try {
+        const type = req.query.type || 'all';
+        const page = parseInt(req.query.page) || 1;
+        const perPage = 50;
+
+        let logs = [];
+        let totalCount = 0;
+
+        switch (type) {
+            case 'punishments':
+                logs = db.all(
+                    'SELECT * FROM punishment_logs ORDER BY issued_at DESC LIMIT ? OFFSET ?',
+                    [perPage, (page - 1) * perPage]
+                );
+                totalCount = db.get('SELECT COUNT(*) as count FROM punishment_logs')?.count || 0;
+                break;
+            case 'balance':
+                logs = db.all(
+                    'SELECT * FROM balance_logs ORDER BY created_at DESC LIMIT ? OFFSET ?',
+                    [perPage, (page - 1) * perPage]
+                );
+                totalCount = db.get('SELECT COUNT(*) as count FROM balance_logs')?.count || 0;
+                break;
+            case 'chat':
+                logs = db.all(
+                    'SELECT * FROM clan_chat_logs ORDER BY created_at DESC LIMIT ? OFFSET ?',
+                    [perPage, (page - 1) * perPage]
+                );
+                totalCount = db.get('SELECT COUNT(*) as count FROM clan_chat_logs')?.count || 0;
+                break;
+            default:
+                // Общий лог (последние события)
+                break;
+        }
+
+        const totalPages = Math.ceil(totalCount / perPage);
+
+        res.render('admin/logs', {
+            title: 'Просмотр логов',
+            logs,
+            type,
+            pagination: {
+                page,
+                totalPages,
+                totalCount,
+                perPage,
+            },
+            page: 'logs',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка логов: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки логов',
+            type: 'error',
+        });
+    }
+});
+
+// Настройки
+app.get('/admin/settings', requireAuth, async (req, res) => {
+    try {
+        const settings = db.settings.getAll();
+
+        res.render('admin/settings', {
+            title: 'Настройки',
+            settings,
+            page: 'settings',
+        });
+    } catch (error) {
+        webLogger.error(`Ошибка настроек: ${error.message}`);
+        res.status(500).render('message', {
+            title: 'Ошибка',
+            message: 'Ошибка загрузки настроек',
+            type: 'error',
+        });
+    }
+});
+
+// API для сохранения настроек
+app.post('/api/admin/settings', requireAuth, (req, res) => {
+    try {
+        const { key, value } = req.body;
+
+        if (!key) {
+            return res.status(400).json({ success: false, error: 'key is required' });
+        }
+
+        db.settings.set(key, String(value));
+
+        webLogger.info(`Настройка ${key} изменена на: ${value}`);
+
+        res.json({ success: true });
+    } catch (error) {
+        webLogger.error(`Ошибка сохранения настройки: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API для выполнения команд Minecraft
+app.post('/api/admin/command', requireAuth, (req, res) => {
+    try {
+        const { command } = req.body;
+
+        if (!command) {
+            return res.status(400).json({ success: false, error: 'command is required' });
+        }
+
+        webLogger.info(`Админ-команда от ${req.session.user.username}: ${command}`);
+
+        // Отправка команды Minecraft боту через IPC
+        if (process.send) {
+            process.send({
+                type: 'minecraft_command',
+                command: command,
+                from: req.session.user.username,
+            });
+
+            res.json({ success: true, message: `Команда отправлена: ${command}` });
+        } else {
+            res.status(500).json({ success: false, error: 'IPC не доступен' });
+        }
+    } catch (error) {
+        webLogger.error(`Ошибка выполнения команды: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API для перезапуска ботов
+app.post('/api/admin/restart', requireAuth, (req, res) => {
+    try {
+        const { service } = req.body; // 'discord', 'minecraft', 'all'
+
+        webLogger.warn(`Запрошен перезапуск: ${service} (${req.session.user.username})`);
+
+        if (process.send) {
+            process.send({
+                type: 'restart_service',
+                service: service || 'all',
+                from: req.session.user.username,
+            });
+
+            res.json({ success: true, message: `Перезапуск ${service || 'всех'} initiated` });
+        } else {
+            res.status(500).json({ success: false, error: 'IPC не доступен' });
+        }
+    } catch (error) {
+        webLogger.error(`Ошибка перезапуска: ${error.message}`);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API для получения статистики
+app.get('/api/stats', async (req, res) => {
+    try {
+        const stats = {
+            rpCount: db.rpMembers.count(),
+            clanCount: db.members.count(),
+            onlineCount: db.rpMembers.countOnline(),
+            totalMoney: db.all(
+                'SELECT SUM(balance) as total FROM rp_members WHERE is_active = 1'
+            )[0]?.total || 0,
+            propertiesOwned: db.properties.getAll().filter(p => p.is_owned).length,
+            organizations: db.orgBudgets.getAll().map(o => ({
+                name: o.name,
+                budget: o.budget,
+                materials: o.materials,
+            })),
+            timestamp: new Date().toISOString(),
+        };
+
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==================== ОБРАБОТКА 404 ====================
+app.use((req, res) => {
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ success: false, error: 'Not found' });
+    }
+
+    res.status(404).render('message', {
+        title: '404 — Не найдено',
+        message: 'Запрашиваемая страница не существует',
+        type: 'error',
+    });
+});
+
+// ==================== ОБРАБОТКА ОШИБОК ====================
+app.use((err, req, res, next) => {
+    webLogger.error(`Ошибка сервера: ${err.message}`);
+    if (err.stack) webLogger.error(err.stack);
+
+    if (req.path.startsWith('/api/')) {
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+
+    res.status(500).render('message', {
+        title: '500 — Ошибка сервера',
+        message: NODE_ENV === 'development' ? err.message : 'Произошла внутренняя ошибка сервера',
+        type: 'error',
+    });
+});
+
+// ==================== ЗАПУСК СЕРВЕРА ====================
+function startServer() {
+    return new Promise((resolve, reject) => {
+        const server = app.listen(PORT, HOST, () => {
+            webLogger.success(`╔══════════════════════════════════════════╗`);
+            webLogger.success(`║  WEB SERVER — RESISTANCE CITY v5.0.0     ║`);
+            webLogger.success(`╠══════════════════════════════════════════╣`);
+            webLogger.success(`║  Адрес: http://${HOST}:${PORT}              ║`);
+            webLogger.success(`║  Режим: ${NODE_ENV}                    ║`);
+            webLogger.success(`╚══════════════════════════════════════════╝`);
+
+            if (process.send) {
+                process.send({
+                    type: 'ready',
+                    service: 'web',
+                    host: HOST,
+                    port: PORT,
+                });
+            }
+
+            resolve(server);
         });
 
-        app.get('/top', (req, res) => {
-            try {
-                const db = database.getDb();
-                const topKills = db.prepare('SELECT minecraft_nick, kills FROM clan_members ORDER BY kills DESC LIMIT 10').all();
-                const topMoney = db.prepare('SELECT rp.minecraft_nick, rp.money FROM rp_players rp ORDER BY rp.money DESC LIMIT 10').all();
-                const topHours = db.prepare('SELECT minecraft_nick, total_hours FROM clan_members ORDER BY total_hours DESC LIMIT 10').all();
-
-                res.render('top', { 
-                    title: 'Топ игроков',
-                    topKills,
-                    topMoney,
-                    topHours,
-                    user: req.session.user || null,
-                    currentPage: 'top'
-                });
-            } catch (error) {
-                logger.error('Ошибка топа:', error);
-                res.render('top', { 
-                    title: 'Топ игроков',
-                    topKills: [],
-                    topMoney: [],
-                    topHours: [],
-                    user: null,
-                    currentPage: 'top'
-                });
-            }
-        });
-
-        // ========== ПРОФИЛЬ ==========
-        app.get('/profile', async (req, res) => {
-            if (!req.session.user) {
-                return res.redirect('/');
-            }
-            
-            try {
-                const discordId = req.session.user.id;
-                const username = req.session.user.username;
-                const userAvatar = req.session.user.avatar;
-                const userGlobalName = req.session.user.global_name || username;
-                
-                const db = database.getDb();
-                
-                let member = null;
-                try {
-                    member = db.prepare('SELECT * FROM clan_members WHERE discord_id = ?').get(discordId);
-                } catch (dbError) {
-                    logger.error('Ошибка запроса к БД:', dbError);
-                }
-                
-                if (!member) {
-                    return res.render('profile', { 
-                        title: 'Профиль',
-                        error: 'Ваш Discord не привязан к Minecraft аккаунту. Используйте команду /verify в Discord.',
-                        user: req.session.user,
-                        player: null,
-                        rpPlayer: null,
-                        userAvatar: `https://cdn.discordapp.com/avatars/${discordId}/${userAvatar}.png`,
-                        userGlobalName,
-                        currentPage: 'profile'
-                    });
-                }
-                
-                const rpPlayer = db.prepare('SELECT * FROM rp_players WHERE minecraft_nick = ?').get(member.minecraft_nick);
-                const properties = rpPlayer ? JSON.parse(rpPlayer.properties || '[]') : [];
-                const kills = member.kills || 0;
-                const deaths = member.deaths || 0;
-                const kd = deaths === 0 ? kills : (kills / deaths).toFixed(2);
-                
-                const propertyList = [];
-                for (const propId of properties) {
-                    const prop = db.prepare('SELECT * FROM properties WHERE id = ?').get(propId);
-                    if (prop) propertyList.push(prop);
-                }
-                
-                let structureInfo = null;
-                if (rpPlayer && rpPlayer.structure) {
-                    const members = db.prepare('SELECT COUNT(*) as cnt FROM rp_players WHERE structure = ?').get(rpPlayer.structure);
-                    const budget = db.prepare('SELECT balance FROM org_budgets WHERE structure = ?').get(rpPlayer.structure);
-                    structureInfo = {
-                        name: rpPlayer.structure,
-                        rank: rpPlayer.organization_rank,
-                        members: members?.cnt || 0,
-                        budget: budget?.balance || 0
-                    };
-                }
-                
-                res.render('profile', {
-                    title: `Профиль ${member.minecraft_nick}`,
-                    user: req.session.user,
-                    player: member,
-                    rpPlayer: rpPlayer,
-                    propertyList: propertyList,
-                    kills, deaths, kd,
-                    userAvatar: `https://cdn.discordapp.com/avatars/${discordId}/${userAvatar}.png`,
-                    userGlobalName,
-                    structureInfo,
-                    currentPage: 'profile',
-                    error: null
-                });
-            } catch (error) {
-                logger.error('Ошибка профиля:', error);
-                res.render('profile', { 
-                    title: 'Профиль',
-                    error: 'Ошибка загрузки профиля. Попробуйте позже.',
-                    user: req.session.user,
-                    player: null,
-                    rpPlayer: null,
-                    currentPage: 'profile'
-                });
-            }
-        });
-
-        // ========== АДМИН-ПАНЕЛЬ ==========
-
-        app.get('/admin/login', (req, res) => {
-            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-            try {
-                const db = database.getDb();
-                const attempts = db.prepare(`
-                    SELECT COUNT(*) as count FROM login_attempts 
-                    WHERE ip = ? AND success = 0 AND attempt_time > datetime('now', '-15 minutes')
-                `).get(ip);
-                const attemptCount = attempts ? attempts.count : 0;
-                const blocked = attemptCount >= 5;
-                
-                res.render('admin/login', { 
-                    title: 'Вход в админку', 
-                    currentPage: 'admin',
-                    blocked: blocked,
-                    attemptsLeft: Math.max(0, 5 - attemptCount),
-                    error: null,
-                    success: null,
-                    user: null
-                });
-            } catch (error) {
-                console.error('Ошибка получения попыток:', error);
-                res.render('admin/login', { 
-                    title: 'Вход в админку', 
-                    currentPage: 'admin',
-                    blocked: false,
-                    attemptsLeft: 5,
-                    error: null,
-                    success: null,
-                    user: null
-                });
-            }
-        });
-
-        app.post('/admin/login', (req, res) => {
-            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-            const { username, password } = req.body;
-            
-            if (!username || !password) {
-                return res.render('admin/login', { 
-                    error: 'Введите логин и пароль', 
-                    currentPage: 'admin',
-                    blocked: false,
-                    attemptsLeft: 5,
-                    success: null,
-                    user: null
-                });
-            }
-            
-            try {
-                const db = database.getDb();
-                
-                const attempts = db.prepare(`
-                    SELECT COUNT(*) as count FROM login_attempts 
-                    WHERE ip = ? AND success = 0 AND attempt_time > datetime('now', '-15 minutes')
-                `).get(ip);
-                
-                const attemptCount = attempts?.count || 0;
-                const isBlocked = attemptCount >= 5;
-                
-                if (isBlocked) {
-                    return res.render('admin/login', { 
-                        error: '❌ IP заблокирован на 15 минут. Слишком много попыток.', 
-                        currentPage: 'admin',
-                        blocked: true,
-                        attemptsLeft: 0,
-                        success: null,
-                        user: null
-                    });
-                }
-                
-                const isValid = (username === process.env.ADMIN_LOGIN && password === process.env.ADMIN_PASSWORD) ||
-                                (username === process.env.ADMIN_LOGIN_2 && password === process.env.ADMIN_PASSWORD_2);
-                
-                db.prepare(`
-                    INSERT INTO login_attempts (ip, username, success, attempt_time) 
-                    VALUES (?, ?, ?, datetime('now'))
-                `).run(ip, username || 'unknown', isValid ? 1 : 0);
-                
-                if (isValid) {
-                    db.prepare(`DELETE FROM login_attempts WHERE ip = ? AND success = 0`).run(ip);
-                    req.session.user = { username, isAdmin: true };
-                    req.session.save((err) => {
-                        if (err) {
-                            return res.render('admin/login', { 
-                                error: 'Ошибка сервера при входе', 
-                                currentPage: 'admin',
-                                blocked: false,
-                                attemptsLeft: 5,
-                                success: null,
-                                user: null
-                            });
-                        }
-                        return res.redirect('/admin/dashboard');
-                    });
-                    return;
-                } else {
-                    const newAttempts = db.prepare(`
-                        SELECT COUNT(*) as count FROM login_attempts 
-                        WHERE ip = ? AND success = 0 AND attempt_time > datetime('now', '-15 minutes')
-                    `).get(ip);
-                    const remaining = 5 - (newAttempts?.count || 0);
-                    return res.render('admin/login', { 
-                        error: `❌ Неверные данные. Осталось попыток: ${remaining}`, 
-                        currentPage: 'admin',
-                        blocked: remaining <= 0,
-                        attemptsLeft: remaining,
-                        success: null,
-                        user: null
-                    });
-                }
-                
-            } catch (error) {
-                console.error('Ошибка входа:', error);
-                return res.render('admin/login', { 
-                    error: 'Внутренняя ошибка сервера', 
-                    currentPage: 'admin',
-                    blocked: false,
-                    attemptsLeft: 5,
-                    success: null,
-                    user: null
-                });
-            }
-        });
-
-        // ========== ДАШБОРД (исправлен) ==========
-        app.get('/admin/dashboard', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            try {
-                const db = database.getDb();
-                const stats = {
-                    clan_members: db.prepare('SELECT COUNT(*) as count FROM clan_members').get().count,
-                    rp_players: db.prepare('SELECT COUNT(*) as count FROM rp_players').get().count,
-                    staff: db.prepare('SELECT COUNT(*) as count FROM staff').get().count,
-                    properties: db.prepare('SELECT COUNT(*) as count FROM properties WHERE owner IS NOT NULL').get().count,
-                    today_joins: db.prepare(`SELECT COUNT(*) as count FROM clan_members WHERE date(joined_at) = date('now')`).get().count,
-                    today_messages: db.prepare(`SELECT COUNT(*) as count FROM clan_chat_logs WHERE date(timestamp) = date('now')`).get().count,
-                    today_pvp: db.prepare(`SELECT SUM(kills + deaths) as count FROM clan_members WHERE date(last_seen) = date('now')`).get().count || 0,
-                    today_transactions: db.prepare(`SELECT COUNT(*) as count FROM money_logs WHERE date(timestamp) = date('now')`).get().count
-                };
-                
-                const success = req.query.success || null;
-                const error = req.query.error || null;
-                const lastPayday = global.lastPayday || 'Не проводился';
-                
-                // Получаем последние действия
-                const recentActivities = [];
-                const recentLogs = db.prepare(`SELECT 'money' as type, timestamp, player, amount as details FROM money_logs ORDER BY timestamp DESC LIMIT 3`).all();
-                const recentJoins = db.prepare(`SELECT 'join' as type, joined_at as timestamp, minecraft_nick as player, 'присоединился' as details FROM clan_members ORDER BY joined_at DESC LIMIT 3`).all();
-                
-                const allActivities = [...recentLogs, ...recentJoins];
-                allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                
-                for (const act of allActivities.slice(0, 5)) {
-                    let badge = 'info';
-                    let text = '';
-                    let time = new Date(act.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    
-                    if (act.type === 'money') {
-                        badge = 'success';
-                        text = `${act.player} изменил баланс на ${Math.abs(act.details)}₽`;
-                    } else if (act.type === 'join') {
-                        badge = 'warning';
-                        text = `${act.player} ${act.details}`;
-                    }
-                    
-                    recentActivities.push({ time, text, badge });
-                }
-                
-                res.render('admin/dashboard', { 
-                    user: req.session.user, 
-                    stats, 
-                    success,
-                    error,
-                    lastPayday,
-                    recentActivities,
-                    currentPage: 'dashboard' 
-                });
-            } catch (error) {
-                logger.error('Ошибка дашборда:', error);
-                res.render('admin/dashboard', { 
-                    user: req.session.user, 
-                    stats: { clan_members: 0, rp_players: 0, staff: 0, properties: 0, today_joins: 0, today_messages: 0, today_pvp: 0, today_transactions: 0 },
-                    success: null,
-                    error: 'Ошибка загрузки данных',
-                    lastPayday: null,
-                    recentActivities: [],
-                    currentPage: 'dashboard' 
-                });
-            }
-        });
-
-        // ========== КОНСОЛЬ (исправлен) ==========
-        // В server.js, замените маршрут /admin/console на этот:
-
-    app.get('/admin/console', (req, res) => {
-        if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-        
-        const success = req.query.success || null;
-        const error = req.query.error || null;
-        
-        // Получаем логи из глобальных переменных
-        const chatLogs = global.botLogs || [];
-        const systemLogs = global.systemLogs || [];
-        
-        res.render('admin/console', { 
-            user: req.session.user, 
-            chatLogs: chatLogs.slice(-200), // последние 200 сообщений
-            systemLogs: systemLogs.slice(-200), // последние 200 системных логов
-            success: success,
-            error: error,
-            currentPage: 'console' 
+        server.on('error', (error) => {
+            webLogger.error(`Ошибка запуска веб-сервера: ${error.message}`);
+            reject(error);
         });
     });
-
-        app.get('/admin/console/logs', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            res.json({ logs: globalLogs.slice(0, 200) });
-        });
-
-        app.post('/admin/console/clear', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            globalLogs = [];
-            addWebLog(`🧹 Админ ${req.session.user.username} очистил консоль`, 'info');
-            res.json({ success: true });
-        });
-
-        app.post('/admin/console/send', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            const { command, target } = req.body;
-            if (!command) return res.status(400).json({ error: 'Команда не указана' });
-
-            if (!activeBot && global.botComponents && global.botComponents.minecraft) {
-                activeBot = global.botComponents.minecraft;
-            }
-
-            if (!activeBot || !activeBot.chat) {
-                return res.status(500).json({ error: 'Бот не активен' });
-            }
-
-            try {
-                let fullCommand = command;
-                if (target === 'clan') {
-                    fullCommand = `/cc ${command}`;
-                } else if (target === 'global') {
-                    fullCommand = command;
-                } else if (target && target.startsWith('@')) {
-                    fullCommand = `/msg ${target.substring(1)} ${command}`;
-                }
-
-                activeBot.chat(fullCommand);
-                addWebLog(`📤 ${req.session.user.username}: ${fullCommand}`, 'command');
-                res.json({ success: true });
-            } catch (error) {
-                res.status(500).json({ error: 'Ошибка отправки' });
-            }
-        });
-
-        // ========== НАСТРОЙКИ (исправлен) ==========
-        app.get('/admin/settings', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const settings = database.getDb().prepare('SELECT * FROM settings ORDER BY key').all();
-            const success = req.query.success || null;
-            const error = req.query.error || null;
-            const adminLogs = global.adminLogs || [];
-            
-            res.render('admin/settings', { 
-                user: req.session.user, 
-                settings,
-                success: success,
-                error: error,
-                adminLogs: adminLogs,
-                currentPage: 'settings' 
-            });
-        });
-
-        app.post('/admin/settings/update', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            for (const [key, val] of Object.entries(req.body)) {
-                if (key === 'submit') continue;
-                database.getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, val);
-            }
-            addWebLog(`⚙️ Админ ${req.session.user.username} обновил настройки`, 'info');
-            res.redirect('/admin/settings?success=updated');
-        });
-
-        app.post('/admin/settings/reset', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            const defaultSettings = [
-                ['auto_moderation_enabled', 'true'], ['clan_ad_enabled', 'true'], ['payday_enabled', 'true'],
-                ['tax_property', '1'], ['tax_business', '2'], ['tax_office', '1.5'],
-                ['license_business_price', '800000'], ['license_office_price', '900000'], ['license_duration', '7'],
-                ['mute_duration', '30'], ['kick_warning_threshold', '3'], ['blacklist_duration', '360']
-            ];
-            for (const [key, val] of defaultSettings) {
-                database.getDb().prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, val);
-            }
-            addWebLog(`🔄 Админ ${req.session.user.username} сбросил настройки`, 'info');
-            res.json({ success: true });
-        });
-
-        // ========== УПРАВЛЕНИЕ БАЗОЙ ДАННЫХ ==========
-        app.get('/admin/db', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const tables = database.getDb().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
-            const success = req.query.success || null;
-            const error = req.query.error || null;
-            res.render('admin/db/index', { 
-                user: req.session.user, 
-                tables,
-                success: success,
-                error: error,
-                currentPage: 'db' 
-            });
-        });
-
-        app.get('/admin/db/:table', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table } = req.params;
-            const db = database.getDb();
-            const page = parseInt(req.query.page) || 1;
-            const perPage = 50;
-            const rows = db.prepare(`SELECT * FROM "${table}" LIMIT ? OFFSET ?`).all(perPage, (page-1)*perPage);
-            const total = db.prepare(`SELECT COUNT(*) as c FROM "${table}"`).get().c;
-            const columns = db.prepare(`PRAGMA table_info("${table}")`).all();
-            const success = req.query.success || null;
-            const error = req.query.error || null;
-            
-            res.render('admin/db/table', { 
-                user: req.session.user, 
-                table, 
-                columns, 
-                rows, 
-                page, 
-                totalPages: Math.ceil(total/perPage),
-                success: success,
-                error: error,
-                currentPage: 'db' 
-            });
-        });
-
-        app.get('/admin/db/:table/edit/:id', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table, id } = req.params;
-            const row = database.getDb().prepare(`SELECT * FROM "${table}" WHERE id = ?`).get(id);
-            const columns = database.getDb().prepare(`PRAGMA table_info("${table}")`).all();
-            const success = req.query.success || null;
-            const error = req.query.error || null;
-            
-            res.render('admin/db/edit', { 
-                user: req.session.user, 
-                table, 
-                row, 
-                columns,
-                success: success,
-                error: error,
-                currentPage: 'db' 
-            });
-        });
-
-        app.post('/admin/db/:table/edit/:id', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table, id } = req.params;
-            const data = req.body;
-            const fields = Object.keys(data).filter(k => k !== 'id');
-            const setClause = fields.map(f => `"${f}" = ?`).join(', ');
-            const values = [...fields.map(f => data[f]), id];
-            database.getDb().prepare(`UPDATE "${table}" SET ${setClause} WHERE id = ?`).run(...values);
-            addWebLog(`📝 Админ ${req.session.user.username} обновил ${table} id=${id}`, 'info');
-            res.redirect(`/admin/db/${table}?success=updated`);
-        });
-
-        app.post('/admin/db/:table/delete/:id', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table, id } = req.params;
-            database.getDb().prepare(`DELETE FROM "${table}" WHERE id = ?`).run(id);
-            addWebLog(`🗑️ Админ ${req.session.user.username} удалил из ${table} id=${id}`, 'warn');
-            res.redirect(`/admin/db/${table}?success=deleted`);
-        });
-
-        app.get('/admin/db/:table/new', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table } = req.params;
-            const columns = database.getDb().prepare(`PRAGMA table_info("${table}")`).all();
-            const success = req.query.success || null;
-            const error = req.query.error || null;
-            
-            res.render('admin/db/new', { 
-                user: req.session.user, 
-                table, 
-                columns,
-                success: success,
-                error: error,
-                currentPage: 'db' 
-            });
-        });
-
-        app.post('/admin/db/:table/new', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.redirect('/admin/login');
-            const { table } = req.params;
-            const data = req.body;
-            const fields = Object.keys(data);
-            const placeholders = fields.map(() => '?').join(',');
-            database.getDb().prepare(`INSERT INTO "${table}" (${fields.map(f => `"${f}"`).join(',')}) VALUES (${placeholders})`).run(...fields.map(f => data[f]));
-            addWebLog(`➕ Админ ${req.session.user.username} добавил в ${table}`, 'info');
-            res.redirect(`/admin/db/${table}?success=created`);
-        });
-
-        // ========== ПЕРЕЗАПУСК БОТА ==========
-        app.post('/admin/bot/restart', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            addWebLog(`🔄 Админ ${req.session.user.username} перезапускает бота`, 'warn');
-            
-            if (activeBot && typeof activeBot.end === 'function') {
-                activeBot.end();
-            }
-            
-            // Запускаем перезапуск через 1 секунду
-            setTimeout(() => {
-                if (global.botComponents && global.botComponents.minecraft) {
-                    const minecraft = require('../minecraft');
-                    minecraft.start(database, addWebLog).then(newBot => {
-                        global.botComponents.minecraft = newBot;
-                        activeBot = newBot;
-                        addWebLog('✅ Бот успешно перезапущен', 'success');
-                    }).catch(err => {
-                        addWebLog(`❌ Ошибка перезапуска: ${err.message}`, 'error');
-                    });
-                }
-            }, 1000);
-            
-            res.json({ success: true, message: 'Бот перезапускается' });
-        });
-
-        // ========== ОЧИСТКА КЭША ==========
-        app.post('/admin/cache/clear', (req, res) => {
-            if (!req.session.user?.isAdmin) return res.status(403).json({ error: 'Forbidden' });
-            
-            addWebLog(`🧹 Админ ${req.session.user.username} очистил кэш`, 'info');
-            
-            // Очищаем require-кэш для модулей проекта
-            Object.keys(require.cache).forEach(key => {
-                if (!key.includes('node_modules')) {
-                    delete require.cache[key];
-                }
-            });
-            
-            // Очищаем глобальные логи
-            if (globalLogs.length > 0) {
-                globalLogs = globalLogs.slice(0, 100);
-            }
-            
-            res.json({ success: true, message: 'Кэш очищен' });
-        });
-
-        app.get('/admin/logout', (req, res) => {
-            req.session.destroy();
-            res.redirect('/');
-        });
-
-        server = app.listen(PORT, () => {
-            logger.success(`✅ Веб-сервер запущен на порту ${PORT}`);
-        });
-        
-        return server;
-    } catch (error) {
-        logger.error('❌ Ошибка запуска веб-сервера:', error);
-        throw error;
-    }
 }
 
-function stop() {
-    if (server) {
-        server.close();
-        server = null;
-        logger.info('🛑 Веб-сервер остановлен');
-    }
-}
+// ==================== IPC ОТ РОДИТЕЛЯ ====================
+process.on('message', async (message) => {
+    if (!message || !message.type) return;
 
-module.exports = { start, stop, setBot };
+    switch (message.type) {
+        case 'init':
+            webLogger.info('Получено init-сообщение от оркестратора');
+            break;
+
+        case 'graceful_shutdown':
+            webLogger.warn('Запрос на завершение от оркестратора');
+            if (process.send) {
+                process.send({ type: 'shutdown', reason: 'graceful' });
+            }
+            setTimeout(() => process.exit(0), 3000);
+            break;
+
+        case 'heartbeat':
+            if (process.send) {
+                process.send({
+                    type: 'stats',
+                    data: {
+                        uptime: process.uptime(),
+                        port: PORT,
+                        env: NODE_ENV,
+                    },
+                });
+            }
+            break;
+    }
+});
+
+// ==================== ЗАПУСК ====================
+startServer().catch(error => {
+    webLogger.error(`Критическая ошибка: ${error.message}`);
+    process.exit(1);
+});
+
+// ==================== ЭКСПОРТ ====================
+module.exports = app;
+module.exports.startServer = startServer;

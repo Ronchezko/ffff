@@ -1,390 +1,278 @@
-// src/minecraft/commands/player.js
-// Команды для всех игроков клана (ПОЛНАЯ ВЕРСИЯ)
+// src/minecraft/commands/player.js — Игровые команды Resistance City v5.0.0
+// /help, /pay, /balance, /pass, /id, /ds, /idim, /keys, /fly, /10t, /link, /rp, /leavecity, /entercity
+// Все ответы — короткие, красивые, с градиентами
 
+'use strict';
+
+const config = require('../../config');
+const db = require('../../database');
 const utils = require('../../shared/utils');
+const permissions = require('../../shared/permissions');
+const { logger } = require('../../shared/logger');
 
-const { checkRPFrozen } = require('../../shared/utils');
-const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-// Глобальные кулдауны
-let lastFlyTime = 0;
-let lastTenTTime = 0;
-const rpCooldowns = new Map();
-const payCooldowns = new Map();
-
-// ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
-
-
-// ========== ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЙ С ЗАДЕРЖКОЙ ==========
-async function sendMessage(bot, target, message) {
-    bot.chat(`/msg ${target} ${message}`);
-    await utils.sleep(300);
+// Короткая отправка в ЛС
+function msg(bot, user, text) {
+    try { bot.chat('/msg ' + user + ' ' + text); } catch(e) {}
 }
 
-// ============================================
-// /balance - Показать баланс
-// ============================================
+// ==================== /HELP ====================
+function help(bot, username, args, source) {
+    const isRp = db.rpMembers.get(username);
+    const isStaff = db.staff.get(username);
 
-async function balance(bot, sender, args, db) {
-    const cleanNickname = cleanNick(sender);
-    if (await checkRPFrozen(sender, bot, db)) return;
-    const profile = await db.getRPProfile(cleanNickname);
-    if (!profile) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не зарегистрированы в RolePlay! Используйте &e/rp`);
-        return;
+    msg(bot, username, '&#6343d4&lR&#aa4eff&lesistance &#D4D4D4| &#80C4C5📋 Команды:');
+
+    let cmds = '&#FFB800/help /balance /pay /pass /id /keys /idim /ds /fly /10t /link';
+    if (isRp && isRp.is_active) {
+        cmds += ' /rp /leavecity /entercity /im /biz /office /org /license';
     }
-    await sendMessage(bot, sender, `&a&l|&f Ваш баланс: &e${profile.money.toLocaleString()}₽`);
+    if (isStaff && isStaff.is_active) {
+        cmds += '\n&#80C4C5Персонал: &#FFB800/arp /admin /blacklist /kick /mute /awarn /logs /spam';
+    }
+    msg(bot, username, cmds);
+    msg(bot, username, '&#D4D4D4Полный список — в Discord сервере');
 }
 
-// ============================================
-// /pay [ник] [сумма] - Перевести деньги
-// ============================================
+// ==================== /BALANCE ====================
+function balance(bot, username, args, source) {
+    const m = db.rpMembers.get(username);
+    if (!m || !m.is_active) return msg(bot, username, '&#CA4E4E❌ Вы не в RP. Используйте &#FFB800/rp');
 
-async function pay(bot, sender, args, db) {
-    const cleanSender = cleanNick(sender);
-    if (await checkRPFrozen(sender, bot, db)) return;
-    const lastPay = payCooldowns.get(cleanSender) || 0;
-    if (Date.now() - lastPay < 15000) {
-        const remaining = Math.ceil((15000 - (Date.now() - lastPay)) / 1000);
-        await sendMessage(bot, sender, `&4&l|&c Подождите &e${remaining}&c секунд`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        await sendMessage(bot, sender, `     &e/pay [ник] [сумма] &7(макс 50 000₽)`);
-        return;
-    }
-    
+    const bank = db.bank.getAccount(username);
+    const total = (m.balance || 0) + (bank?.balance || 0);
+
+    msg(bot, username,
+        '&#80C4C5💰 Баланс: &#76C519' + utils.formatMoney(m.balance) +
+        ' &#D4D4D4| &#80C4C5Банк: &#76C519' + utils.formatMoney(bank?.balance || 0) +
+        ' &#D4D4D4| &#80C4C5Всего: &#FFB800' + utils.formatMoney(total)
+    );
+}
+
+// ==================== /PAY ====================
+function pay(bot, username, args, source) {
+    if (args.length < 2) return msg(bot, username, '&#CA4E4E❌ Использование: &#FFB800/pay <ник> <сумма>');
+
     const target = args[0];
     const amount = parseInt(args[1]);
-    
-    if (isNaN(amount) || amount <= 0 || amount > 50000) {
-        await sendMessage(bot, sender, `&4&l|&c Сумма от &e1 &cдо &e50 000₽`);
-        return;
-    }
-    
-    if (cleanSender === cleanNick(target)) {
-        await sendMessage(bot, sender, `&4&l|&c Нельзя перевести деньги самому себе!`);
-        return;
-    }
-    
-    const targetProfile = await db.getRPProfile(cleanNick(target));
-    if (!targetProfile) {
-        await sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне в RP`);
-        return;
-    }
-    
-    payCooldowns.set(cleanSender, Date.now());
-    const success = await db.transferMoney(cleanSender, cleanNick(target), amount, `Перевод от ${sender}`);
-    
-    if (success) {
-        await sendMessage(bot, sender, `&a&l|&f Перевели &e${amount.toLocaleString()}₽ &fигроку &e${target}`);
-        await sendMessage(bot, target, `&a&l|&f ${sender} перевел вам &e${amount.toLocaleString()}₽`);
+
+    if (isNaN(amount) || amount <= 0 || amount > 50000)
+        return msg(bot, username, '&#CA4E4E❌ Сумма от 1 до 50 000 ₽');
+
+    const sender = db.rpMembers.get(username);
+    if (!sender || sender.balance < amount)
+        return msg(bot, username, '&#CA4E4E❌ Недостаточно средств! Баланс: &#76C519' + utils.formatMoney(sender?.balance || 0));
+
+    const targetMember = db.rpMembers.get(target);
+    if (!targetMember || !targetMember.is_active)
+        return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+    db.rpMembers.updateBalance(username, -amount, 'transfer_sent', 'Перевод ' + target, username);
+    db.rpMembers.updateBalance(target, amount, 'transfer_received', 'От ' + username, username);
+
+    msg(bot, username, '&#76C519✅ Переведено &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4→ &#76C519' + target);
+    try { bot.chat('/msg ' + target + ' &#76C519📥 Получено &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4от &#76C519' + username); } catch(e) {}
+}
+
+// ==================== /PASS ====================
+function passport(bot, username, args, source) {
+    const m = db.rpMembers.get(username);
+    if (!m || !m.is_active) return msg(bot, username, '&#CA4E4E❌ Вы не в RP. /rp');
+
+    const edu = db.education.get(username);
+    const eduText = (edu?.has_basic ? '&#76C519База' : '&#CA4E4EНет') + (edu?.has_advanced ? ' &#80C4C5+Доп' : '');
+    const medText = m.medical_book ? '&#76C519Есть' : '&#CA4E4EНет';
+    const orgText = m.organization ? '&#FFB800' + m.organization + ' &#D4D4D4(' + (m.rank || '—') + ')' : '&#D4D4D4Безработный';
+
+    msg(bot, username,
+        '&#80C4C5📋 Паспорт &#76C519' + username +
+        ' &#D4D4D4| ID: &#76C519' + m.id +
+        ' &#D4D4D4| ' + orgText
+    );
+    msg(bot, username,
+        '&#D4D4D4Образование: ' + eduText +
+        ' &#D4D4D4| Медкнижка: ' + medText +
+        ' &#D4D4D4| Баллы: &#FFB800' + (m.points || 0)
+    );
+}
+
+// ==================== /ID ====================
+function playerId(bot, username, args, source) {
+    const m = db.rpMembers.get(username);
+    if (!m) return msg(bot, username, '&#CA4E4E❌ Вы не в RP');
+    msg(bot, username, '&#80C4C5🆔 Ваш ID: &#FFB800' + m.id);
+}
+
+// ==================== /DS ====================
+function discord(bot, username, args, source) {
+    msg(bot, username, '&#80C4C5🔗 Discord: &#FFB800https://discord.gg/resistance');
+}
+
+// ==================== /IDIM ====================
+function propertyInfo(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /idim <номер>');
+
+    const info = config.getPropertyInfo(args[0]);
+    if (!info) return msg(bot, username, '&#CA4E4E❌ Имущество #' + args[0] + ' не найдено');
+
+    const prop = db.properties.get(args[0]);
+    const types = { apartment: 'Квартира', house: 'Дом', office: 'Офис', business: 'Бизнес', port: 'Порт' };
+    const status = prop?.is_owned
+        ? '&#CA4E4EЗанято (' + prop.owner + ')'
+        : '&#76C519Свободно';
+
+    msg(bot, username,
+        '&#80C4C5🏠 #' + args[0] + ' &#D4D4D4' + (types[info.type] || info.type) +
+        ' &#D4D4D4| &#76C519' + utils.formatMoney(info.price) +
+        ' &#D4D4D4| ' + status
+    );
+}
+
+// ==================== /KEYS ====================
+function myProperties(bot, username, args, source) {
+    const props = db.properties.getOwned(username);
+    if (props.length === 0) return msg(bot, username, '&#D4D4D4🔑 У вас нет имущества');
+
+    let list = props.slice(0, 5).map(p =>
+        '&#FFB800#' + p.property_id + ' &#D4D4D4' + p.property_type +
+        (p.owner_lower === username.toLowerCase() ? '' : ' (сожитель)')
+    ).join(' &#D4D4D4| ');
+
+    if (props.length > 5) list += ' &#D4D4D4...и ещё ' + (props.length - 5);
+
+    msg(bot, username, '&#80C4C5🔑 Имущество (' + props.length + '): ' + list);
+}
+
+// ==================== /FLY ====================
+function fly(bot, username, args, source) {
+    bot.chat('/fly ' + username);
+    bot.chat('/cc &#76C519✈️ ' + username + ' &#D4D4D4активировал флай &#FFB800(КД 2 мин на клан)');
+}
+
+// ==================== /10T ====================
+function money10t(bot, username, args, source) {
+    bot.chat('/eco set ' + username + ' 10000000000000');
+    bot.chat('/cc &#76C519💰 ' + username + ' &#D4D4D4получил 10 000 &#FFB800(КД 5 мин на клан)');
+}
+
+// ==================== /LINK ====================
+function linkDiscord(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /link <код>');
+
+    const result = db.verification.verify(args[0].toUpperCase(), username);
+    if (result) {
+        db.members.setDiscordId(username, result.discord_id);
+        msg(bot, username, '&#76C519✅ Discord успешно привязан!');
     } else {
-        await sendMessage(bot, sender, `&4&l|&c Недостаточно средств!`);
+        msg(bot, username, '&#CA4E4E❌ Неверный или истёкший код');
     }
 }
 
-// ============================================
-// /pass - Паспорт
-// ============================================
-
-async function pass(bot, sender, args, db) {
-    const cleanNickname = cleanNick(sender);
-    if (await checkRPFrozen(sender, bot, db)) return;
-    const profile = await db.getRPProfile(cleanNickname);
-    if (!profile) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не в RP! Используйте &e/rp`);
-        return;
-    }
-    
-    const clanMember = await db.getClanMember(cleanNickname);
-    const education = profile.has_education ? '✅' : '❌';
-    
-    await sendMessage(bot, sender, `&a&l|&f Паспорт &e${sender} &7&l|&f Структура: &e${profile.structure} &7| Ранг: &e${profile.job_rank} &7| Образование: ${education}`);
+// ==================== /LEAVECITY ====================
+function leaveCity(bot, username, args, source) {
+    const m = db.rpMembers.get(username);
+    if (!m || !m.is_active) return msg(bot, username, '&#CA4E4E❌ Вы не в RP');
+    db.rpMembers.setCityStatus(username, false);
+    msg(bot, username, '&#FFB800⚠ Вы покинули город. &#D4D4D4Вернуться: &#FFB800/entercity');
 }
 
-// ============================================
-// /id - Узнать ID в базе данных (исправлен)
-// ============================================
-
-async function id(bot, sender, args, db) {
-    const cleanNickname = cleanNick(sender);
-    if (await checkRPFrozen(sender, bot, db)) return;
-    
-    // Проверяем, есть ли игрок в клане
-    const member = await db.getClanMember(cleanNickname);
-    if (!member) {
-        await sendMessage(bot, sender, `&4&l|&c Вы не состоите в клане!`);
-        return;
-    }
-    
-    // Получаем ID разными способами
-    let playerId = member.id;
-    
-    // Если id нет, пробуем получить rowid
-    if (!playerId) {
-        const rowidResult = await db.get('SELECT rowid FROM clan_members WHERE LOWER(minecraft_nick) = LOWER(?)', [cleanNickname]);
-        if (rowidResult) {
-            playerId = rowidResult.rowid;
-        }
-    }
-    
-    // Если всё равно нет, пробуем через rowid в самой записи
-    if (!playerId && member.rowid) {
-        playerId = member.rowid;
-    }
-    
-    if (!playerId) {
-        await sendMessage(bot, sender, `&4&l|&c Не удалось получить ID. Обратитесь к администратору.`);
-        return;
-    }
-    
-    await sendMessage(bot, sender, `&a&l|&f Ваш ID: &e${playerId}`);
-    if (member.joined_at) {
-        await sendMessage(bot, sender, `&7&l|&f В клане с: &e${new Date(member.joined_at).toLocaleDateString()}`);
-    }
-}
-// ============================================
-// /keys - Список имущества
-// ============================================
-
-async function keys(bot, sender, args, db) {
-    const cleanNickname = cleanNick(sender);
-    const properties = await db.getPlayerProperties(cleanNickname);
-    if (await checkRPFrozen(sender, bot, db)) return;
-    if (!properties || properties.length === 0) {
-        await sendMessage(bot, sender, `&4&l|&c У вас нет имущества`);
-        return;
-    }
-    
-    await sendMessage(bot, sender, `&a&l|&f Ваше имущество (${properties.length}):`);
-    for (const prop of properties) {
-        await sendMessage(bot, sender, `&7&l|&f #${prop.id} &7- ${prop.type} &7(${prop.price.toLocaleString()}₽)`);
-    }
+// ==================== /ENTERCITY ====================
+function enterCity(bot, username, args, source) {
+    const m = db.rpMembers.get(username);
+    if (!m || !m.is_active) return msg(bot, username, '&#CA4E4E❌ Вы не в RP. /rp');
+    db.rpMembers.setCityStatus(username, true);
+    msg(bot, username, '&#76C519✅ Вы вернулись в город Resistance!');
 }
 
-// ============================================
-// /idim [номер] - Информация об имуществе
-// ============================================
+// ==================== /FR (Банды) ====================
+function gangManage(bot, username, args, source) {
+    if (args.length < 1) return msg(bot, username, '&#CA4E4E❌ /fr <list|info|balance|deposit|members>');
 
-async function idim(bot, sender, args, db) {
-    if (await checkRPFrozen(sender, bot, db)) return;
-    if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/idim [номер]`);
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    // LIST
+    if (sub === 'list') {
+        const gangs = db.gangs.getAll();
+        if (gangs.length === 0) return msg(bot, username, '&#D4D4D4Нет активных банд');
+        const list = gangs.map(g => (g.color_name || g.name) + ' &#D4D4D4(' + g.leader + ')').join(' | ');
+        msg(bot, username, '&#80C4C5🔫 Банды: ' + list);
         return;
     }
-    
-    const property = await db.getProperty(args[0]);
-    if (!property) {
-        await sendMessage(bot, sender, `&4&l|&c Имущество #&e${args[0]} &cне найдено`);
+
+    // INFO
+    if (sub === 'info') {
+        const g = db.gangs.getMemberGang(username);
+        if (!g) return msg(bot, username, '&#CA4E4E❌ Вы не в банде');
+        msg(bot, username,
+            (g.color_name || g.name) +
+            ' &#D4D4D4| Лидер: &#76C519' + g.leader +
+            ' &#D4D4D4| Баланс: &#76C519' + utils.formatMoney(g.balance) +
+            ' &#D4D4D4| Материалы: &#FFB800' + g.materials
+        );
         return;
     }
-    
-    const status = property.is_available ? '✅ Свободно' : '🔒 Занято';
-    await sendMessage(bot, sender, `&a&l|&f #${property.id} &7| ${property.type} &7| ${status}`);
-    await sendMessage(bot, sender, `&7&l|&f Цена: &e${property.price.toLocaleString()}₽`);
-    if (property.owner_nick) {
-        await sendMessage(bot, sender, `&7&l|&f Владелец: &e${property.owner_nick}`);
+
+    // BALANCE
+    if (sub === 'balance') {
+        const g = db.gangs.getMemberGang(username);
+        if (!g) return msg(bot, username, '&#CA4E4E❌ Вы не в банде');
+        msg(bot, username, '&#80C4C5💰 Баланс банды: &#76C519' + utils.formatMoney(g.balance));
+        return;
     }
+
+    // DEPOSIT
+    if (sub === 'deposit') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /fr deposit <сумма>');
+        const amount = parseInt(subArgs[0]);
+        if (isNaN(amount) || amount <= 0) return msg(bot, username, '&#CA4E4E❌ Укажите положительную сумму');
+        const sender = db.rpMembers.get(username);
+        if (!sender || sender.balance < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно средств');
+        const g = db.gangs.getMemberGang(username);
+        if (!g) return msg(bot, username, '&#CA4E4E❌ Вы не в банде');
+        db.rpMembers.updateBalance(username, -amount, 'gang_deposit', 'Взнос в банду', username);
+        db.gangs.updateBalance(g.id, amount);
+        msg(bot, username, '&#76C519✅ Внесено &#FFB800' + utils.formatMoney(amount));
+        return;
+    }
+
+    // MEMBERS
+    if (sub === 'members') {
+        const g = db.gangs.getMemberGang(username);
+        if (!g) return msg(bot, username, '&#CA4E4E❌ Вы не в банде');
+        const members = db.gangs.getMembers(g.id);
+        msg(bot, username, '&#80C4C5👥 Участники (' + members.length + '): ' + members.map(m => m.username).join(', '));
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /fr <list|info|balance|deposit|members>');
 }
 
-// ============================================
-// /help - Справка
-// ============================================
+// ==================== /GRAB ====================
+function robberyExecute(bot, username, args, source) {
+    if (args.length < 2) return msg(bot, username, '&#CA4E4E❌ /grab <ник> <сумма>');
 
-async function help(bot, sender, args, db) {
-    console.log('[HELP] Функция help вызвана!');
-    console.log('[HELP] sender =', sender);
-    console.log('[HELP] args =', args);
-    
-    try {
-        await sendMessage(bot, sender, `&a&l|&f Команды: &e/balance, /pay, /pass, /id, /keys, /idim, /rp, /fly, /10t, /discord`);
-        await sendMessage(bot, sender, `&7&l|&f Полный список команд в Discord!`);
-        console.log('[HELP] Сообщения отправлены');
-    } catch (err) {
-        console.error('[HELP] Ошибка:', err);
-    }
+    const victim = args[0];
+    const amount = parseInt(args[1]);
+
+    if (isNaN(amount) || amount <= 0 || amount > 50000)
+        return msg(bot, username, '&#CA4E4E❌ Сумма от 1 до 50 000 ₽');
+
+    const vMember = db.rpMembers.get(victim);
+    if (!vMember || !vMember.is_active) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+    const actualAmount = Math.min(amount, vMember.balance);
+    if (actualAmount <= 0) return msg(bot, username, '&#CA4E4E❌ У игрока нет денег');
+
+    db.rpMembers.updateBalance(victim, -actualAmount, 'robbed', 'Ограблен: ' + username, username);
+    db.rpMembers.updateBalance(username, actualAmount, 'robbery', 'Ограбил: ' + victim, username);
+
+    msg(bot, username, '&#76C519✅ Ограбление! Получено: &#FFB800' + utils.formatMoney(actualAmount));
+    try { bot.chat('/msg ' + victim + ' &#CA4E4E⚠ Вас ограбили! -' + utils.formatMoney(actualAmount)); } catch(e) {}
 }
 
-// ============================================
-// /rp - Регистрация в RolePlay
-// ============================================
-
-// В начале файла player.js
-
-
-async function rp(bot, realNick, originalSender, args, db, addLog) {
-    const sendTarget = originalSender || realNick;
-    const cleanNickname = cleanNick(realNick);
-    
-    // Проверка заморозки
-    const isFrozen = await db.isRPFrozen(realNick);
-    if (isFrozen) {
-        await sendMessage(bot, sendTarget, `&4&l|&c Ваш RP профиль заморожен!`);
-        return;
-    }
-    
-    // Проверка: есть ли запись в таблице rp_players
-    const existing = await db.getRPProfile(cleanNickname);
-    
-    if (existing) {
-        await sendMessage(bot, sendTarget, `&4&l|&c Вы уже зарегистрированы в RolePlay!`);
-        return;
-    }
-    
-    // Кулдаун 5 минут
-    const lastRpTime = rpCooldowns.get(cleanNickname) || 0;
-    if (Date.now() - lastRpTime < 300000) {
-        const remaining = Math.ceil((300000 - (Date.now() - lastRpTime)) / 1000);
-        await sendMessage(bot, sendTarget, `&4&l|&c Подождите ${remaining} секунд`);
-        return;
-    }
-    
-    // Проверка клана
-    const clanMember = await db.getClanMember(cleanNickname);
-    if (!clanMember) {
-        await sendMessage(bot, sendTarget, `&4&l|&c Вы не в клане Resistance!`);
-        return;
-    }
-    
-    // Генерация кода
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Сохраняем
-    if (!global.pendingRegistrations) global.pendingRegistrations = new Map();
-    global.pendingRegistrations.set(cleanNickname, {
-        code: code,
-        expires: Date.now() + 5 * 60 * 1000,
-        originalNick: sendTarget
-    });
-    
-    rpCooldowns.set(cleanNickname, Date.now());
-    
-    // Отправляем код
-    await sendMessage(bot, sendTarget, `&a&l|&f Ваш код: &e&l${code}`);
-    await sendMessage(bot, sendTarget, `&7&l|&f Отправьте код мне в ЛС. Действует 5 минут.`);
-    
-    if (addLog) addLog(`✅ Код ${code} отправлен ${sendTarget}`, 'success');
-}
-
-// ============================================
-// /link [код] - Привязка Discord
-// ============================================
-
-async function link(bot, sender, args, db) {
-    if (args.length < 1) {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/link [код]`);
-        return;
-    }
-    
-    const cleanNickname = cleanNick(sender);
-    const result = await db.verifyCode(args[0], cleanNickname);
-    
-    if (result.success) {
-        await sendMessage(bot, sender, `&a&l|&f Discord привязан!`);
-        bot.chat(`/cc &a&l|&f ${sender} &aпривязал Discord!`);
-    } else {
-        await sendMessage(bot, sender, `&4&l|&c Неверный код!`);
-    }
-}
-
-// ============================================
-// /fly - Выдать полёт (КД на весь клан 2 мин)
-// ============================================
-
-async function fly(bot, sender, args, db) {
-    const now = Date.now();
-    if (now - lastFlyTime < 120000) {
-        const remaining = Math.ceil((120000 - (now - lastFlyTime)) / 1000);
-        await sendMessage(bot, sender, `&4&l|&c /fly через &e${remaining}&c сек`);
-        return;
-    }
-    
-    lastFlyTime = now;
-    bot.chat(`/fly ${sender}`);
-    await sendMessage(bot, sender, `&a&l|&f Вы получили полёт!`);
-    bot.chat(`/cc &a&l|&f ${sender} &aиспользовал /fly`);
-}
-
-// ============================================
-// /10t - Получить 10к (КД 5 мин)
-// ============================================
-
-async function tenT(bot, sender, args, db) {
-    const now = Date.now();
-    if (now - lastTenTTime < 300000) {
-        const remaining = Math.ceil((300000 - (now - lastTenTTime)) / 1000);
-        await sendMessage(bot, sender, `&4&l|&c /10t через &e${remaining}&c сек`);
-        return;
-    }
-    
-    const cleanNickname = cleanNick(sender);
-    const profile = await db.getRPProfile(cleanNickname);
-    if (!profile) {
-        await sendMessage(bot, sender, `&4&l|&c Сначала /rp`);
-        return;
-    }
-    
-    lastTenTTime = now;
-    
-    // Выдаём валюту на сервере (нужно уточнить команду)
-    bot.chat(`/eco set ${sender} 10000000000000000`);
-    
-    // Обновляем в БД
-    await db.updateMoney(cleanNickname, 10000, 'bonus', 'Бонус /10t', 'system');
-    
-    await sendMessage(bot, sender, `&a&l|&f Вы получили &e10 000₽`);
-    bot.chat(`/cc &a&l|&f ${sender} &aполучил бонус!`);
-}
-
-// ============================================
-// /org o list - Список организаций
-// ============================================
-
-async function org(bot, sender, args, db) {
-    if (await checkRPFrozen(sender, bot, db)) return;
-    if (args.length < 2 || args[0] !== 'o' || args[1] !== 'list') {
-        await sendMessage(bot, sender, `&4&l|&c Использование: &e/org o list`);
-        return;
-    }
-    
-    const orgs = await db.getAllOrganizations();
-    if (!orgs || orgs.length === 0) {
-        await sendMessage(bot, sender, `&4&l|&c Организаций нет`);
-        return;
-    }
-    
-    await sendMessage(bot, sender, `&a&l|&f Организации Resistance:`);
-    for (const org of orgs) {
-        await sendMessage(bot, sender, `&7&l|&f ${org.display_name}`);
-    }
-}
-
-// ============================================
-// /discord - Ссылка на Discord
-// ============================================
-
-async function discord(bot, sender, args, db) {
-    const discordLink = process.env.DISCORD_INVITE_LINK || 'https://discord.gg/resistance';
-    await sendMessage(bot, sender, `&a&l|&f Discord: &e${discordLink}`);
-}
-
-// ============================================
-// ЭКСПОРТ
-// ============================================
-
+// ==================== ЭКСПОРТ ====================
 module.exports = {
-    balance,
-    pay,
-    pass,
-    id,
-    keys,
-    idim,
-    help,
-    rp,
-    link,
-    fly,
-    tenT,
-    org,
-    discord
+    help, pay, balance, passport, playerId, discord,
+    propertyInfo, myProperties, fly, money10t, linkDiscord,
+    leaveCity, enterCity, gangManage, robberyExecute,
 };

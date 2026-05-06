@@ -1,755 +1,325 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Консоль бота | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Консоль управления' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
     <style>
-        /* ===== ОБЩИЕ СТИЛИ ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Roboto, sans-serif;
+        .console-output-area {
+            background: #0a0a14;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #a0ffa0;
+            min-height: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.6;
         }
-
-        :root {
-            --bg-color: #f5f7fa;
-            --text-color: #333;
-            --card-bg: #ffffff;
-            --header-bg: rgba(255,255,255,0.95);
-            --border-color: rgba(0,0,0,0.1);
-            --primary: #4a3aff;
-            --primary-hover: #3728e0;
-            --nav-link-color: #333;
-            --nav-link-hover: #4a3aff;
-            --footer-color: #999;
-            --gradient-2: linear-gradient(45deg, #6343d4, #aa4eff);
-            --shadow-sm: 0 10px 30px rgba(0,0,0,0.05);
-            --shadow-md: 0 15px 40px rgba(0,0,0,0.1);
-            --shadow-lg: 0 20px 50px rgba(0,0,0,0.2);
-            --log-bg: #0b0c1e;
-            --log-text: #ffffff;
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #0b0c1e;
-            --text-color: #e0e0e0;
-            --card-bg: #1a1b2f;
-            --header-bg: rgba(10,10,20,0.95);
-            --border-color: rgba(255,255,255,0.1);
-            --primary: #aa4eff;
-            --primary-hover: #8a3fcc;
-            --nav-link-color: #e0e0e0;
-            --nav-link-hover: #aa4eff;
-            --footer-color: #666;
-            --log-bg: #0b0c1e;
-            --log-text: #ffffff;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            transition: background-color 0.3s, color 0.3s;
-            min-height: 100vh;
+        .console-output-area .c-error { color: #ff6b6b; }
+        .console-output-area .c-warn { color: #ffb800; }
+        .console-output-area .c-info { color: #80c4c5; }
+        .console-output-area .c-success { color: #76c519; }
+        .console-output-area .c-time { color: #555; }
+        .console-output-area .c-input { color: #ffb800; }
+        .console-input-row {
             display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
+            gap: 8px;
+            margin-top: 12px;
             align-items: center;
-            padding: 20px 40px;
-            background: var(--header-bg);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid var(--border-color);
-            position: sticky;
-            top: 0;
-            z-index: 100;
         }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 15px;
+        .console-prefix {
+            color: var(--success);
+            font-family: 'Consolas', monospace;
+            font-weight: 700;
+            white-space: nowrap;
+            font-size: 0.9rem;
         }
-
-        .logo img {
-            height: 50px;
-            filter: drop-shadow(0 0 10px rgba(170,78,255,0.5));
-        }
-
-        .logo h2 {
-            font-size: 1.8rem;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .btn-logout {
-            padding: 8px 20px;
-            background: var(--gradient-2);
-            color: white;
-            text-decoration: none;
-            border-radius: 30px;
-            font-weight: 600;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .btn-logout:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
-        }
-
-        .theme-toggle {
-            background: none;
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-color);
-            font-size: 1.5rem;
-            transition: background 0.3s;
-        }
-
-        .theme-toggle:hover {
-            background: rgba(128,128,128,0.2);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 30px auto;
-            padding: 0 20px;
+        .console-input-row input {
             flex: 1;
-            width: 100%;
+            background: #0a0a14;
+            border: 1px solid var(--border);
+            color: #a0ffa0;
+            font-family: 'Consolas', monospace;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
         }
-
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 25px;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            color: transparent;
-            display: inline-block;
-        }
-
-        /* ===== КОНСОЛЬ ===== */
-        .console-container {
-            display: flex;
-            flex-direction: column;
-            gap: 25px;
-        }
-
-        .command-panel {
-            background: var(--card-bg);
-            border-radius: 30px;
-            padding: 25px;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .command-panel h2 {
-            font-size: 1.8rem;
-            margin-bottom: 20px;
-            color: var(--primary);
-        }
-
-        .input-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: flex-end;
-        }
-
-        .input-group select,
-        .input-group input {
-            flex: 1;
-            min-width: 200px;
-            padding: 12px 20px;
-            border: 2px solid var(--border-color);
-            background: var(--card-bg);
-            border-radius: 30px;
-            font-size: 1rem;
-            color: var(--text-color);
-            transition: border 0.3s, box-shadow 0.3s;
-            appearance: none;
-        }
-
-        .input-group select {
-            background-image: url("data:image/svg+xml;utf8,<svg fill='%234a3aff' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 15px center;
-            background-size: 20px;
-        }
-
-        .input-group select option {
-            background: var(--card-bg);
-            color: var(--text-color);
-            padding: 10px;
-        }
-
-        .input-group select:focus,
-        .input-group input:focus {
+        .console-input-row input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(170,78,255,0.2);
         }
-
-        .input-group button {
-            padding: 12px 30px;
-            background: var(--gradient-2);
-            border: none;
-            border-radius: 30px;
-            color: white;
-            font-weight: 600;
+        .quick-cmd-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            transition: all 0.15s ease;
         }
-
-        .input-group button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(170,78,255,0.4);
+        .quick-cmd-btn:hover {
+            background: rgba(99,67,212,0.1);
+            border-color: var(--primary);
+            color: var(--text-bright);
         }
-
-        #playerNameInput {
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        #playerNameInput input {
-            width: 100%;
-        }
-
-        .log-panel {
-            background: var(--card-bg);
-            border-radius: 30px;
-            padding: 25px;
-            border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-sm);
-            display: none;
-            flex-direction: column;
-            height: 600px;
-        }
-
-        .log-panel.active {
-            display: flex;
-        }
-
-        .log-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .log-header h2 {
-            font-size: 1.8rem;
-            color: var(--primary);
-        }
-
-        .log-header button {
-            padding: 8px 20px;
-            background: var(--primary);
-            border: none;
-            border-radius: 30px;
-            color: white;
-            font-weight: 600;
+        .history-item {
+            padding: 6px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: background 0.3s;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
         }
-
-        .log-header button:hover {
-            background: var(--primary-hover);
-        }
-
-        .log-content {
-            flex: 1;
-            overflow-y: auto;
-            background: var(--log-bg);
-            border-radius: 20px;
-            padding: 15px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            border: 1px solid var(--border-color);
-            color: var(--log-text);
-        }
-
-        .log-entry {
-            padding: 2px 0;
-            margin: 0;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-            font-family: inherit;
-            border-bottom: none;
-        }
-
-        .log-entry.admin {
-            font-weight: bold;
-            color: #ffff00;
-        }
-
-        .log-entry.error {
-            color: #ff5555;
-        }
-
-        .log-entry.success {
-            color: #55ff55;
-        }
-
-        .log-entry.warn {
-            color: #ffff55;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 10px;
-        }
-        .tab {
-            padding: 10px 25px;
-            border-radius: 30px;
-            cursor: pointer;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            transition: background 0.3s, color 0.3s;
-            font-weight: 600;
-        }
-        .tab.active {
-            background: var(--gradient-2);
-            color: white;
-            border-color: transparent;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 30px 0;
-            color: var(--footer-color);
-            border-top: 1px solid var(--border-color);
-            margin-top: 40px;
-        }
-
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 30px;
-            background: white;
-            box-shadow: var(--shadow-lg);
-            border-left: 5px solid;
-            animation: slideIn 0.3s;
-            z-index: 9999;
-        }
-        .notification.success { border-color: #00d25b; background: #d4edda; color: #155724; }
-        .notification.error { border-color: #ff4757; background: #f8d7da; color: #721c24; }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0%); opacity: 1; }
+        .history-item:hover {
+            background: rgba(99,67,212,0.1);
+            color: var(--text-bright);
         }
     </style>
 </head>
 <body>
-    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
-    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+    <%- include('../partials/header', { page: 'admin' }) %>
 
-    <header class="header">
-        <div class="logo">
-            <img src="/images/logo.jpg" alt="Resistance Logo">
-            <h2>Resistance Admin</h2>
-        </div>
-        <div class="user-info">
-            <span><%= user.username %></span>
-            <button id="theme-toggle" class="theme-toggle">🌙</button>
-            <a href="/admin/logout" class="btn-logout">Выйти</a>
-        </div>
-    </header>
+    <div class="admin-layout">
+        <%- include('../partials/sidebar', { page: 'console' }) %>
 
-    <div class="container">
-        <h1>Консоль бота</h1>
-        <div class="console-container">
-            <!-- Панель отправки команд -->
-            <div class="command-panel">
-                <h2>Отправить команду</h2>
-                <div class="input-group">
-                    <select id="commandTarget">
-                        <option value="clan">Клановый чат (/cc)</option>
-                        <option value="global">Обычный чат</option>
-                        <option value="@player">Личное сообщение</option>
-                    </select>
-                    <input type="text" id="commandInput" placeholder="Введите команду или сообщение..." />
-                    <button id="sendCommand">Отправить</button>
+        <div class="admin-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h1 class="text-gradient" style="margin-bottom: 4px;">💻 Консоль управления</h1>
+                    <p style="color: var(--text-secondary);">Отправка команд Minecraft боту напрямую</p>
                 </div>
-                <div id="playerNameInput" style="display:none;">
-                    <input type="text" id="playerName" placeholder="Никнейм игрока" />
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-sm btn-outline" onclick="clearConsoleOutput()">🗑️ Очистить</button>
+                    <button class="btn btn-sm btn-outline" onclick="exportConsoleLog()">📥 Экспорт</button>
                 </div>
             </div>
 
-            <!-- Вкладки -->
-            <div class="tabs">
-                <div class="tab active" data-tab="chat">Чат</div>
-                <div class="tab" data-tab="system">Система</div>
+            <!-- ВЫВОД КОНСОЛИ -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">📺 Вывод</h3>
+                </div>
+                <div class="card-body">
+                    <div class="console-output-area" id="consoleOutput">
+                        <span class="c-time">[<%= new Date().toLocaleTimeString('ru-RU') %>]</span> <span class="c-info">Консоль готова. Введите команду...</span>
+                    </div>
+
+                    <div class="console-input-row">
+                        <span class="console-prefix">resistance@admin&gt;</span>
+                        <input type="text"
+                               id="consoleInput"
+                               placeholder="Введите команду (например: /c kick Player причина)..."
+                               autocomplete="off"
+                               onkeydown="handleConsoleKey(event)">
+                        <button class="btn btn-primary btn-sm" onclick="sendConsoleCommand()" style="flex-shrink: 0;">▶ Выполнить</button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Логи чата -->
-            <div class="log-panel active" id="chatPanel">
-                <div class="log-header">
-                    <h2>Логи чата (новые снизу)</h2>
-                    <button id="clearChatLogs">Очистить</button>
+            <!-- БЫСТРЫЕ КОМАНДЫ -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">⚡ Быстрые команды</h3>
                 </div>
-                <div class="log-content" id="chatLogContent"></div>
+                <div class="card-body">
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        <button class="quick-cmd-btn" onclick="quickCommand('/c kick ')">/c kick</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/c mute ')">/c mute</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/c unmute ')">/c unmute</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/c accept ')">/c accept</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/c rank ')">/c rank</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/rg addmember ')">/rg addmember</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/rg removemember ')">/rg removemember</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/eco set ')">/eco set</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/msg ')">/msg</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/cc ')">/cc</button>
+                        <button class="quick-cmd-btn" onclick="quickCommand('/fly ')">/fly</button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Логи системы -->
-            <div class="log-panel" id="systemPanel">
-                <div class="log-header">
-                    <h2>Системные логи (новые снизу)</h2>
-                    <button id="clearSystemLogs">Очистить</button>
+            <!-- ПОЛЕЗНЫЕ КОМАНДЫ -->
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3 class="card-title">📋 Полезные команды</h3>
                 </div>
-                <div class="log-content" id="systemLogContent"></div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <% 
+                            var usefulCommands = [
+                                { cmd: '/c kick {ник}', desc: 'Кикнуть из клана' },
+                                { cmd: '/c mute {ник} {причина}', desc: 'Замутить в клане' },
+                                { cmd: '/c unmute {ник}', desc: 'Размутить' },
+                                { cmd: '/c accept {ник}', desc: 'Принять заявку' },
+                                { cmd: '/c rank {ник} {ранг}', desc: 'Выдать ранг' },
+                                { cmd: '/rg addmember TRTR{id} {ник}', desc: 'Добавить в регион' },
+                                { cmd: '/rg removemember TRTR{id} {ник}', desc: 'Удалить из региона' },
+                                { cmd: '/rg flag TRTR{id} use allow/deny', desc: 'Флаг региона' },
+                                { cmd: '/eco set {ник} {сумма}', desc: 'Установить баланс' },
+                                { cmd: '/msg {ник} {текст}', desc: 'Личное сообщение' },
+                                { cmd: '/cc {текст}', desc: 'В клановый чат' },
+                                { cmd: '/fly {ник}', desc: 'Выдать флай' },
+                            ];
+                            for (var i = 0; i < usefulCommands.length; i++) {
+                                var cmd = usefulCommands[i];
+                        %>
+                            <div style="padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.02); cursor: pointer;"
+                                 onclick="quickCommand('<%= cmd.cmd %> ')" title="Нажмите для вставки">
+                                <code style="color: var(--info); font-family: var(--font-mono);"><%= cmd.cmd %></code>
+                                <span style="color: var(--text-muted); margin-left: 8px; font-size: 0.85rem;"><%= cmd.desc %></span>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div style="margin-top:30px;">
-            <a href="/admin/dashboard" class="btn-logout" style="background:var(--primary);">← Назад</a>
+
+            <!-- ИСТОРИЯ -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📜 История команд</h3>
+                    <button class="btn btn-sm btn-outline" onclick="clearHistory()">Очистить</button>
+                </div>
+                <div class="card-body" id="commandHistoryContainer">
+                    <p style="color: var(--text-muted); text-align: center;">История пуста</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <footer class="footer">
-        <p>Resistance City Project • 2026</p>
-    </footer>
-
-    <!-- Встроенная простая реализация ansi-to-html на случай, если CDN недоступен -->
     <script>
-        // Простая реализация AnsiToHtml, если библиотека не загрузится
-        window.SimpleAnsiToHtml = function() {
-            this.toHtml = function(text) {
-                // Очень простая обработка: заменяем ANSI-коды на пустые строки
-                // Это временное решение, чтобы не ломать консоль
-                return text.replace(/\u001b\[[0-9;]*m/g, '');
-            };
-        };
-        
-        // Пытаемся загрузить настоящую библиотеку, но если не получится - используем простую
-        window.AnsiToHtml = window.AnsiToHtml || window.SimpleAnsiToHtml;
+        var commandHistory = [];
+        var historyIndex = -1;
+
+        function handleConsoleKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendConsoleCommand();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (historyIndex < commandHistory.length - 1) {
+                    historyIndex++;
+                    document.getElementById('consoleInput').value = commandHistory[commandHistory.length - 1 - historyIndex] || '';
+                }
+            } else if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    document.getElementById('consoleInput').value = commandHistory[commandHistory.length - 1 - historyIndex] || '';
+                } else {
+                    historyIndex = -1;
+                    document.getElementById('consoleInput').value = '';
+                }
+            }
+        }
+
+        async function sendConsoleCommand() {
+            var input = document.getElementById('consoleInput');
+            var command = input.value.trim();
+            if (!command) return;
+
+            commandHistory.push(command);
+            historyIndex = -1;
+            updateHistoryDisplay();
+            appendToConsole(command, 'input');
+
+            try {
+                var response = await fetch('/api/admin/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command }),
+                });
+                var data = await response.json();
+                if (data.success) {
+                    appendToConsole(data.message || 'Команда отправлена', 'success');
+                } else {
+                    appendToConsole(data.error || 'Ошибка', 'error');
+                }
+            } catch (err) {
+                appendToConsole('Ошибка: ' + err.message, 'error');
+            }
+
+            input.value = '';
+            input.focus();
+        }
+
+        function quickCommand(cmd) {
+            document.getElementById('consoleInput').value = cmd;
+            document.getElementById('consoleInput').focus();
+        }
+
+        function appendToConsole(text, type) {
+            var output = document.getElementById('consoleOutput');
+            var time = new Date().toLocaleTimeString('ru-RU');
+            var line = document.createElement('div');
+            if (type === 'input') {
+                line.innerHTML = '<span class="c-time">[' + time + ']</span> <span class="c-input">&gt; ' + escapeHtml(text) + '</span>';
+            } else {
+                line.innerHTML = '<span class="c-time">[' + time + ']</span> <span class="c-' + type + '">' + escapeHtml(text) + '</span>';
+            }
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearConsoleOutput() {
+            var output = document.getElementById('consoleOutput');
+            var time = new Date().toLocaleTimeString('ru-RU');
+            output.innerHTML = '<span class="c-time">[' + time + ']</span> <span class="c-info">Консоль очищена.</span>';
+        }
+
+        function exportConsoleLog() {
+            var output = document.getElementById('consoleOutput');
+            var text = output.innerText;
+            var blob = new Blob([text], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'console-' + new Date().toISOString().replace(/[:.]/g, '-') + '.log';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function updateHistoryDisplay() {
+            var container = document.getElementById('commandHistoryContainer');
+            if (commandHistory.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); text-align: center;">История пуста</p>';
+                return;
+            }
+            var html = '';
+            var reversed = commandHistory.slice().reverse().slice(0, 30);
+            for (var i = 0; i < reversed.length; i++) {
+                html += '<div class="history-item" onclick="quickCommand(\'' + escapeHtml(reversed[i]) + ' \')">' + escapeHtml(reversed[i]) + '</div>';
+            }
+            container.innerHTML = html;
+        }
+
+        function clearHistory() {
+            commandHistory = [];
+            historyIndex = -1;
+            updateHistoryDisplay();
+        }
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('consoleInput').focus();
+        });
     </script>
 
-    <script>
-        (function() {
-            // === Глобальные переменные ===
-            let chatLogs = [];
-            let systemLogs = [];
-            let activeTab = 'chat';
-            let ansiConverter;
-
-            // === Функция форматирования Minecraft сообщений ===
-            function formatMinecraftMessage(text) {
-                if (!text) return text;
-                
-                // Сначала заменяем hex-цвета &#RRGGBB
-                text = text.replace(/&#([0-9A-Fa-f]{6})/g, '<span style="color: #$1;">$&</span>');
-                
-                const mapping = {
-                    '0': 'color: #000000;', '1': 'color: #0000AA;', '2': 'color: #00AA00;',
-                    '3': 'color: #00AAAA;', '4': 'color: #AA0000;', '5': 'color: #AA00AA;',
-                    '6': 'color: #FFAA00;', '7': 'color: #AAAAAA;', '8': 'color: #555555;',
-                    '9': 'color: #5555FF;', 'a': 'color: #55FF55;', 'b': 'color: #55FFFF;',
-                    'c': 'color: #FF5555;', 'd': 'color: #FF55FF;', 'e': 'color: #FFFF55;',
-                    'f': 'color: #FFFFFF;',
-                    'l': 'font-weight: bold;',
-                    'o': 'font-style: italic;',
-                    'n': 'text-decoration: underline;',
-                    'm': 'text-decoration: line-through;',
-                    'k': 'filter: blur(1px);'
-                };
-
-                let result = '';
-                let i = 0;
-                while (i < text.length) {
-                    if (text[i] === '&' && i+1 < text.length) {
-                        const code = text[i+1].toLowerCase();
-                        if (mapping[code]) {
-                            result += `<span style="${mapping[code]}">`;
-                        } else {
-                            result += '&';
-                        }
-                        i += 2;
-                    } else {
-                        result += text[i];
-                        i++;
-                    }
-                }
-                return result;
-            }
-
-            // === Рендеринг чата ===
-            function renderChat() {
-                const container = document.getElementById('chatLogContent');
-                if (!container) return;
-                let html = '';
-                for (let i = 0; i < chatLogs.length; i++) {
-                    const entry = chatLogs[i];
-                    const formatted = formatMinecraftMessage(entry.message);
-                    html += `<div class="log-entry ${entry.type}">[${entry.timestamp}] ${formatted}</div>`;
-                }
-                container.innerHTML = html;
-            }
-
-            // === Рендеринг системы ===
-            function renderSystem() {
-                const container = document.getElementById('systemLogContent');
-                if (!container) return;
-                let html = '';
-                for (let i = 0; i < systemLogs.length; i++) {
-                    const entry = systemLogs[i];
-                    let ansiHtml;
-                    try {
-                        if (ansiConverter && typeof ansiConverter.toHtml === 'function') {
-                            ansiHtml = ansiConverter.toHtml(entry.message);
-                        } else {
-                            // Если конвертер не работает, просто показываем текст без цветов
-                            ansiHtml = entry.message.replace(/\u001b\[[0-9;]*m/g, '');
-                        }
-                    } catch (e) {
-                        ansiHtml = entry.message.replace(/\u001b\[[0-9;]*m/g, '');
-                    }
-                    html += `<div class="log-entry ${entry.level}">[${entry.timestamp}] ${ansiHtml}</div>`;
-                }
-                container.innerHTML = html;
-            }
-
-            // === Загрузка данных с сервера ===
-            async function fetchChatLogs() {
-                try {
-                    const res = await fetch('/admin/console/logs');
-                    const data = await res.json();
-                    if (data.logs) {
-                        chatLogs = data.logs;
-                        if (activeTab === 'chat') renderChat();
-                    }
-                } catch (e) { 
-                    console.error('Ошибка получения логов чата:', e); 
-                }
-            }
-
-            async function fetchSystemLogs() {
-                try {
-                    const res = await fetch('/admin/system/logs');
-                    const data = await res.json();
-                    if (data.logs) {
-                        systemLogs = data.logs;
-                        if (activeTab === 'system') renderSystem();
-                    }
-                } catch (e) { 
-                    console.error('Ошибка получения системных логов:', e); 
-                }
-            }
-
-            // === Отправка команды ===
-            async function sendCommand() {
-                const targetSelect = document.getElementById('commandTarget');
-                const commandInput = document.getElementById('commandInput');
-                const playerNameInput = document.getElementById('playerName');
-                const playerNameDiv = document.getElementById('playerNameInput');
-
-                const target = targetSelect.value;
-                let command = commandInput.value.trim();
-                if (!command) {
-                    alert('Введите команду');
-                    return;
-                }
-
-                let payload = { command, target };
-                if (target === '@player') {
-                    const player = playerNameInput.value.trim();
-                    if (!player) {
-                        alert('Введите ник игрока');
-                        return;
-                    }
-                    payload.target = `@${player}`;
-                }
-
-                try {
-                    const res = await fetch('/admin/console/send', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        commandInput.value = '';
-                        if (playerNameDiv.style.display === 'block') {
-                            playerNameInput.value = '';
-                        }
-                        // Добавляем команду в локальный лог
-                        const newEntry = {
-                            timestamp: new Date().toLocaleTimeString('ru-RU', { hour12: false }),
-                            type: 'admin',
-                            message: `[ADMIN] Отправлено: ${payload.command}`
-                        };
-                        chatLogs.push(newEntry);
-                        if (chatLogs.length > 1000) chatLogs.shift();
-                        if (activeTab === 'chat') renderChat();
-                    } else {
-                        alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-                    }
-                } catch (e) {
-                    alert('Ошибка сети: ' + e.message);
-                }
-            }
-
-            // === Инициализация при загрузке страницы ===
-            window.addEventListener('load', function() {
-                console.log('Страница загружена, начинаем инициализацию');
-
-                // Инициализация ANSI конвертера (используем window.AnsiToHtml, который определён выше)
-                try {
-                    if (typeof AnsiToHtml === 'function') {
-                        ansiConverter = new AnsiToHtml({ 
-                            fg: '#ffffff', 
-                            bg: '#0b0c1e',
-                            colors: {
-                                0: '#000000', 1: '#AA0000', 2: '#00AA00', 3: '#AA5500',
-                                4: '#0000AA', 5: '#AA00AA', 6: '#00AAAA', 7: '#AAAAAA',
-                                8: '#555555', 9: '#FF5555', 10: '#55FF55', 11: '#FFFF55',
-                                12: '#5555FF', 13: '#FF55FF', 14: '#55FFFF', 15: '#FFFFFF'
-                            }
-                        });
-                        console.log('AnsiToHtml загружен');
-                    } else {
-                        console.warn('AnsiToHtml не загружен, используем заглушку');
-                        ansiConverter = { toHtml: (text) => text.replace(/\u001b\[[0-9;]*m/g, '') };
-                    }
-                } catch (e) {
-                    console.error('Ошибка инициализации AnsiToHtml:', e);
-                    ansiConverter = { toHtml: (text) => text.replace(/\u001b\[[0-9;]*m/g, '') };
-                }
-
-                // Загружаем начальные данные из EJS
-                try {
-                    chatLogs = <%- JSON.stringify(chatLogs || []) %>;
-                    systemLogs = <%- JSON.stringify(systemLogs || []) %>;
-                    console.log('Загружено логов чата:', chatLogs.length);
-                    console.log('Загружено системных логов:', systemLogs.length);
-                } catch (e) {
-                    console.error('Ошибка загрузки данных из EJS:', e);
-                    chatLogs = [];
-                    systemLogs = [];
-                }
-
-                // Первоначальный рендер
-                renderChat();
-                renderSystem();
-
-                // Переключение темы
-                const themeToggle = document.getElementById('theme-toggle');
-                if (themeToggle) {
-                    const savedTheme = localStorage.getItem('theme');
-                    if (savedTheme === 'dark') {
-                        document.documentElement.setAttribute('data-theme', 'dark');
-                        themeToggle.textContent = '☀️';
-                    } else {
-                        document.documentElement.setAttribute('data-theme', 'light');
-                        themeToggle.textContent = '🌙';
-                    }
-                    themeToggle.onclick = function() {
-                        const current = document.documentElement.getAttribute('data-theme');
-                        const newTheme = current === 'light' ? 'dark' : 'light';
-                        document.documentElement.setAttribute('data-theme', newTheme);
-                        localStorage.setItem('theme', newTheme);
-                        themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
-                    };
-                }
-
-                // Поле для ника
-                const targetSelect = document.getElementById('commandTarget');
-                const playerNameDiv = document.getElementById('playerNameInput');
-                if (targetSelect && playerNameDiv) {
-                    targetSelect.onchange = function() {
-                        playerNameDiv.style.display = targetSelect.value === '@player' ? 'block' : 'none';
-                    };
-                }
-
-                // Переключение вкладок
-                const tabs = document.querySelectorAll('.tab');
-                const panels = document.querySelectorAll('.log-panel');
-                
-                for (let i = 0; i < tabs.length; i++) {
-                    tabs[i].onclick = function() {
-                        for (let j = 0; j < tabs.length; j++) {
-                            tabs[j].classList.remove('active');
-                        }
-                        this.classList.add('active');
-                        
-                        for (let j = 0; j < panels.length; j++) {
-                            panels[j].classList.remove('active');
-                        }
-                        
-                        const tabName = this.dataset.tab;
-                        activeTab = tabName;
-                        if (tabName === 'chat') {
-                            document.getElementById('chatPanel').classList.add('active');
-                            renderChat();
-                        } else {
-                            document.getElementById('systemPanel').classList.add('active');
-                            renderSystem();
-                        }
-                    };
-                }
-
-                // Отправка команды
-                const sendBtn = document.getElementById('sendCommand');
-                if (sendBtn) {
-                    sendBtn.onclick = sendCommand;
-                }
-
-                // Очистка логов
-                const clearChatBtn = document.getElementById('clearChatLogs');
-                if (clearChatBtn) {
-                    clearChatBtn.onclick = function() {
-                        chatLogs = [];
-                        renderChat();
-                    };
-                }
-
-                const clearSystemBtn = document.getElementById('clearSystemLogs');
-                if (clearSystemBtn) {
-                    clearSystemBtn.onclick = function() {
-                        systemLogs = [];
-                        renderSystem();
-                    };
-                }
-
-                // Запуск периодического обновления
-                setInterval(fetchChatLogs, 2000);
-                setInterval(fetchSystemLogs, 2000);
-
-                // Скрытие уведомлений
-                setTimeout(() => {
-                    const notifications = document.querySelectorAll('.notification');
-                    for (let i = 0; i < notifications.length; i++) {
-                        notifications[i].remove();
-                    }
-                }, 5000);
-            });
-        })();
-    </script>
+    <%- include('../partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

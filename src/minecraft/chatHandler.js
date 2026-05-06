@@ -1,467 +1,900 @@
-// src/minecraft/chatHandler.js
-// Чистая версия с поддержкой всех функций
+// src/minecraft/chatHandler.js — Обработчик чата Minecraft бота Resistance City v5.0.0
+// Анализирует все сообщения из чата, определяет тип сообщения и направляет
+// в соответствующие обработчики: команды, клан-чат, ЛС, заявки, убийства
 
+'use strict';
+
+const config = require('../config');
+const db = require('../database');
 const utils = require('../shared/utils');
+const permissions = require('../shared/permissions');
+const { logger } = require('../shared/logger');
 
-// ========== ФУНКЦИЯ ОЧИСТКИ НИКА ==========
-function cleanNick(nick) {
-    if (!nick) return '';
-    let cleaned = nick;
-    cleaned = cleaned.replace(/[&§][0-9a-fk-or]/g, '');
-    cleaned = cleaned.replace(/&#[0-9a-fA-F]{6}/g, '');
-    cleaned = cleaned.replace(/[^a-zA-Z0-9_]/g, '');
-    return cleaned.toLowerCase();
-}
-// ============================================
-
-// ========== МАССИВЫ РАЗНЫХ СООБЩЕНИЙ ==========
-const UNKNOWN_COMMAND_MESSAGES = [
-    `&4&l|&c Неизвестная команда. Используйте &e/help`,
-    `&4&l|&c Такой команды нет. Напишите &e/help`,
-    `&4&l|&c Ошибка. Доступные команды: &e/help`,
-    `&4&l|&c Команда не найдена. &e/help &c- список`,
-    `&4&l|&c Неверная команда. &e/help &cвам поможет`,
-    `&4&l|&c Такой команды не существует. Попробуйте &e/help`,
-    `&4&l|&c Ошибка ввода. &e/help &c- список команд`,
-    `&4&l|&c Неизвестная команда! Введите &e/help`,
-    `&4&l|&c Такой команды нет в системе. Используйте &e/help`,
-    `&4&l|&c Команда не распознана. &e/help &c- справка`
-];
-
-const ERROR_MESSAGES = {
-    notInClan: [
-        `&4&l|&c Вы не состоите в клане Resistance!`,
-        `&4&l|&c Доступ только для членов клана!`,
-        `&4&l|&c Эта команда только для Resistance`,
-        `&4&l|&c Вступите в клан для использования команд`
-    ],
-    notInRP: [
-        `&4&l|&c Вы не зарегистрированы в RolePlay! Используйте &e/rp`,
-        `&4&l|&c Требуется RP регистрация. Напишите &e/rp`,
-        `&4&l|&c Для команд RP нужно зарегистрироваться: &e/rp`,
-        `&4&l|&c Сначала пройдите регистрацию: &e/rp`
-    ],
-    frozen: [
-        `&4&l|&c Ваш RP профиль заморожен!`,
-        `&4&l|&c Доступ к RP командам заблокирован`,
-        `&4&l|&c Ваш аккаунт заморожен в RP системе`,
-        `&4&l|&c RP профиль заблокирован. Обратитесь к администрации`
-    ]
-};
-
-function getRandomMessage(category) {
-    const messages = ERROR_MESSAGES[category] || ERROR_MESSAGES.notInClan;
-    return messages[Math.floor(Math.random() * messages.length)];
+// ПРЯМОЕ ПОДКЛЮЧЕНИЕ КОМАНД — ГАРАНТИРОВАННО РАБОТАЕТ
+let commandProcessor = null;
+try {
+    commandProcessor = require('./commands/index');
+    console.log('[CHAT-HANDLER] commandProcessor ЗАГРУЖЕН');
+    console.log('[CHAT-HANDLER] processCommand = ' + (typeof commandProcessor.processCommand));
+} catch(e) {
+    console.log('[CHAT-HANDLER] ОШИБКА загрузки команд: ' + e.message);
+    console.log(e.stack);
 }
 
-function getRandomUnknownMessage() {
-    return UNKNOWN_COMMAND_MESSAGES[Math.floor(Math.random() * UNKNOWN_COMMAND_MESSAGES.length)];
+// ==================== КЭШ ДЛЯ АВТОМОДЕРАЦИИ ====================
+const messageCache = new Map();
+const joinLeaveCache = new Map();
+const commandSpamCache = new Map();
+
+// ==================== ССЫЛКИ НА ДРУГИЕ МОДУЛИ (устанавливаются при инициализации) ====================
+let moderationModule = null;
+let verificationModule = null;
+
+/**
+ * Установить ссылки на модули
+ */
+function setModules(modules) {
+    if (modules.commandProcessor) commandProcessor = modules.commandProcessor;
+    if (modules.moderationModule) moderationModule = modules.moderationModule;
+    if (modules.verificationModule) verificationModule = modules.verificationModule;
 }
 
-const joinLeaveTracker = new Map();
+// ==================== ОСНОВНОЙ ОБРАБОТЧИК ====================
+function handleMessage(bot, message, jsonMsg, isBackup = false) {
+    console.log('[CHAT-IN] ' + JSON.stringify(message));
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+        return;
+    }
 
-const PATTERNS = {
-    clanChat: /^КЛАН:\s*(?:[&§][0-9a-fklmnor])*((?:~~)?[^\s:]+):\s*(.+)$/i,
-    clanChatWithRank: /^КЛАН:\s*[&§][0-9a-fklmnor]*[^\s]+\s+((?:~~)?[^\s:]+):\s*(.+)$/i,
-    privateMessage: /^\[\*\]\s*\[((?:~~)?[^\s\]]+)\s*->\s*я\]\s*(.+)$/i,
-    realnameResult: /^\[\*\]\s*~~(\S+)\s+является\s+(\S+)$/i,
-    joinRequest: /^\[\*\]\s*Игрок\s+(\S+)\s+подал заявку на вступление в ваш клан\.$/i,
-    joinClan: /^\[\*\]\s*(\S+)\s+присоединился к клану\.$/i,
-    leaveClan: /^\[\*\]\s*(\S+)\s+покинул клан\.$/i,
-    kill: /^(\S+)\s+убил\s+игрока\s+(\S+)'$/i,
-    lobbyMove: /Ты перемещен в лобби/i
-};
+    const trimmedMessage = message.trim();
 
-const rpCommands = [
-    '/balance', '/pay', '/pass', '/id', '/org', '/arp', 
-    '/im', '/biz', '/office', '/duty', '/status', '/tr', 
-    '/border', '/search', '/fine', '/order', '/redcode', 
-    '/grade', '/keys', '/idim'
-];
+    // Пропускаем сообщения от самого бота
+    if (isBotMessage(trimmedMessage, bot.username)) {
+        return;
+    }
 
-// Команды которые доступны всем в клане (даже без RP)
-const publicCommands = ['/help', '/discord', '/ds', '/link', '/rp', '/fly', '/10t'];
+    // ==================== СНАЧАЛА ЗАЯВКИ, ВХОДЫ, ВЫХОДЫ ====================
 
-global.realnameCache = global.realnameCache || new Map();
-global.pendingRegistrations = global.pendingRegistrations || new Map();
+    // 1. Заявка в клан (ПРОВЕРЯЕМ ПЕРВОЙ!)
+    if (trimmedMessage.includes('подал заявку на вступление в ваш клан')) {
+        const match = trimmedMessage.match(/Игрок\s+(\S+)\s+подал заявку/);
+        if (match) {
+            const username = match[1];
+            logger.info(`ЗАЯВКА ОТ: ${username} — ПРИНИМАЕМ МГНОВЕННО!`);
+            // Мгновенное принятие без setTimeout
+            bot.chat('/c accept ' + username);
+            return;
+        }
+    }
 
-function safeLog(parentBot, message, level = 'info') {
-    if (parentBot && typeof parentBot.addLog === 'function') {
-        parentBot.addLog(message, level);
+    // 2. Вход в клан
+    if (trimmedMessage.includes('присоединился к клану')) {
+    const match = trimmedMessage.match(/(\S+)\s+присоединился к клану/);
+    if (match) {
+        const username = match[1];
+        logger.info(`ВОШЁЛ В КЛАН: ${username}`);
+        
+        // Добавляем в БД
+        try { 
+            db.members.add(username); 
+        } catch(e) {
+            logger.error(`Ошибка добавления в БД: ${e.message}`);
+        }
+        
+        // Выдаём начальный ранг ИГРОКУ (тому кто вошёл)
+        setTimeout(() => {
+            bot.chat(`/c rank ${username} ${config.clan.defaultRank}`);
+            logger.info(`Выдан ранг для ${username}: ${config.clan.defaultRank}`);
+        }, 1500);
+        
+        // Приветствие в клановый чат
+        setTimeout(() => {
+            bot.chat(`/cc ${utils.formatClanMessage(`&f ${username}&a присоединился к Resistance! Добро пожаловать в клан!`)}`);
+            bot.chat(`/cc ${utils.formatClanMessage(`&e Для ознакомления с проектом, телепортируйся - &b/warp info`)}`);
+        }, 3000);
+        
+        return;
     }
 }
 
-class ChatHandler {
-    constructor(bot, db, parentBot) {
-        this.bot = bot;
-        this.db = db;
-        this.parentBot = parentBot;
-        this.moderation = null;
-    }
-    
-    async handleMessage(jsonMessage) {
-        const rawMessage = jsonMessage?.toString?.() || String(jsonMessage);
-        const message = rawMessage.replace(/[&§][0-9a-fklmnor]/g, '');
+    // 3. Выход из клана
+    // 3. Выход из клана
+if (trimmedMessage.includes('покинул клан')) {
+    const match = trimmedMessage.match(/(\S+)\s+покинул клан/);
+    if (match) {
+        const username = match[1];
+        logger.info(`ВЫШЕЛ ИЗ КЛАНА: ${username}`);
         
-        // 1. Обработка ответа /realname
-        const realnameMatch = message.match(PATTERNS.realnameResult);
-        if (realnameMatch) {
-            const fakeNick = realnameMatch[1];
-            const realNick = realnameMatch[2];
-            global.realnameCache.set(fakeNick, { realname: realNick, timestamp: Date.now() });
-            for (const [key, value] of global.realnameCache) {
-                if (Date.now() - value.timestamp > 600000) global.realnameCache.delete(key);
+        // Удаляем из БД
+        try { 
+            db.members.removeFromClan(username);
+        } catch(e) {
+            logger.error(`Ошибка удаления из БД: ${e.message}`);
+        }
+        
+        // Если был RP-участником — деактивируем
+        try {
+            const rpMember = db.rpMembers.get(username);
+            if (rpMember && rpMember.is_active === 1) {
+                db.rpMembers.removeRp(username);
             }
-            return;
-        }
+        } catch(e) {}
         
-        // 2. Личные сообщения
-        const pmMatch = message.match(PATTERNS.privateMessage);
-        if (pmMatch) {
-            let sender = pmMatch[1].trim();
-            const pmMessage = pmMatch[2].trim();
-            if (sender === this.bot.username) return;
+        // Случайное прощальное сообщение
+        const goodbyeMessages = [
+            ` ${username}, нам очень жаль что вы покинули нас...`,
             
-            if (sender.startsWith('~~')) {
-                const fakeNick = sender.slice(2);
-                const cached = global.realnameCache.get(fakeNick);
-                if (cached && Date.now() - cached.timestamp < 600000) {
-                    await this.processMessage(cached.realname, pmMessage, sender);
-                } else {
-                    const realNick = await this.requestRealname(fakeNick);
-                    await this.processMessage(realNick, pmMessage, sender);
-                }
-            } else {
-                await this.processMessage(sender, pmMessage, sender);
-            }
-            return;
-        }
-        
-        // 3. Клановый чат
-        const clanMatch = message.match(PATTERNS.clanChat) || message.match(PATTERNS.clanChatWithRank);
-        if (clanMatch) {
-            let nickname = clanMatch[1].trim();
-            const chatMessage = clanMatch[2].trim();
-            if (nickname.startsWith('~~')) {
-                const cached = global.realnameCache.get(nickname.slice(2));
-                if (cached) nickname = cached.realname;
-            }
-            await this.handleClanChat(nickname, chatMessage);
-            return;
-        }
-        
-        // 4. Заявки, вступление, выход, убийства
-        const joinRequestMatch = message.match(PATTERNS.joinRequest);
-        if (joinRequestMatch) {
-            await this.handleJoinRequest(joinRequestMatch[1]);
-            return;
-        }
-        
-        const joinClanMatch = message.match(PATTERNS.joinClan);
-        if (joinClanMatch && !joinClanMatch[1].includes(this.bot.username)) {
-            await this.handleJoinClan(joinClanMatch[1]);
-            return;
-        }
-        
-        const leaveClanMatch = message.match(PATTERNS.leaveClan);
-        if (leaveClanMatch && !leaveClanMatch[1].includes(this.bot.username)) {
-            await this.handleLeaveClan(leaveClanMatch[1]);
-            return;
-        }
-        
-        const killMatch = message.match(PATTERNS.kill);
-        if (killMatch) {
-            await this.handleKill(killMatch[1], killMatch[2]);
-        }
-    }
-    
-    requestRealname(fakeNick) {
-        return new Promise((resolve) => {
-            let resolved = false;
-            const messageHandler = (jsonMessage) => {
-                const msg = jsonMessage.toString?.() || String(jsonMessage);
-                const match = msg.match(PATTERNS.realnameResult);
-                if (match && match[1] === fakeNick) {
-                    global.realnameCache.set(fakeNick, { realname: match[2], timestamp: Date.now() });
-                    resolved = true;
-                    this.bot.removeListener('message', messageHandler);
-                    clearTimeout(timeout);
-                    resolve(match[2]);
-                }
-            };
-            const timeout = setTimeout(() => {
-                if (!resolved) {
-                    this.bot.removeListener('message', messageHandler);
-                    resolve(fakeNick);
-                }
-            }, 3000);
-            this.bot.on('message', messageHandler);
-            this.bot.chat(`/realname ${fakeNick}`);
-        });
-    }
-    
-    async processMessage(nickname, message, originalSender) {
-        const playerName = nickname;
-        const cleanNickname = cleanNick(nickname);
-        
-        // ========== ПРОВЕРКА: Игрок в клане? ==========
-        const isInClan = await this.db.getClanMember(playerName);
-        if (!isInClan) {
-            const randomMsg = getRandomMessage('notInClan');
-            await utils.sleep(400);
-            this.bot.chat(`/msg ${playerName} ${randomMsg}`);
-            return;
-        }
-        
-        const isRPCommand = rpCommands.some(cmd => message.startsWith(cmd));
-        
-        // ========== ПРОВЕРКА: Игрок в RP? (только для RP команд) ==========
-        if (isRPCommand) {
-            const rpProfile = await this.db.getRPProfile(cleanNickname);
-            if (!rpProfile) {
-                const randomMsg = getRandomMessage('notInRP');
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${nickname} ${randomMsg}`);
-                return;
-            }
-            
-            const isFrozen = rpProfile.is_frozen === 1;
-            if (isFrozen) {
-                const randomMsg = getRandomMessage('frozen');
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${nickname} ${randomMsg}`);
-                return;
-            }
-        }
-        
-        if (!this.moderation) {
-            const { getModerationSystem } = require('./moderation');
-            this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot);
-        }
-        
-        const isMuted = await this.moderation.isPrivateMuted(nickname);
-        if (isMuted) return;
-        
-        const codeMatch = message.match(/^([0-9]{6})$/);
-        if (codeMatch) {
-            await this.handleRPCode(nickname, codeMatch[1], originalSender);
-            return;
-        }
-        
-        if (message.startsWith('/')) {
-            const parts = message.slice(1).split(' ');
-            const command = parts[0].toLowerCase();
-            const args = parts.slice(1);
-            
-            if (command === 'rp') {
-                const playerCommands = require('./commands/player');
-                await playerCommands.rp(this.bot, nickname, originalSender, args, this.db, this.parentBot?.addLog);
-                return;
-            }
-            
-            if (this.moderation.checkCommandCooldown) {
-                const cooldownResult = await this.moderation.checkCommandCooldown(nickname, command);
-                if (!cooldownResult.allowed) return;
-            }
-            
-            const cmdResult = await this.moderation.checkPrivateCommand(nickname, command);
-            if (!cmdResult.allowed) return;
-            
-            const commands = require('./commands');
-            
-            const isValidCommand = commands.commandMap?.has(command);
-            const spamCheck = await this.moderation.checkCommandSpam(nickname, command, isValidCommand);
-            if (!spamCheck.allowed) return;
-            
-            const cmd = commands.commandMap?.get(command);
-            if (cmd && cmd.handler) {
-                await cmd.handler(this.bot, nickname, args, this.db, this.parentBot?.addLog);
-            } else {
-                await this.moderation.checkInvalidCommand(nickname, command);
-            }
-        }
-    }
-    
-    async handleRPCode(nickname, code, originalSender) {
-        const cleanNickname = cleanNick(nickname);
-        const sendTarget = originalSender || nickname;
-        
-        const existing = await this.db.getRPProfile(cleanNickname);
-        if (existing && existing.structure !== 'Гражданин') {
-            await utils.sleep(400);
-            this.bot.chat(`/msg ${sendTarget} &4&l|&c Вы уже зарегистрированы в RolePlay!`);
-            return;
-        }
-        
-        if (global.pendingRegistrations?.has(cleanNickname)) {
-            const pending = global.pendingRegistrations.get(cleanNickname);
-            
-            if (Date.now() > pending.expires) {
-                global.pendingRegistrations.delete(cleanNickname);
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &4&l|&c Время кода истекло. Используйте &e/rp &fснова`);
-                return;
-            }
-            
-            if (pending.code === code) {
-                await this.db.registerRP(cleanNickname);
-                global.pendingRegistrations.delete(cleanNickname);
-                
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &a&l|&f Вы &2успешно&f зарегистрированы в RolePlay!`);
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &7&l|&f Теперь вам доступны команды: &e/balance, /pay, /pass, /id, /org, /duty`);
-                await utils.sleep(400);
-                this.bot.chat(`/cc &a&l|&f &e${sendTarget} &aтеперь гражданин Resistance!`);
-                
-                const discord = global.botComponents?.discord;
-                if (discord && discord.client) {
-                    const channel = discord.client.channels.cache.get('1474633679442804798');
-                    if (channel) {
-                        channel.send(`✅ **Новый гражданин**\nИгрок ${sendTarget} зарегистрировался в RolePlay!`);
-                    }
-                }
-            } else {
-                await utils.sleep(400);
-                this.bot.chat(`/msg ${sendTarget} &4&l|&c Неверный код! Попробуйте снова или используйте &e/rp`);
-            }
-        } else {
-            await utils.sleep(400);
-            this.bot.chat(`/msg ${sendTarget} &4&l|&c У вас нет активного кода. Сначала используйте &e/rp`);
-        }
-    }
-    
-    async handleClanChat(nickname, message) {
-        if (nickname === this.bot.username) return;
-        
-        if (!this.moderation) {
-            const { getModerationSystem } = require('./moderation');
-            this.moderation = await getModerationSystem(this.bot, this.db, this.parentBot);
-        }
-        
-        const isMuted = await this.moderation.isClanMuted(nickname);
-        if (isMuted) {
-            safeLog(this.parentBot, `🚫 ${nickname} в клановом муте`, 'debug');
-            return;
-        }
-        
-        const result = await this.moderation.checkClanChat(nickname, message);
-        
-        if (!result.allowed && result.reason) {
-            safeLog(this.parentBot, `🚫 Сообщение от ${nickname} отклонено: ${result.reason}`, 'debug');
-        }
-        
-        if (this.db.logClanChat) {
-            await this.db.logClanChat(nickname, message);
-        }
-    }
-    
-    async handleJoinRequest(nickname) {
-        const originalNick = nickname;
-        const cleanNickname = cleanNick(nickname);
-        
-        const isBlacklisted = await this.db.isBlacklisted?.(cleanNickname);
-        if (isBlacklisted) {
-            safeLog(this.parentBot, `🚫 Заявка от ${originalNick} отклонена (ЧС)`, 'warn');
-            return;
-        }
-        
-        await utils.sleep(500);
-        this.bot.chat(`/c accept ${originalNick}`);
-        safeLog(this.parentBot, `✅ Принята заявка от ${originalNick}`, 'success');
-    }
-    
-    async handleJoinClan(nickname) {
-        const cleanNickname = cleanNick(nickname);
-        const now = Date.now();
-        const twelveHours = 12 * 60 * 60 * 1000;
-        
-        let tracker = joinLeaveTracker.get(cleanNickname);
-        if (!tracker) {
-            tracker = { count: 0, lastTime: 0, firstTime: now };
-            joinLeaveTracker.set(cleanNickname, tracker);
-        }
-        
-        if (now - tracker.firstTime > twelveHours) {
-            tracker.count = 0;
-            tracker.firstTime = now;
-        }
-        
-        if (tracker.count >= 3) {
-            await this.db.addPunishment?.(cleanNickname, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
-            this.bot.chat(`/c kick ${cleanNickname}`);
-            await utils.sleep(400);
-            this.bot.chat(`/cc &4&l|&c &e${nickname} &cдобавлен в ЧС на 6 часов за спам`);
-            safeLog(this.parentBot, `⛔ ${nickname} в ЧС за спам`, 'warn');
-            return;
-        }
-        
-        tracker.count++;
-        tracker.lastTime = now;
-        
-        if (this.db.addClanMember) await this.db.addClanMember(cleanNickname, 'system');
-        
-        this.bot.chat(`/c rank ${nickname} &8⌜&e&l𐓏&8⌟ﾠ&#0b674d&lн&#0e6f50&lо&#127753&lʙ&#157f56&lᴇ&#198759&lн&#1c8e5b&lь&#1f965e&lᴋ&#239e61&lи&#26a664&lй`);
-        
-        const messages = [
-            `&a&l|&f Добро пожаловать в клан Resistance, &e${nickname}&f!`,
-            `&a&l|&f Рады приветствовать &e${nickname} &fв Resistance!`,
-            `&a&l|&f Новый игрок &e${nickname} &fприсоединился к нам!`
+            ` ${username}, спасибо что были с нами! Надеемся увидеть вас снова!`,
+
+            ` ${username}, честь имеем! Мы сохраним ваше место в истории клана.`,
+
+            ` ${username}, вы навсегда в истории клана! Каждый ушедший оставляет след.Мы будем помнить вас.`,
+
+            ` ${username}, удачи на просторах! Куда бы вы ни пошли — помните о Resistance.Всегда рады видеть вас снова.`,
+
+            ` ${username}, до новых встреч! Спасибо за время проведённое вместе.`,
+
+            ` ${username}, вы часть нашей истории! Каждая глава когда-то заканчивается. Но новую можно начать снова.`,
         ];
-        const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-        await utils.sleep(400);
-        this.bot.chat(`/cc ${randomMsg}`);
-        safeLog(this.parentBot, `➕ ${nickname} вступил в клан`, 'success');
+        
+        const randomMessage = goodbyeMessages[Math.floor(Math.random() * goodbyeMessages.length)];
+        
+        // Отправляем в ЛС
+        setTimeout(() => {
+            try {
+                bot.chat(`/msg ${username} ${randomMessage}`);
+                logger.info(`Отправлено прощальное сообщение для ${username}`);
+            } catch(e) {
+                logger.error(`Ошибка отправки ЛС для ${username}: ${e.message}`);
+            }
+        }, 1000);
+        
+        // Сообщение в клановый чат
+        setTimeout(() => {
+            bot.chat(`/cc ${utils.formatClanMessage(`y ${username} покинул клан Resistance. Мы будем скучать!`)}`);
+        }, 2000);
+        
+        return;
     }
-    
-    async handleLeaveClan(nickname) {
-        const cleanNickname = cleanNick(nickname);
-        const now = Date.now();
-        const twelveHours = 12 * 60 * 60 * 1000;
-        
-        let tracker = joinLeaveTracker.get(cleanNickname);
-        if (!tracker) {
-            tracker = { count: 0, lastTime: 0, firstTime: now };
-            joinLeaveTracker.set(cleanNickname, tracker);
+}
+    // 4. Убийство
+    if (trimmedMessage.includes('убил игрока')) {
+        const match = trimmedMessage.match(/(\S+)\s+убил игрока\s+(\S+)/);
+        if (match) {
+            handleKill(bot, { killer: match[1], victim: match[2] }, trimmedMessage);
+            return;
         }
-        
-        if (now - tracker.firstTime > twelveHours) {
-            tracker.count = 0;
-            tracker.firstTime = now;
+    }
+
+    // 5. Кик из клана
+    if (trimmedMessage.includes('был исключён из клана')) {
+        const match = trimmedMessage.match(/Игрок\s+(\S+)\s+был исключён/);
+        if (match) {
+            handleClanKick(bot, { username: match[1] }, trimmedMessage);
+            return;
         }
-        
-        if (tracker.count >= 3) {
-            await this.db.addPunishment?.(cleanNickname, 'blacklist', 'Спам входом/выходом из клана', 'system', 360, 'clan');
-            this.bot.chat(`/c kick ${cleanNickname}`);
-            await utils.sleep(400);
-            this.bot.chat(`/cc &4&l|&c &e${nickname} &cдобавлен в ЧС на 6 часов за спам`);
-            safeLog(this.parentBot, `⛔ ${nickname} в ЧС за спам`, 'warn');
+    }
+
+    // ==================== ПОТОМ ЧАТ ====================
+
+    // 6. Клановый чат
+    // 6. Клановый чат
+    if (trimmedMessage.startsWith('КЛАН:')) {
+        // Пробуем с рангом: "КЛАН: Ранг Никнейм: Сообщение"
+        var rankMatch = trimmedMessage.match(/^КЛАН:\s+(.+?)\s+(\S+):\s+(.+)$/);
+        if (rankMatch) {
+            // Есть ранг
+            handleClanMessage(bot, {
+                username: rankMatch[2],
+                rank: rankMatch[1],
+                message: rankMatch[3].trim()
+            }, trimmedMessage, isBackup);
             return;
         }
         
-        tracker.count++;
-        tracker.lastTime = now;
-        
-        await this.db.removeClanMember(cleanNickname);
-        await this.db.run(`UPDATE rp_players SET structure = 'Гражданин', job_rank = 'Нет', on_duty = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNickname]);
-        await this.db.run(`DELETE FROM org_members WHERE LOWER(minecraft_nick) = LOWER(?)`, [cleanNickname]);
-        
-        await utils.sleep(400);
-        this.bot.chat(`/msg ${nickname} &4&l|&c Вы покинули клан Resistance`);
-        await utils.sleep(400);
-        this.bot.chat(`/msg ${nickname} &4&l|&c Ваш RP профиль был удалён`);
-        
-        safeLog(this.parentBot, `➖ ${nickname} покинул клан`, 'info');
+        // Без ранга: "КЛАН: Никнейм: Сообщение"
+        var simpleMatch = trimmedMessage.match(/^КЛАН:\s+(\S+):\s+(.+)$/);
+        if (simpleMatch) {
+            handleClanMessage(bot, {
+                username: simpleMatch[1],
+                rank: null,
+                message: simpleMatch[2].trim()
+            }, trimmedMessage, isBackup);
+            return;
+        }
     }
+
+    // 7. Личное сообщение
+    if (trimmedMessage.startsWith('[*] [')) {
+        const pmMatch = trimmedMessage.match(/^\[.*?\]\s*\[(\S+)\s*->\s*я\]\s*(.+)$/);
+        if (pmMatch) {
+            handlePrivateMessage(bot, {
+                sender: pmMatch[1].replace(/^~~/, ''),
+                message: pmMatch[2].trim(),
+                isNickChanged: pmMatch[1].startsWith('~~'),
+                changedNick: pmMatch[1].startsWith('~~') ? pmMatch[1].replace(/^~~/, '') : null
+            }, trimmedMessage, isBackup);
+            return;
+        }
+    }
+
+    // 8. Результат /realname
+    if (trimmedMessage.includes('является')) {
+        const match = trimmedMessage.match(/~~(\S+)\s+является\s+(\S+)/);
+        if (match) {
+            handleRealnameResult(bot, { changedNick: match[1], realUsername: match[2] }, trimmedMessage);
+            return;
+        }
+    }
+
+    // 9. Информация о регионе
+    if (trimmedMessage.includes('Участники:')) {
+        const match = trimmedMessage.match(/Участники:\s+(.+)$/);
+        if (match && bot._pendingRegionCheck) {
+            handleRegionInfo(bot, { members: match[1].split(',').map(m => m.trim()) }, trimmedMessage);
+            return;
+        }
+    }
+
+    // 10. Системные сообщения сервера
+    handleSystemMessage(bot, trimmedMessage, isBackup);
+}
+
+// ==================== ОБРАБОТЧИК КЛАНОВОГО ЧАТА ====================
+function handleClanMessage(bot, clanMsg, rawMessage, isBackup) {
+    const username = clanMsg.username;
+
+    // Логирование в БД
+    try {
+        db.chatLogs.logClanChat(username, clanMsg.message);
+    } catch (error) {
+        logger.error(`Ошибка логирования кланового чата: ${error.message}`);
+    }
+
+    // Автомодерация кланового чата
+    if (config.autoMod.enabled && !isBackup && moderationModule) {
+        const modResult = checkAutoModeration(username, 'clan_chat');
+        if (modResult.action === 'mute') {
+            moderationModule.mutePlayer(bot, username, config.autoMod.muteDurationMinutes,
+                'Автомодерация: спам в клановом чате', 'AutoMod');
+            bot.chat(`/cc &#CA4E4E[AutoMod] ${username} заглушен на ${config.autoMod.muteDurationMinutes} мин за спам`);
+            return;
+        }
+        if (modResult.action === 'warn') {
+            const warns = modResult.warnCount;
+            bot.chat(`/cc &#FFB800[AutoMod] ${username}, предупреждение ${warns}/${config.autoMod.warnCountBeforeMute} за спам`);
+        }
+    }
+
+    // НЕ ОБРАБАТЫВАЕМ КОМАНДЫ В КЛАН-ЧАТЕ
+    // if (clanMsg.message.startsWith('/')) { ... } — УДАЛИТЬ
+
+    // Если это резервный бот — просто логируем
+    if (isBackup) {
+        logger.debug(`[CLAN] ${username}: ${clanMsg.message}`);
+        return;
+    }
+
+
+    // Проверка на рекламу (если включена авто-реклама)
+    if (config.autoMod.clanAdEnabled || db.settings.getBoolean('clan_ad_enabled')) {
+        const adTriggers = ['http://', 'https://', 'discord.gg', 'vk.com', 'youtube.com', '.ru/', '.com/'];
+        const hasAd = adTriggers.some(trigger => clanMsg.message.toLowerCase().includes(trigger));
+
+        if (hasAd) {
+            // Проверяем, разрешена ли реклама в клановом чате
+            const chatAdEnabled = db.settings.getBoolean('chat_ad_enabled');
+            if (!chatAdEnabled) {
+                // Предупреждение
+                bot.chat(`/cc &#FFB800⚠ ${username}, реклама в клановом чате запрещена!`);
+            }
+        }
+    }
+}
+
+// ==================== ОБРАБОТЧИК ЛИЧНЫХ СООБЩЕНИЙ ====================
+function handlePrivateMessage(bot, privateMsg, rawMessage, isBackup) {
+    if (isBackup) {
+        // Резервный бот не обрабатывает ЛС
+        return;
+    }
+
+    let sender = privateMsg.sender;
+    const messageContent = privateMsg.message;
+
+    // Если никнейм изменён, нужно получить реальный
+    if (privateMsg.isNickChanged) {
+        const changedNick = privateMsg.changedNick;
+        // Проверяем в кэше
+        if (nicknameCache.has(changedNick.toLowerCase())) {
+            sender = nicknameCache.get(changedNick.toLowerCase());
+        } else {
+            // Запрашиваем /realname
+            bot._pendingRealname = {
+                changedNick: changedNick,
+                originalMessage: privateMsg,
+                timestamp: Date.now(),
+            };
+            bot.chat(`/realname ${changedNick}`);
+            return; // Ждём результат /realname
+        }
+    }
+
+    // Логирование в БД
+    try {
+        db.chatLogs.logPrivateMessage(sender, bot.username, messageContent);
+    } catch (error) {
+        logger.error(`Ошибка логирования ЛС: ${error.message}`);
+    }
+
+    // Автомодерация ЛС
+    if (config.autoMod.enabled && moderationModule) {
+        const modResult = checkAutoModeration(sender, 'private_message');
+        if (modResult.action === 'mute') {
+            moderationModule.mutePlayer(bot, sender, config.autoMod.muteDurationMinutes,
+                'Автомодерация: спам в ЛС', 'AutoMod');
+            bot.chat(`/msg ${sender} &#CA4E4EВы заглушены на ${config.autoMod.muteDurationMinutes} мин за спам`);
+            return;
+        }
+    }
+
+    // Проверка активных мутов в ЛС
+    const activePunishments = db.punishments.getActive(sender);
+    const hasPrivateMute = activePunishments.some(p =>
+        p.type === 'pm_mute' && p.is_active === 1
+    );
+    if (hasPrivateMute) {
+        // Игнорируем сообщение
+        logger.debug(`Игнорировано сообщение от заглушенного игрока: ${sender}`);
+        return;
+    }
+
+    // Проверка, является ли сообщение командой
+    if (messageContent.startsWith('/')) {
+        handleClanCommand(bot, sender, messageContent, 'private_message', isBackup);
+        return;
+    }
+
+    // Проверка на код верификации
+    if (messageContent.length >= 4 && messageContent.length <= 6 && /^\d+$/.test(messageContent)) {
+    console.log('[RP-VERIFY] Получен потенциальный код RP от ' + sender + ': ' + messageContent);
     
-    async handleKill(killer, victim) {
-        if (this.db.addKill) await this.db.addKill(killer, victim);
+    // Проверяем через модуль rp
+    var rpModule;
+    try {
+        rpModule = require('./commands/rp');
+        if (rpModule && typeof rpModule.checkRpVerification === 'function') {
+            var verifyResult = rpModule.checkRpVerification(bot, sender, messageContent);
+            console.log('[RP-VERIFY] Результат проверки: ' + JSON.stringify(verifyResult));
+        } else {
+            console.log('[RP-VERIFY] rpModule.checkRpVerification не найдена');
+        }
+    } catch(e) {
+        console.log('[RP-VERIFY] Ошибка загрузки модуля RP: ' + e.message);
+    }
+    return;
+}
+
+    // Проверка на ответ по штрафу
+    if (messageContent.toLowerCase() === 'да' || messageContent.toLowerCase() === 'нет') {
+        handleFineResponse(bot, sender, messageContent.toLowerCase());
+        return;
+    }
+
+    // Обычное личное сообщение
+    logger.debug(`[MSG] ${sender} -> бот: ${messageContent}`);
+}
+
+// ==================== КЭШ НИКНЕЙМОВ ====================
+const nicknameCache = new Map();
+
+// ==================== ОБРАБОТЧИК РЕЗУЛЬТАТА /REALNAME ====================
+function handleRealnameResult(bot, result, rawMessage) {
+    const changedNick = result.changedNick.toLowerCase();
+    const realUsername = result.realUsername;
+
+    // Сохраняем в кэш
+    nicknameCache.set(changedNick, realUsername);
+
+    // Очищаем кэш через 5 минут
+    setTimeout(() => {
+        nicknameCache.delete(changedNick);
+    }, 300000);
+
+    // Если был ожидающий запрос
+    if (bot._pendingRealname && bot._pendingRealname.changedNick.toLowerCase() === changedNick) {
+        const pendingMsg = bot._pendingRealname.originalMessage;
+        bot._pendingRealname = null;
+
+        // Повторно обрабатываем сообщение с реальным ником
+        const newPrivateMsg = {
+            ...pendingMsg,
+            sender: realUsername,
+            isNickChanged: false,
+        };
+        handlePrivateMessage(bot, newPrivateMsg, pendingMsg.raw, false);
+    }
+
+    logger.debug(`Realname: ${changedNick} -> ${realUsername}`);
+}
+
+// ==================== ОБРАБОТЧИК КОМАНД В ЧАТЕ ====================
+function handleClanCommand(bot, username, command, source, isBackup) {
+    if (isBackup) {
+        // Резервный бот не обрабатывает команды
+        if (source === 'private_message') {
+            bot.chat(`/msg ${username} &#CA4E4EБот в режиме ограниченной функциональности. Команды недоступны.`);
+        }
+        return;
+    }
+
+    // Проверка глобальной заморозки
+    if (db.settings.getBoolean('global_freeze') && !permissions.isAdmin(username, db)) {
+        if (source === 'private_message') {
+            bot.chat(`/msg ${username} &#CA4E4EСистема заморожена. Команды временно недоступны.`);
+        }
+        return;
+    }
+
+    // Анти-спам команд
+    const spamCheck = checkCommandSpam(username);
+    if (spamCheck.blocked) {
+        if (source === 'private_message') {
+            bot.chat(`/msg ${username} &#CA4E4EСлишком много команд! Подождите немного.`);
+        }
+        return;
+    }
+
+    // Парсинг команды
+    const parts = command.slice(1).split(' ');
+    const cmd = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    // Проверка прав доступа
+    const accessCheck = permissions.checkCommandAccess(username, `/${cmd}`, db);
+    if (!accessCheck.allowed) {
+        if (source === 'private_message') {
+            bot.chat(`/msg ${username} ${accessCheck.message}`);
+        } else if (source === 'clan_chat') {
+            bot.chat(`/cc ${utils.formatError(username, accessCheck.message.replace(/&[0-9a-fk-or]/gi, ''))}`);
+        }
+        return;
+    }
+
+    // Передача в обработчик команд
+    if (commandProcessor && typeof commandProcessor.processCommand === 'function') {
+    commandProcessor.processCommand(bot, username, cmd, args, source);
+} else {
+    console.log('[CMD-ERROR] commandProcessor недоступен');
+    bot.chat('/msg ' + username + ' &cКоманды временно недоступны.');
+}
+}
+
+// ==================== ОБРАБОТЧИК ЗАЯВКИ В КЛАН ====================
+function handleClanApplication(bot, application, rawMessage) {
+    const username = application.username;
+    logger.info(`Заявка в клан от: ${username}`);
+
+    // Проверка на спам заявками
+    const spamCheck = checkJoinLeaveSpam(username, 'application');
+    if (spamCheck.blocked) {
+        logger.warn(`Заявка от ${username} заблокирована (спам)`);
+        return;
+    }
+
+    // Проверка чёрного списка
+    const activePunishments = db.punishments.getActive(username);
+    const isBlacklisted = activePunishments.some(p => p.type === 'blacklist' && p.is_active === 1);
+    if (isBlacklisted) {
+        logger.info(`Заявка от ${username} отклонена (чёрный список)`);
+        return;
+    }
+
+    // МГНОВЕННОЕ ПРИНЯТИЕ — без setTimeout!
+    bot.chat(`/c accept ${username}`);
+    logger.info(`Заявка от ${username} принята`);
+
+    // Добавляем в БД сразу
+    try {
+        db.members.add(username);
+    } catch (error) {
+        logger.error(`Ошибка добавления в БД: ${error.message}`);
+    }
+
+    // Ранг и приветствие — с небольшой задержкой (серверу нужно время обработать accept)
+    setTimeout(() => {
+        bot.chat(`/c rank ${username} ${config.clan.defaultRank}`);
+        bot.chat(`/cc ${utils.formatClanMessage(`&#76C519${username} присоединился к клану! Добро пожаловать!`)}`);
+        bot.chat(`/cc ${utils.formatClanMessage(`&#80C4C5Используйте &#FFB800/rp &#80C4C5для регистрации в RolePlay`)}`);
+    }, 1500);
+}
+
+// ==================== ОБРАБОТЧИК ВХОДА В КЛАН ====================
+function handleClanJoin(bot, joinInfo, rawMessage) {
+    const username = joinInfo.username;
+
+    logger.info(`${username} присоединился к клану`);
+
+    // Проверка на спам входом/выходом
+    const spamCheck = checkJoinLeaveSpam(username, 'join');
+    if (spamCheck.blocked) {
+        // Добавляем в чёрный список при превышении лимита
+        if (spamCheck.count >= config.autoMod.blacklistJoinLeaveLimit) {
+            try {
+                db.punishments.add(username, 'blacklist',
+                    config.autoMod.blacklistDurationHours * 60,
+                    'Спам входом/выходом из клана', 'AutoMod');
+                bot.chat(`/cc &#CA4E4E${username} добавлен в чёрный список за спам входом/выходом`);
+                logger.warn(`${username} в чёрном списке за спам входом/выходом`);
+            } catch (error) {
+                logger.error(`Ошибка добавления в ЧС: ${error.message}`);
+            }
+        }
+        return;
+    }
+
+    // Добавляем в БД
+    try {
+        db.members.add(username);
+    } catch (error) {
+        logger.error(`Ошибка добавления в БД: ${error.message}`);
     }
 }
 
-async function handleMessage(bot, message, db, parentBot) {
-    const handler = new ChatHandler(bot, db, parentBot);
-    await handler.handleMessage(message);
+// ==================== ОБРАБОТЧИК ВЫХОДА ИЗ КЛАНА ====================
+function handleClanLeave(bot, leaveInfo, rawMessage) {
+    const username = leaveInfo.username;
+
+    logger.info(`${username} покинул клан`);
+
+    // Проверка на спам
+    const spamCheck = checkJoinLeaveSpam(username, 'leave');
+    if (spamCheck.blocked) {
+        if (spamCheck.count >= config.autoMod.blacklistJoinLeaveLimit) {
+            try {
+                db.punishments.add(username, 'blacklist',
+                    config.autoMod.blacklistDurationHours * 60,
+                    'Спам входом/выходом из клана', 'AutoMod');
+                bot.chat(`/cc &#CA4E4E${username} добавлен в чёрный список за спам входом/выходом`);
+            } catch (error) {
+                logger.error(`Ошибка добавления в ЧС: ${error.message}`);
+            }
+        }
+        return;
+    }
+
+    // Обновляем БД
+    try {
+        db.members.removeFromClan(username);
+
+        // Если был RP-участником — деактивируем
+        const rpMember = db.rpMembers.get(username);
+        if (rpMember && rpMember.is_active === 1) {
+            db.rpMembers.removeRp(username);
+            // Уведомление в ЛС
+            bot.chat(`/msg ${username} &#CA4E4EВы покинули клан. Ваш RolePlay профиль деактивирован.`);
+        }
+    } catch (error) {
+        logger.error(`Ошибка обновления БД при выходе из клана: ${error.message}`);
+    }
 }
 
-module.exports = { handleMessage, ChatHandler };
+// ==================== ОБРАБОТЧИК КИКА ИЗ КЛАНА ====================
+function handleClanKick(bot, kickInfo, rawMessage) {
+    const username = kickInfo.username;
+
+    logger.info(`${username} исключён из клана`);
+
+    try {
+        db.members.removeFromClan(username);
+
+        const rpMember = db.rpMembers.get(username);
+        if (rpMember && rpMember.is_active === 1) {
+            db.rpMembers.removeRp(username);
+        }
+
+        // Освобождаем имущество
+        const properties = db.properties.getOwned(username);
+        properties.forEach(prop => {
+            db.properties.remove(prop.property_id);
+        });
+    } catch (error) {
+        logger.error(`Ошибка обработки кика из клана: ${error.message}`);
+    }
+}
+
+// ==================== ОБРАБОТЧИК УБИЙСТВ ====================
+function handleKill(bot, kill, rawMessage) {
+    const killer = kill.killer;
+    const victim = kill.victim;
+
+    logger.debug(`Убийство: ${killer} -> ${victim}`);
+
+    try {
+        // Проверяем, в клане ли убийца
+        const killerMember = db.members.get(killer);
+        if (killerMember && killerMember.is_in_clan === 1) {
+            db.members.updateStats(killer, 1, 0);
+        }
+
+        // Проверяем, в клане ли жертва
+        const victimMember = db.members.get(victim);
+        if (victimMember && victimMember.is_in_clan === 1) {
+            db.members.updateStats(victim, 0, 1);
+        }
+    } catch (error) {
+        logger.error(`Ошибка обновления статистики убийств: ${error.message}`);
+    }
+}
+
+// ==================== ОБРАБОТЧИК ИНФОРМАЦИИ О РЕГИОНЕ ====================
+function handleRegionInfo(bot, regionInfo, rawMessage) {
+    if (!bot._pendingRegionCheck) return;
+
+    const callback = bot._pendingRegionCheck.callback;
+    bot._pendingRegionCheck = null;
+
+    if (callback && typeof callback === 'function') {
+        callback(regionInfo.members);
+    }
+}
+
+// ==================== ОБРАБОТЧИК СИСТЕМНЫХ СООБЩЕНИЙ ====================
+function handleSystemMessage(bot, message, isBackup) {
+    // Проверка на перезагрузку сервера
+    if (message.includes('перезагрузка') || message.includes('restart') || message.includes('Перезагрузка')) {
+        logger.warn('Обнаружено сообщение о перезагрузке сервера');
+        bot._serverRestartDetected = true;
+    }
+
+    // Проверка на онлайн игрока (/seen или подобное)
+    if (message.includes('сейчас на сервере') || message.includes('онлайн')) {
+        // Может использоваться для отслеживания онлайна
+    }
+
+    // Проверка на сообщения о платежах
+    if (message.includes('支付') || message.includes('оплата') || message.includes('платёж')) {
+        logger.debug(`Системное сообщение о платеже: ${message}`);
+    }
+}
+
+// ==================== АВТОМОДЕРАЦИЯ ====================
+function checkAutoModeration(username, source) {
+    const key = `${username.toLowerCase()}_${source}`;
+    const now = Date.now();
+
+    if (!messageCache.has(key)) {
+        messageCache.set(key, {
+            messages: [{ timestamp: now }],
+            warnCount: 0,
+            muteUntil: null,
+        });
+        return { action: 'none', warnCount: 0 };
+    }
+
+    const cache = messageCache.get(key);
+
+    // Проверка мута
+    if (cache.muteUntil && cache.muteUntil > now) {
+        return { action: 'mute', reason: 'already_muted' };
+    }
+
+    // Очистка старых сообщений (старше 1 минуты)
+    cache.messages = cache.messages.filter(m => now - m.timestamp < 60000);
+
+    // Добавление нового сообщения
+    cache.messages.push({ timestamp: now });
+
+    // Проверка лимита
+    if (cache.messages.length > config.autoMod.maxMessagesPerMinute) {
+        cache.warnCount++;
+
+        if (cache.warnCount >= config.autoMod.warnCountBeforeMute) {
+            cache.muteUntil = now + config.autoMod.muteDurationMinutes * 60000;
+            cache.messages = [];
+            return { action: 'mute', warnCount: cache.warnCount };
+        }
+
+        return { action: 'warn', warnCount: cache.warnCount };
+    }
+
+    return { action: 'none', warnCount: cache.warnCount };
+}
+
+// ==================== ПРОВЕРКА НА СПАМ КОМАНДАМИ ====================
+function checkCommandSpam(username) {
+    const key = username.toLowerCase();
+    const now = Date.now();
+
+    if (!commandSpamCache.has(key)) {
+        commandSpamCache.set(key, {
+            commands: [{ timestamp: now }],
+            blockedUntil: null,
+        });
+        return { blocked: false, count: 1 };
+    }
+
+    const cache = commandSpamCache.get(key);
+
+    // Проверка блокировки
+    if (cache.blockedUntil && cache.blockedUntil > now) {
+        return { blocked: true };
+    }
+
+    // Очистка старых команд (старше 10 секунд)
+    cache.commands = cache.commands.filter(c => now - c.timestamp < 10000);
+    cache.commands.push({ timestamp: now });
+
+    // Если больше 5 команд за 10 секунд — блокируем на 30 секунд
+    if (cache.commands.length > 5) {
+        cache.blockedUntil = now + 30000;
+        return { blocked: true };
+    }
+
+    return { blocked: false, count: cache.commands.length };
+}
+
+// ==================== ПРОВЕРКА НА СПАМ ВХОДОМ/ВЫХОДОМ ====================
+function checkJoinLeaveSpam(username, action) {
+    const key = username.toLowerCase();
+    const now = Date.now();
+
+    if (!joinLeaveCache.has(key)) {
+        joinLeaveCache.set(key, {
+            actions: [{ action, timestamp: now }],
+            blockedUntil: null,
+        });
+        return { blocked: false, count: 1 };
+    }
+
+    const cache = joinLeaveCache.get(key);
+
+    // Очистка старых действий (старше 12 часов)
+    const resetMs = config.autoMod.blacklistResetHours * 3600000;
+    cache.actions = cache.actions.filter(a => now - a.timestamp < resetMs);
+    cache.actions.push({ action, timestamp: now });
+
+    if (cache.actions.length >= config.autoMod.blacklistJoinLeaveLimit) {
+        cache.blockedUntil = now + config.autoMod.blacklistDurationHours * 3600000;
+        return { blocked: true, count: cache.actions.length };
+    }
+
+    return { blocked: false, count: cache.actions.length };
+}
+
+// ==================== ОБРАБОТКА КОДА ВЕРИФИКАЦИИ ====================
+function handleVerificationCode(bot, username, code) {
+    if (!verificationModule) return;
+
+    try {
+        const result = db.verification.verify(code, username);
+        if (result) {
+            bot.chat(`/msg ${username} &#76C519✅ Верификация успешна! Ваш Discord аккаунт привязан.`);
+            logger.info(`Верификация: ${username} привязан к Discord ${result.discord_id}`);
+        } else {
+            bot.chat(`/msg ${username} &#CA4E4E❌ Неверный или истёкший код верификации.`);
+        }
+    } catch (error) {
+        logger.error(`Ошибка верификации: ${error.message}`);
+    }
+}
+
+// ==================== ОБРАБОТКА ОТВЕТА ПО ШТРАФУ ====================
+function handleFineResponse(bot, username, response) {
+    try {
+        const pendingFines = db.fines.getPending(username);
+        if (pendingFines.length === 0) return;
+
+        const lastFine = pendingFines[0];
+
+        if (response === 'да') {
+            // Проверяем баланс
+            const rpMember = db.rpMembers.get(username);
+            if (!rpMember || rpMember.balance < lastFine.amount) {
+                bot.chat(`/msg ${username} &#CA4E4EНедостаточно средств! Штраф: ${utils.formatMoney(lastFine.amount)}`);
+                db.fines.respond(lastFine.id, 'insufficient_funds');
+                return;
+            }
+
+            // Списываем деньги
+            db.rpMembers.updateBalance(username, -lastFine.amount, 'fine_payment',
+                `Оплата штрафа #${lastFine.id}`, 'SYSTEM');
+            db.fines.respond(lastFine.id, 'yes');
+
+            bot.chat(`/msg ${username} &#76C519✅ Штраф ${utils.formatMoney(lastFine.amount)} оплачен.`);
+            logger.info(`${username} оплатил штраф ${utils.formatMoney(lastFine.amount)}`);
+        } else {
+            db.fines.respond(lastFine.id, 'no');
+            bot.chat(`/msg ${username} &#FFB800⚠ Штраф отклонён. Полиция уведомлена.`);
+            logger.info(`${username} отклонил штраф`);
+        }
+    } catch (error) {
+        logger.error(`Ошибка обработки штрафа: ${error.message}`);
+    }
+}
+
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+/**
+ * Проверить, является ли сообщение от самого бота
+ */
+function isBotMessage(message, botUsername) {
+    if (!botUsername) return false;
+
+    // Исключаем сообщения бота, чтобы не было рекурсии
+    const botPatterns = [
+        `[${botUsername}]`,
+        `${botUsername}:`,
+        `${botUsername} »`,
+        `» ${botUsername}`,
+    ];
+
+    return botPatterns.some(pattern => message.includes(pattern));
+}
+
+/**
+ * Проверить на дубликаты системных сообщений
+ */
+function isDuplicateSystemMessage(message) {
+    const key = message.substring(0, 50);
+    const now = Date.now();
+
+    if (systemMessageCache.has(key)) {
+        const lastTime = systemMessageCache.get(key);
+        if (now - lastTime < 5000) {
+            return true;
+        }
+    }
+
+    systemMessageCache.set(key, now);
+
+    // Очистка старых записей
+    if (systemMessageCache.size > 100) {
+        const oldest = [...systemMessageCache.entries()]
+            .sort((a, b) => a[1] - b[1])[0];
+        if (oldest) systemMessageCache.delete(oldest[0]);
+    }
+
+    return false;
+}
+
+const systemMessageCache = new Map();
+
+// ==================== ОЧИСТКА КЭША ====================
+setInterval(() => {
+    const now = Date.now();
+
+    // Очистка кэша сообщений
+    for (const [key, value] of messageCache) {
+        if (value.muteUntil && value.muteUntil < now) {
+            value.muteUntil = null;
+            value.warnCount = 0;
+            value.messages = [];
+        }
+    }
+
+    // Очистка кэша спама команд
+    for (const [key, value] of commandSpamCache) {
+        if (value.blockedUntil && value.blockedUntil < now) {
+            value.blockedUntil = null;
+            value.commands = [];
+        }
+    }
+
+    // Очистка кэша входов/выходов
+    for (const [key, value] of joinLeaveCache) {
+        if (value.blockedUntil && value.blockedUntil < now) {
+            joinLeaveCache.delete(key);
+        }
+    }
+
+    // Очистка кэша никнеймов (каждые 10 минут)
+    if (Math.floor(now / 600000) !== Math.floor((now - 60000) / 600000)) {
+        nicknameCache.clear();
+    }
+}, 60000);
+
+module.exports = handleMessage;
+module.exports.setModules = setModules;
+module.exports.getMessageCache = () => messageCache;
+module.exports.getJoinLeaveCache = () => joinLeaveCache;

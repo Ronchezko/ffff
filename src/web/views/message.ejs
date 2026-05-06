@@ -1,21 +1,119 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Сообщение' %> — Resistance City</title>
+    <link rel="stylesheet" href="/css/style.css">
     <style>
-        body { font-family: sans-serif; background: #f5f7fb; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        .message-box { background: white; padding: 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .error { color: #ef4444; }
-        .success { color: #10b981; }
-        .btn { margin-top: 20px; display: inline-block; padding: 10px 20px; background: #6343d4; color: white; text-decoration: none; border-radius: 9999px; }
+        .message-container {
+            max-width: 520px;
+            margin: 80px auto;
+            padding: 0 20px;
+        }
+        .message-card {
+            text-align: center;
+            padding: 48px 36px;
+            border-radius: var(--radius-xl);
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        .message-card.success {
+            border-color: var(--success);
+            background: linear-gradient(135deg, rgba(118,197,25,0.08), rgba(118,197,25,0.02));
+        }
+        .message-card.warning {
+            border-color: var(--warning);
+            background: linear-gradient(135deg, rgba(255,184,0,0.08), rgba(255,184,0,0.02));
+        }
+        .message-card.error {
+            border-color: var(--danger);
+            background: linear-gradient(135deg, rgba(202,78,78,0.08), rgba(202,78,78,0.02));
+        }
+        .message-card.info {
+            border-color: var(--info);
+            background: linear-gradient(135deg, rgba(128,196,197,0.08), rgba(128,196,197,0.02));
+        }
+        .message-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+            animation: pulse 2s ease infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .message-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .message-title.success { color: var(--success); }
+        .message-title.warning { color: var(--warning); }
+        .message-title.error { color: var(--danger); }
+        .message-title.info { color: var(--info); }
+        .message-text {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.8;
+            font-size: 1rem;
+        }
+        .message-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
     </style>
 </head>
 <body>
-    <div class="message-box">
-        <h1 class="<%= type %>"><%= message %></h1>
-        <a href="/" class="btn">На главную</a>
+    <%- include('partials/header') %>
+
+    <div class="message-container">
+        <div class="card message-card <%= typeof type !== 'undefined' ? type : 'info' %>">
+            
+            <!-- ИКОНКА -->
+            <span class="message-icon">
+                <% if (typeof type !== 'undefined') { %>
+                    <% if (type === 'success') { %>✅
+                    <% } else if (type === 'warning') { %>⚠️
+                    <% } else if (type === 'error') { %>❌
+                    <% } else { %>ℹ️<% } %>
+                <% } else { %>
+                    ℹ️
+                <% } %>
+            </span>
+
+            <!-- ЗАГОЛОВОК -->
+            <h2 class="message-title <%= typeof type !== 'undefined' ? type : 'info' %>">
+                <%= typeof title !== 'undefined' ? title : 'Сообщение' %>
+            </h2>
+
+            <!-- ТЕКСТ -->
+            <p class="message-text">
+                <%= typeof message !== 'undefined' ? message : 'Нет дополнительной информации.' %>
+            </p>
+
+            <!-- КНОПКИ -->
+            <div class="message-actions">
+                <a href="/" class="btn btn-primary">
+                    🏠 На главную
+                </a>
+                <% if (typeof backUrl !== 'undefined' && backUrl) { %>
+                    <a href="<%= backUrl %>" class="btn btn-outline">
+                        ← Назад
+                    </a>
+                <% } else { %>
+                    <a href="javascript:history.back()" class="btn btn-outline">
+                        ← Назад
+                    </a>
+                <% } %>
+            </div>
+        </div>
     </div>
+
+    <%- include('partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>
-<script src="/js/theme.js"></script>

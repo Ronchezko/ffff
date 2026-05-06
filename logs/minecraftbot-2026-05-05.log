@@ -1,0 +1,29 @@
+[2026-05-05 03:22:39.665] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-05 03:22:39.667] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-05 03:22:39.668] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-05 03:22:39.669] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-05 03:22:39.669] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-05 03:22:39.669] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-05 03:22:39.670] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-05 03:22:39.670] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-05 03:22:39.670] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-05 03:22:39.670] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-05 03:22:39.726] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-05T00:22:39.418Z"}
+[2026-05-05 03:22:39.847] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-05 03:22:39.856] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-05 03:22:39.856] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-05 03:22:39.858] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-05 03:22:40.092] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-05 03:22:40.093] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-05 03:22:40.094] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-05 03:22:40.109] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-05 03:22:41.854] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-05 03:22:42.239] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-05 03:22:42.240] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-05 03:22:42.240] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-05 03:22:42.240] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-05 03:22:42.241] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-05 03:22:42.286] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-05 03:22:44.242] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-05 03:22:44.861] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-05 03:22:47.248] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...

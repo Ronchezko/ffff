@@ -1,95 +1,242 @@
-// src/minecraft/commands/cooldown.js
-// Система кулдаунов для команд
+// src/minecraft/commands/cooldown.js — Система кулдаунов команд Resistance City v5.0.0
+// Отслеживание времени последнего использования команд
+// Глобальные и персональные кулдауны
 
-const cooldowns = new Map();
-// Кулдауны для КАЖДОЙ отдельной подкоманды (в секундах)
-const cooldownSettings = {
-    // ===== ПОЛИЦИЯ =====
-    'org_police_search': 3,
-    'org_police_check': 3,
-    'org_police_fine': 5,
-    'org_police_order': 10,
-    
-    // ===== АРМИЯ =====
-    'org_army_tr': 3,
-    'org_army_border': 3,
-    
-    // ===== БОЛЬНИЦА =====
-    'org_hospital_redcode': 5,
-    
-    // ===== АКАДЕМИЯ =====
-    'org_academy_grade': 5,
-    
-    // ===== ЛИДЕРЫ (/org o) =====
-    'org_o_invite': 5,
-    'org_o_accept': 2,
-    'org_o_kick': 10,
-    'org_o_rank_set': 10,
-    'org_o_rankinfo': 5,
-    'org_o_setsalary': 15,
-    'org_o_paybonus': 10,
-    'org_o_vacation': 30,
-    'org_o_duty': 30,
-    'org_o_warn': 10,
-    'org_o_unwarn': 10,
-    'org_o_fine': 10,
-    
-    // ===== МИНИСТРЫ (/org ministry) =====
-    'org_ministry_tax_set': 30,
-    'org_ministry_tax_list': 30,
-    'org_ministry_budget': 30,
-    'org_ministry_bonus': 20,
-    'org_ministry_grant': 15,
-    'org_ministry_idset': 10,
-    'org_ministry_imtake': 10,
-    'org_ministry_defense': 30,
-    'org_ministry_armystatus': 30,
-    'org_ministry_mvdbudget': 30,
-    'org_ministry_mvdstatus': 30,
-    'org_ministry_crimelist': 30,
-    'org_ministry_healthbudget': 30,
-    'org_ministry_hospitalstatus': 30,
-    'org_ministry_edubudget': 30,
-    'org_ministry_academystatus': 30,
-    'org_ministry_mayorkick': 20,
-    'org_ministry_cityinfo': 30,
-    'org_ministry_setbudget': 30,
+'use strict';
+
+const config = require('../../config');
+const db = require('../../database');
+const { logger } = require('../../shared/logger');
+
+// ==================== КЭШ КУЛДАУНОВ ====================
+const cooldownCache = new Map();
+const globalCooldowns = new Map();
+
+// ==================== КОНСТАНТЫ ====================
+const DEFAULT_COOLDOWNS = {
+    '/fly': { duration: 120000, type: 'global', description: 'Флай (на клан)' },
+    '/10t': { duration: 300000, type: 'global', description: '10 тысяч (на клан)' },
+    '/pay': { duration: 15000, type: 'personal', description: 'Перевод денег' },
 };
 
-function checkCooldown(sender, commandKey) {
-    const key = `${sender}_${commandKey}`;
-    const cooldown = cooldowns.get(key);
-    
-    if (cooldown) {
-        const remaining = Math.ceil((cooldown - Date.now()) / 1000);
-        if (remaining > 0) {
-            return { allowed: false, remaining };
+// ==================== ПРОВЕРКА КУЛДАУНА ====================
+
+/**
+ * Проверить кулдаун для команды
+ * @returns {object} { onCooldown: boolean, remaining: number (секунд) }
+ */
+function checkCooldown(username, command, customDuration) {
+    var config_amd = config.autoMod || {};
+    var now = Date.now();
+
+    // Нормализация команды
+    var normalizedCommand = normalizeCommand(command);
+
+    // Проверка глобального кулдауна
+    if (DEFAULT_COOLDOWNS[normalizedCommand] && DEFAULT_COOLDOWNS[normalizedCommand].type === 'global') {
+        var globalKey = 'global_' + normalizedCommand;
+        if (globalCooldowns.has(globalKey)) {
+            var globalExpiry = globalCooldowns.get(globalKey);
+            if (now < globalExpiry) {
+                var remaining = Math.ceil((globalExpiry - now) / 1000);
+                return {
+                    onCooldown: true,
+                    remaining: remaining,
+                    type: 'global',
+                    message: 'Кулдаун на клан: ' + remaining + 'с',
+                };
+            }
         }
     }
-    
-    return { allowed: true, remaining: 0 };
-}
 
-function setCooldown(sender, commandKey) {
-    const duration = cooldownSettings[commandKey];
-    if (!duration || duration <= 0) return;
-    
-    const key = `${sender}_${commandKey}`;
-    cooldowns.set(key, Date.now() + (duration * 1000));
-    
-    setTimeout(() => {
-        if (cooldowns.get(key) <= Date.now()) {
-            cooldowns.delete(key);
-        }
-    }, (duration * 1000) + 100);
-}
-
-function clearCooldowns(sender) {
-    for (const [key, value] of cooldowns) {
-        if (key.startsWith(`${sender}_`)) {
-            cooldowns.delete(key);
+    // Проверка персонального кулдауна
+    var personalKey = username.toLowerCase() + '_' + normalizedCommand;
+    if (cooldownCache.has(personalKey)) {
+        var personalExpiry = cooldownCache.get(personalKey);
+        if (now < personalExpiry) {
+            var personalRemaining = Math.ceil((personalExpiry - now) / 1000);
+            return {
+                onCooldown: true,
+                remaining: personalRemaining,
+                type: 'personal',
+                message: 'Подождите ' + personalRemaining + 'с',
+            };
         }
     }
+
+    // Проверка в БД
+    var dbCooldown = db.cooldowns ? db.cooldowns.get(username, normalizedCommand) : null;
+    if (dbCooldown) {
+        var dbRemaining = Math.ceil((dbCooldown - now) / 1000);
+        if (dbRemaining > 0) {
+            return {
+                onCooldown: true,
+                remaining: dbRemaining,
+                type: 'database',
+                message: 'Подождите ' + dbRemaining + 'с',
+            };
+        }
+    }
+
+    return { onCooldown: false, remaining: 0 };
 }
 
-module.exports = { checkCooldown, setCooldown, clearCooldowns, cooldownSettings };
+// ==================== УСТАНОВКА КУЛДАУНА ====================
+
+/**
+ * Установить кулдаун для команды
+ */
+function setCooldown(username, command, customDuration) {
+    var normalizedCommand = normalizeCommand(command);
+    var now = Date.now();
+
+    // Определение длительности
+    var duration = customDuration;
+    if (!duration && DEFAULT_COOLDOWNS[normalizedCommand]) {
+        duration = DEFAULT_COOLDOWNS[normalizedCommand].duration;
+    }
+    if (!duration) {
+        duration = 3000; // По умолчанию 3 секунды
+    }
+
+    var expiry = now + duration;
+
+    // Глобальный кулдаун
+    if (DEFAULT_COOLDOWNS[normalizedCommand] && DEFAULT_COOLDOWNS[normalizedCommand].type === 'global') {
+        globalCooldowns.set('global_' + normalizedCommand, expiry);
+    }
+
+    // Персональный кулдаун
+    var personalKey = username.toLowerCase() + '_' + normalizedCommand;
+    cooldownCache.set(personalKey, expiry);
+
+    // Сохранение в БД для долгих кулдаунов (> 60 секунд)
+    if (duration > 60000 && db.cooldowns) {
+        db.cooldowns.set(username, normalizedCommand, Math.ceil(duration / 1000));
+    }
+
+    // Авто-очистка
+    setTimeout(function() {
+        cooldownCache.delete(personalKey);
+        if (DEFAULT_COOLDOWNS[normalizedCommand] && DEFAULT_COOLDOWNS[normalizedCommand].type === 'global') {
+            if (globalCooldowns.get('global_' + normalizedCommand) <= expiry) {
+                globalCooldowns.delete('global_' + normalizedCommand);
+            }
+        }
+    }, duration + 1000);
+
+    return { success: true, duration: duration, expiresAt: new Date(expiry).toISOString() };
+}
+
+// ==================== СБРОС КУЛДАУНОВ ====================
+
+function resetCooldown(username, command) {
+    if (!username && !command) {
+        // Полный сброс
+        cooldownCache.clear();
+        globalCooldowns.clear();
+        if (db.cooldowns) db.cooldowns.clear();
+        logger.info('Все кулдауны сброшены');
+        return { success: true, message: 'Все кулдауны сброшены' };
+    }
+
+    var normalizedCommand = command ? normalizeCommand(command) : null;
+
+    if (normalizedCommand) {
+        // Сброс конкретной команды
+        if (username) {
+            cooldownCache.delete(username.toLowerCase() + '_' + normalizedCommand);
+        }
+        globalCooldowns.delete('global_' + normalizedCommand);
+        if (db.cooldowns && username) {
+            db.cooldowns.clear(username);
+        }
+        logger.info('Кулдаун сброшен: ' + (username || 'global') + ' - ' + normalizedCommand);
+        return { success: true, message: 'Кулдаун сброшен' };
+    }
+
+    if (username) {
+        // Сброс всех кулдаунов игрока
+        var prefix = username.toLowerCase() + '_';
+        var keysToDelete = [];
+        cooldownCache.forEach(function(value, key) {
+            if (key.indexOf(prefix) === 0) {
+                keysToDelete.push(key);
+            }
+        });
+        for (var i = 0; i < keysToDelete.length; i++) {
+            cooldownCache.delete(keysToDelete[i]);
+        }
+        if (db.cooldowns) db.cooldowns.clear(username);
+        logger.info('Кулдауны сброшены для игрока: ' + username);
+        return { success: true, message: 'Кулдауны сброшены для ' + username };
+    }
+
+    return { success: false, message: 'Укажите имя игрока или команду' };
+}
+
+// ==================== СТАТИСТИКА ====================
+
+function getCooldownStats() {
+    var now = Date.now();
+    var activePersonal = 0;
+    var activeGlobal = 0;
+
+    cooldownCache.forEach(function(expiry) {
+        if (expiry > now) activePersonal++;
+    });
+
+    globalCooldowns.forEach(function(expiry) {
+        if (expiry > now) activeGlobal++;
+    });
+
+    return {
+        activePersonalCooldowns: activePersonal,
+        activeGlobalCooldowns: activeGlobal,
+        totalTracked: cooldownCache.size + globalCooldowns.size,
+    };
+}
+
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+
+function normalizeCommand(command) {
+    if (!command) return '';
+    var normalized = command.toLowerCase().trim();
+    if (normalized.indexOf('/') !== 0) {
+        normalized = '/' + normalized;
+    }
+    return normalized;
+}
+
+// ==================== ОЧИСТКА УСТАРЕВШИХ ====================
+setInterval(function() {
+    var now = Date.now();
+    var removedCount = 0;
+
+    cooldownCache.forEach(function(expiry, key) {
+        if (expiry <= now) {
+            cooldownCache.delete(key);
+            removedCount++;
+        }
+    });
+
+    globalCooldowns.forEach(function(expiry, key) {
+        if (expiry <= now) {
+            globalCooldowns.delete(key);
+            removedCount++;
+        }
+    });
+
+    if (removedCount > 0) {
+        logger.debug('Очищено устаревших кулдаунов: ' + removedCount);
+    }
+}, 30000);
+
+// ==================== ЭКСПОРТ ====================
+module.exports = {
+    checkCooldown,
+    setCooldown,
+    resetCooldown,
+    getCooldownStats,
+    DEFAULT_COOLDOWNS,
+};

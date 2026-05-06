@@ -1,30 +1,76 @@
 {
   "name": "resistance-bot",
   "version": "5.0.0",
-  "description": "Универсальный бот для города Resistance (Minecraft + Discord + Web)",
+  "description": "Resistance City — единая экосистема Minecraft RP с Discord, сайтом и Mineflayer-ботом. Свободный Город «Сопротивление».",
   "main": "src/main.js",
   "scripts": {
-    "start": "node --experimental-sqlite src/main.js",
-    "dev": "nodemon --experimental-sqlite src/main.js"
+    "start": "node src/main.js",
+    "dev": "nodemon src/main.js",
+    "db:init": "node src/database/init.js",
+    "db:migrate": "node src/database/migrate.js",
+    "deploy:discord": "node src/discord/deploy-commands.js",
+    "deploy:web": "node src/web/deploy.js",
+    "test": "node tests/run.js",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "minecraft",
+    "discord-bot",
+    "mineflayer",
+    "roleplay",
+    "resistance-city",
+    "rp-bot",
+    "clan-management",
+    "economy-bot"
+  ],
+  "author": "Ronche_ & Resistance Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ronchezko/ffff"
   },
   "dependencies": {
     "ansi-to-html": "^0.7.2",
+    "axios": "^1.7.2",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.1.2",
     "body-parser": "^1.20.2",
+    "chalk": "^4.1.2",
     "colors": "^1.4.0",
-    "connect-sqlite3": "^0.9.13",
+    "connect-sqlite3": "^0.9.16",
+    "cors": "^2.8.5",
     "discord.js": "^14.25.1",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.4.5",
     "ejs": "^5.0.1",
     "express": "^4.22.1",
+    "express-rate-limit": "^7.3.1",
     "express-session": "^1.19.0",
-    "git": "^0.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
     "mineflayer": "^4.14.0",
-    "moment": "^2.29.4",
+    "moment": "^2.30.1",
+    "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
-    "socks-proxy-agent": "^8.0.2",
-    "sqlite": "^5.1.1"
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^6.9.13",
+    "socks-proxy-agent": "^8.0.3",
+    "uuid": "^10.0.0",
+    "ws": "^8.17.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "eslint": "^8.57.0",
+    "nodemon": "^3.1.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "data/*",
+      "logs/*",
+      "node_modules/*"
+    ],
+    "delay": 1000
   }
 }

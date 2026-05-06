@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Управление имуществом' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .property-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .property-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+        }
+        .property-owned {
+            border-left: 4px solid var(--danger);
+        }
+        .property-free {
+            border-left: 4px solid var(--success);
+        }
+        .property-type-apartment { border-left-color: var(--info); }
+        .property-type-house { border-left-color: var(--warning); }
+        .property-type-office { border-left-color: var(--primary-lighter); }
+        .property-type-business { border-left-color: var(--success); }
+        .property-type-port { border-left-color: var(--danger); }
+        .filter-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+        }
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-family: var(--font-sans);
+        }
+        .filter-btn:hover {
+            background: rgba(99,67,212,0.1);
+            border-color: var(--primary);
+            color: var(--text-bright);
+        }
+        .filter-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        .property-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.9rem;
+        }
+        .property-detail-label {
+            color: var(--text-secondary);
+        }
+        .property-detail-value {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header', { page: 'admin' }) %>
+
+    <div class="admin-layout">
+        <%- include('../partials/sidebar', { page: 'properties' }) %>
+
+        <div class="admin-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                <div>
+                    <h1 class="text-gradient" style="margin-bottom: 4px;">🏠 Управление имуществом</h1>
+                    <p style="color: var(--text-secondary);">
+                        Всего объектов: <strong><%= typeof properties !== 'undefined' && properties ? properties.length : 0 %></strong>
+                    </p>
+                </div>
+            </div>
+
+            <!-- СТАТИСТИКА -->
+            <div class="grid grid-4" style="margin-bottom: 24px;">
+                <% 
+                    var ownedCount = 0;
+                    var freeCount = 0;
+                    var apartmentCount = 0;
+                    var businessCount = 0;
+                    if (typeof properties !== 'undefined' && properties) {
+                        for (var i = 0; i < properties.length; i++) {
+                            if (properties[i].isOwned) ownedCount++;
+                            else freeCount++;
+                            if (properties[i].property_type === 'apartment') apartmentCount++;
+                            if (properties[i].property_type === 'business' || properties[i].property_type === 'office') businessCount++;
+                        }
+                    }
+                %>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--danger);"><%= ownedCount %></div>
+                    <div class="stat-label">Занято</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--success);"><%= freeCount %></div>
+                    <div class="stat-label">Свободно</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--info);"><%= apartmentCount %></div>
+                    <div class="stat-label">Квартир</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--primary-lighter);"><%= businessCount %></div>
+                    <div class="stat-label">Бизнесов/Офисов</div>
+                </div>
+            </div>
+
+            <!-- ФИЛЬТРЫ -->
+            <div class="filter-buttons" id="filterButtons">
+                <button class="filter-btn active" data-filter="all">Все</button>
+                <button class="filter-btn" data-filter="owned">Занятые</button>
+                <button class="filter-btn" data-filter="free">Свободные</button>
+                <button class="filter-btn" data-filter="apartment">Квартиры</button>
+                <button class="filter-btn" data-filter="house">Дома</button>
+                <button class="filter-btn" data-filter="office">Офисы</button>
+                <button class="filter-btn" data-filter="business">Бизнесы</button>
+                <button class="filter-btn" data-filter="port">Порты</button>
+            </div>
+
+            <!-- СПИСОК -->
+            <div class="grid grid-2" id="propertiesGrid">
+                <% if (typeof properties !== 'undefined' && properties && properties.length > 0) { %>
+                    <% for (var i = 0; i < properties.length; i++) { 
+                        var prop = properties[i];
+                        var propType = prop.property_type || 'unknown';
+                        var isOwned = prop.isOwned;
+                        var typeNames = {
+                            'apartment': 'Квартира',
+                            'house': 'Дом',
+                            'office': 'Офис',
+                            'business': 'Бизнес',
+                            'port': 'Порт'
+                        };
+                        var typeName = typeNames[propType] || propType;
+                        var price = prop.price || (prop.configInfo ? prop.configInfo.price : 0);
+                    %>
+                        <div class="card property-card property-<%= isOwned ? 'owned' : 'free' %> property-type-<%= propType %>"
+                             data-status="<%= isOwned ? 'owned' : 'free' %>"
+                             data-type="<%= propType %>"
+                             style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                <div>
+                                    <h4 style="margin-bottom: 4px;">
+                                        #<%= prop.id %>
+                                        <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 400;">
+                                            <%= typeName %>
+                                        </span>
+                                    </h4>
+                                    <span class="badge <%= isOwned ? 'badge-danger' : 'badge-success' %>">
+                                        <%= isOwned ? 'Занято' : 'Свободно' %>
+                                    </span>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span style="font-weight: 700; color: var(--success);">
+                                        <%= price.toLocaleString() %> ₽
+                                    </span>
+                                </div>
+                            </div>
+
+                            <% if (isOwned) { %>
+                                <div class="property-detail-row">
+                                    <span class="property-detail-label">Владелец:</span>
+                                    <span class="property-detail-value" style="color: var(--text-bright);"><%= prop.owner || '—' %></span>
+                                </div>
+                                <% if (prop.coOwner1) { %>
+                                    <div class="property-detail-row">
+                                        <span class="property-detail-label">Сожитель 1:</span>
+                                        <span class="property-detail-value"><%= prop.coOwner1 %></span>
+                                    </div>
+                                <% } %>
+                                <% if (prop.coOwner2) { %>
+                                    <div class="property-detail-row">
+                                        <span class="property-detail-label">Сожитель 2:</span>
+                                        <span class="property-detail-value"><%= prop.coOwner2 %></span>
+                                    </div>
+                                <% } %>
+                                <% if (prop.regionName) { %>
+                                    <div class="property-detail-row">
+                                        <span class="property-detail-label">Регион:</span>
+                                        <span class="property-detail-value" style="color: var(--info);"><%= prop.regionName %></span>
+                                    </div>
+                                <% } %>
+                            <% } else { %>
+                                <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">
+                                    Доступно для покупки
+                                </p>
+                            <% } %>
+                        </div>
+                    <% } %>
+                <% } else { %>
+                    <div class="card" style="text-align: center; grid-column: 1 / -1; padding: 40px;">
+                        <p style="color: var(--text-muted);">Нет данных об имуществе</p>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var filterButtons = document.querySelectorAll('#filterButtons .filter-btn');
+            var propertyCards = document.querySelectorAll('#propertiesGrid .property-card');
+
+            filterButtons.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    filterButtons.forEach(function(b) { b.classList.remove('active'); });
+                    this.classList.add('active');
+
+                    var filter = this.getAttribute('data-filter');
+
+                    propertyCards.forEach(function(card) {
+                        if (filter === 'all') {
+                            card.style.display = '';
+                        } else if (filter === 'owned' || filter === 'free') {
+                            card.style.display = card.getAttribute('data-status') === filter ? '' : 'none';
+                        } else {
+                            card.style.display = card.getAttribute('data-type') === filter ? '' : 'none';
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+
+    <%- include('../partials/footer') %>
+    <script src="/js/theme.js"></script>
+</body>
+</html>

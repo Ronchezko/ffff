@@ -1,117 +1,300 @@
-// src/web/auth.js
-const express = require('express');
-const fetch = require('node-fetch');
-const logger = require('../shared/logger');
-const router = express.Router();
+// src/web/auth.js — Модуль аутентификации Resistance City v5.0.0
+// Middleware для проверки авторизации, сессии, ролей
 
-module.exports = (database) => {
-    // Начало авторизации
-    router.get('/discord', (req, res) => {
-        const redirectUri = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/auth/discord/callback';
-        const discordAuthUrl = `https://discord.com/api/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify%20email`;
-        res.redirect(discordAuthUrl);
-    });
+'use strict';
 
-    // Callback после подтверждения
-    router.get('/discord/callback', async (req, res) => {
-        const { code } = req.query;
-        if (!code) {
-            logger.error('❌ Нет кода авторизации');
-            return res.status(400).send('No code provided');
+const { logger, createLogger } = require('../shared/logger');
+const config = require('../config');
+const db = require('../database');
+
+const authLogger = createLogger('WebAuth');
+
+// ==================== КОНСТАНТЫ ====================
+const SESSION_MAX_AGE = parseInt(process.env.SESSION_MAX_AGE) || 86400000;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || config.web.adminUsername;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || config.web.adminPassword;
+
+// ==================== MIDDLEWARE ====================
+
+/**
+ * Проверка авторизации (для админ-панели)
+ */
+function isAuthenticated(req, res, next) {
+    if (!req.session || !req.session.user) {
+        // Сохраняем URL для возврата после логина
+        req.session.returnTo = req.originalUrl;
+
+        if (req.xhr || req.path.startsWith('/api/')) {
+            return res.status(401).json({
+                success: false,
+                error: 'Unauthorized',
+                redirect: '/admin/login',
+            });
         }
 
-        try {
-            // Обмениваем код на токен
-            const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: process.env.DISCORD_CLIENT_ID,
-                    client_secret: process.env.DISCORD_CLIENT_SECRET,
-                    grant_type: 'authorization_code',
-                    code,
-                    redirect_uri: process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/auth/discord/callback',
-                }),
-            });
+        return res.redirect('/admin/login');
+    }
 
-            if (!tokenResponse.ok) {
-                const errorText = await tokenResponse.text();
-                logger.error('❌ Ошибка получения токена:', errorText);
-                return res.status(500).send('Ошибка получения токена');
-            }
+    // Проверка срока сессии
+    if (req.session.user.loginTime) {
+        const loginTime = new Date(req.session.user.loginTime).getTime();
+        if (Date.now() - loginTime > SESSION_MAX_AGE) {
+            req.session.destroy();
+            return res.redirect('/admin/login?error=session_expired');
+        }
+    }
 
-            const tokenData = await tokenResponse.json();
-            const accessToken = tokenData.access_token;
+    // Проверка роли
+    if (req.session.user.role !== 'admin') {
+        return res.status(403).render('message', {
+            title: 'Доступ запрещён',
+            message: 'У вас нет прав для доступа к этой странице.',
+            type: 'error',
+        });
+    }
 
-            if (!accessToken) {
-                logger.error('❌ Нет access_token в ответе');
-                return res.status(500).send('Ошибка получения токена доступа');
-            }
+    // Обновление времени последней активности
+    req.session.user.lastActivity = new Date().toISOString();
+    req.session.touch();
 
-            // Получаем данные пользователя
-            const userResponse = await fetch('https://discord.com/api/users/@me', {
-                headers: { Authorization: `Bearer ${accessToken}` },
-            });
+    next();
+}
 
-            if (!userResponse.ok) {
-                logger.error('❌ Ошибка получения данных пользователя:', userResponse.status);
-                return res.status(500).send('Ошибка получения данных пользователя');
-            }
+/**
+ * Middleware для API (проверка токена или сессии)
+ */
+function isApiAuthenticated(req, res, next) {
+    // Проверка сессии
+    if (req.session && req.session.user && req.session.user.role === 'admin') {
+        req.session.touch();
+        return next();
+    }
 
-            const userData = await userResponse.json();
-            
-            if (!userData || !userData.id) {
-                logger.error('❌ Некорректные данные пользователя:', userData);
-                return res.status(500).send('Некорректные данные пользователя');
-            }
+    // Проверка API токена (Bearer)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
 
-            // Сохраняем пользователя в сессии
-            req.session.user = {
-                id: userData.id,
-                username: userData.username,
-                global_name: userData.global_name || userData.username,
-                avatar: userData.avatar,
-                discriminator: userData.discriminator,
-            };
+        if (validateApiToken(token)) {
+            return next();
+        }
 
-            logger.info(`✅ Пользователь ${userData.username} (${userData.id}) вошёл через Discord`);
+        return res.status(401).json({ success: false, error: 'Invalid token' });
+    }
 
-            // Проверяем, привязан ли аккаунт к Minecraft
-            try {
-                const db = database.getDb();
-                if (!db) {
-                    logger.error('❌ База данных не инициализирована');
-                } else {
-                    const stmt = db.prepare('SELECT minecraft_nick, discord_id FROM clan_members WHERE discord_id = ?');
-                    const member = stmt.get(userData.id);
-                    
-                    if (member && member.minecraft_nick) {
-                        logger.info(`✅ Аккаунт привязан к Minecraft: ${member.minecraft_nick}`);
-                    } else {
-                        logger.info(`⚠️ Discord аккаунт ${userData.username} не привязан к Minecraft`);
-                    }
-                }
-            } catch (dbError) {
-                logger.error('❌ Ошибка при проверке привязки в БД:', dbError);
-            }
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+}
 
-            // Перенаправляем в профиль
-            res.redirect('/profile');
-            
-        } catch (error) {
-            logger.error('❌ Ошибка OAuth2:', error);
-            console.error('Детали ошибки:', error);
-            res.status(500).send('Ошибка авторизации: ' + error.message);
+/**
+ * Проверка роли
+ */
+function requireRole(role) {
+    return (req, res, next) => {
+        if (!req.session || !req.session.user) {
+            return res.status(401).json({ success: false, error: 'Unauthorized' });
+        }
+
+        if (req.session.user.role !== role && req.session.user.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+
+        next();
+    };
+}
+
+// ==================== ФУНКЦИИ АУТЕНТИФИКАЦИИ ====================
+
+/**
+ * Проверить учетные данные
+ */
+function verifyCredentials(username, password) {
+    if (!username || !password) return false;
+
+    // Сравнение с переменными окружения
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Создать сессию
+ */
+function createSession(req, username, role = 'admin') {
+    req.session.user = {
+        username,
+        role,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        loginTime: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+    };
+
+    req.session.save();
+
+    authLogger.info(`Сессия создана: ${username} (${role}) [IP: ${req.ip}]`);
+
+    return req.session.user;
+}
+
+/**
+ * Уничтожить сессию
+ */
+function destroySession(req) {
+    const username = req.session?.user?.username || 'неизвестный';
+
+    req.session.destroy((err) => {
+        if (err) {
+            authLogger.error(`Ошибка удаления сессии: ${err.message}`);
+        } else {
+            authLogger.info(`Сессия удалена: ${username}`);
         }
     });
+}
 
-    // Выход
-    router.get('/logout', (req, res) => {
-        const username = req.session.user?.username || 'unknown';
-        logger.info(`👋 Пользователь ${username} вышел из системы`);
-        req.session.destroy();
-        res.redirect('/');
-    });
+/**
+ * Проверить API токен
+ */
+function validateApiToken(token) {
+    if (!token) return false;
 
-    return router;
+    // Простая проверка (в продакшене заменить на JWT)
+    const validTokens = [
+        process.env.API_TOKEN,
+        'resistance_api_token_2024',
+    ].filter(Boolean);
+
+    return validTokens.includes(token);
+}
+
+/**
+ * Сгенерировать API токен
+ */
+function generateApiToken(username) {
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    authLogger.info(`API токен сгенерирован для ${username}: ${token.substring(0, 8)}...`);
+    return token;
+}
+
+// ==================== ОБРАБОТЧИКИ ====================
+
+/**
+ * Обработчик логина
+ */
+async function handleLogin(req, res) {
+    const { username, password, remember } = req.body;
+
+    if (!verifyCredentials(username, password)) {
+        authLogger.warn(`Неудачная попытка входа: ${username} (IP: ${req.ip})`);
+
+        return res.render('admin/login', {
+            title: 'Вход в админ-панель',
+            error: 'Неверный логин или пароль',
+            layout: false,
+        });
+    }
+
+    createSession(req, username, 'admin');
+
+    // Если "запомнить меня" — увеличиваем срок сессии
+    if (remember) {
+        req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000; // 7 дней
+    }
+
+    const redirectTo = req.session.returnTo || '/admin/dashboard';
+    delete req.session.returnTo;
+
+    return res.redirect(redirectTo);
+}
+
+/**
+ * Обработчик логаута
+ */
+function handleLogout(req, res) {
+    destroySession(req);
+    res.redirect('/admin/login');
+}
+
+// ==================== ЗАЩИТА ОТ БРУТФОРСА ====================
+const loginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_BLOCK_DURATION = 15 * 60 * 1000; // 15 минут
+
+function checkBruteForce(ip) {
+    const now = Date.now();
+    const key = `login_${ip}`;
+
+    if (!loginAttempts.has(key)) {
+        loginAttempts.set(key, { attempts: [], blockedUntil: null });
+    }
+
+    const data = loginAttempts.get(key);
+
+    // Проверка блокировки
+    if (data.blockedUntil && data.blockedUntil > now) {
+        const remaining = Math.ceil((data.blockedUntil - now) / 60000);
+        return { allowed: false, remaining };
+    }
+
+    // Очистка старых попыток (старше часа)
+    data.attempts = data.attempts.filter(t => now - t < 3600000);
+
+    if (data.attempts.length >= MAX_LOGIN_ATTEMPTS) {
+        data.blockedUntil = now + LOGIN_BLOCK_DURATION;
+        authLogger.warn(`Брутфорс-защита: IP ${ip} заблокирован на ${LOGIN_BLOCK_DURATION / 60000} мин`);
+        return { allowed: false, remaining: Math.ceil(LOGIN_BLOCK_DURATION / 60000) };
+    }
+
+    return { allowed: true };
+}
+
+function recordLoginAttempt(ip) {
+    const key = `login_${ip}`;
+    if (!loginAttempts.has(key)) {
+        loginAttempts.set(key, { attempts: [], blockedUntil: null });
+    }
+    loginAttempts.get(key).attempts.push(Date.now());
+}
+
+function resetLoginAttempts(ip) {
+    loginAttempts.delete(`login_${ip}`);
+}
+
+// ==================== ОЧИСТКА СТАРЫХ СЕССИЙ ====================
+function cleanupOldSessions() {
+    try {
+        const result = db.run(
+            "DELETE FROM sessions WHERE expires < datetime('now')"
+        );
+        if (result.changes > 0) {
+            authLogger.debug(`Очищено сессий: ${result.changes}`);
+        }
+    } catch (error) {
+        authLogger.error(`Ошибка очистки сессий: ${error.message}`);
+    }
+}
+
+// Запуск периодической очистки
+setInterval(cleanupOldSessions, 3600000); // Раз в час
+
+// ==================== ЭКСПОРТ ====================
+module.exports = {
+    isAuthenticated,
+    isApiAuthenticated,
+    requireRole,
+    verifyCredentials,
+    createSession,
+    destroySession,
+    validateApiToken,
+    generateApiToken,
+    handleLogin,
+    handleLogout,
+    checkBruteForce,
+    recordLoginAttempt,
+    resetLoginAttempts,
+    cleanupOldSessions,
+    ADMIN_USERNAME,
+    ADMIN_PASSWORD,
 };

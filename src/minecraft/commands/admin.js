@@ -1,641 +1,1038 @@
-// src/minecraft/commands/admin.js
-// Команды для администрации клана (полный функционал)
+// src/minecraft/commands/admin.js — Административные команды Resistance City v5.0.0
+// /admin, /a, /arp, /stopall, /reloadbd
+// Полный набор: управление персоналом, экономикой, организациями, бандами, вирусом
 
+'use strict';
+
+const config = require('../../config');
+const db = require('../../database');
 const utils = require('../../shared/utils');
-const cleanNickname = typeof nick === 'string' ? nick.toLowerCase() : '';
-function sendMessage(bot, target, message) {
-    bot.chat(`/msg ${target} ${message}`);
+const permissions = require('../../shared/permissions');
+const { logger } = require('../../shared/logger');
+
+// ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+function msg(bot, user, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/msg ' + user + ' ' + text); } catch(e) {}
+}
+function cc(bot, text) {
+    try { if (text.length > 200) text = text.substring(0, 197) + '...'; bot.chat('/cc ' + text); } catch(e) {}
+}
+function checkMinRank(username, requiredRank) {
+    const staff = db.staff.get(username);
+    if (!staff || staff.is_active !== 1) return false;
+    return (permissions.STAFF_HIERARCHY[staff.rank] || 0) >= (permissions.STAFF_HIERARCHY[requiredRank] || 999);
 }
 
-// ============================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ============================================
-
-
-
-const roleNames = {
-    1: 'Мл.Модератор',
-    2: 'Модератор',
-    3: 'Ст.Модератор',
-    4: 'Гл.Модератор',
-    5: 'Куратор',
-    6: 'Администратор'
-};
-
-const clanRankDisplay = {
-    1: '&8⌜&e&l🔧&8⌟ﾠ&#59ff6d&lᴍ&#54fd72&lʟ&#4ffa77&l.&#4bf87c&lᴍ&#46f681&lᴏ&#41f486&lᴅ&#3cf18b&lᴇ&#37ef90&lʀ',
-    2: '&8⌜&e&l🛠&8⌟ﾠ&#114fff&lᴍ&#1552fc&lᴏ&#1856f9&lᴅ&#1c59f6&lᴇ&#1f5cf3&lʀ',
-    3: '&8⌜&e🍁&8⌟ﾠ&#ffb10c&ls&#fdb20e&lᴛ&#fab30f&l.&#f8b511&lᴍ&#f6b612&lᴏ&#f4b714&lᴅ&#f1b815&lᴇ&#efb917&lʀ',
-    4: '&8⌜&e🌟&8⌟ﾠ&#5323ff&lɢ&#5624fd&lʟ&#5a25fa&l.&#5d27f8&lᴍ&#6128f6&lᴏ&#6429f4&lᴅ&#682af1&lᴇ&#6b2bef&lʀ',
-    5: '&8⌜&e✦&8⌟ﾠ&#ff118d&lᴋ&#ff158b&lʏ&#ff1a89&lʀ&#ff1e87&lᴀ&#ff2284&lᴛ&#ff2782&lᴏ&#ff2b80&lʀ',
-    6: '&8⌜&e⭐&8⌟ﾠ&#790101&lᴀ&#940d0d&lᴅ&#b01919&lᴍ&#cb2424&lɪ&#e63030&lɴ'
-};
-
-let isStopped = false;
-
-// ============================================
-// /admin add/del [ник] [роль] - Управление персоналом
-// ============================================
-
-async function admin(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    if (staffRank.rank_level < 6) {
-        sendMessage(bot, sender, `&4&l|&c Только Администратор может использовать эту команду!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/admin add/del [ник] [роль]`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    const target = cleanNick(args[1]);
-    const role = parseInt(args[2]);
-    
-    if (!target || target.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Неверный никнейм!`);
-        return;
-    }
-    
-    // Проверяем, существует ли игрок в клане
-    const clanMember = await db.getClanMember(target);
-    if (!clanMember) {
-        sendMessage(bot, sender, `&4&l|&c Игрок &e${target} &cне состоит в клане Resistance!`);
-        return;
-    }
-    
-    if (action === 'add') {
-        if (isNaN(role) || role < 1 || role > 6) {
-            sendMessage(bot, sender, `&4&l|&c Неверная роль! Доступно: &e1-6`);
-            return;
-        }
-        
-        // Куратор не может выдать роль Администратора
-        const senderRank = staffRank.rank_level;
-        if (senderRank === 5 && role === 6) {
-            sendMessage(bot, sender, `&4&l|&c Куратор не может назначить Администратора!`);
-            return;
-        }
-        
-        // Проверяем, не выше ли роль чем у выдающего
-        if (role >= senderRank && senderRank !== 6) {
-            sendMessage(bot, sender, `&4&l|&c Нельзя назначить роль выше или равную вашей!`);
-            return;
-        }
-        
-        await db.run(`INSERT OR REPLACE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by, hired_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`, 
-            [target, role, roleNames[role], cleanNick(sender)]);
-        
-        // Выдаём ранг в клане
-        if (clanRankDisplay[role]) {
-            bot.chat(`/c rank ${target} ${clanRankDisplay[role]}`);
-        }
-        
-        await db.run(`UPDATE clan_members SET rank_name = ?, rank_priority = ? WHERE LOWER(minecraft_nick) = LOWER(?)`, 
-            [roleNames[role], role * 10, target]);
-        await utils.sleep(500);
-        bot.chat(`/cc &a👑 ${sender} назначил ${target} на должность ${roleNames[role]}`);
-        await utils.sleep(500);
-        sendMessage(bot, target, `&a&l|&f Поздравляем! Вы назначены на должность &e${roleNames[role]}`);
-        if (addLog) addLog(`👑 ${sender} назначил ${target} на ${roleNames[role]}`, 'success');
-        
-    } else if (action === 'del') {
-        // Проверяем, не снимает ли нижестоящий вышестоящего
-        const targetRank = await db.getStaffRank(target);
-        if (targetRank.rank_level >= staffRank.rank_level && staffRank.rank_level !== 6) {
-            sendMessage(bot, sender, `&4&l|&c Нельзя снять с должности вышестоящего сотрудника!`);
-            return;
-        }
-        
-        await db.run(`UPDATE staff_stats SET rank_level = 0, rank_name = NULL, updated_at = CURRENT_TIMESTAMP WHERE LOWER(minecraft_nick) = LOWER(?)`, [target]);
-        await db.run(`UPDATE clan_members SET rank_name = 'Участник', rank_priority = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [target]);
-        
-        // Снимаем клановый ранг
-        bot.chat(`/c rank ${target} &8⌜&e&l𐓏&8⌟ﾠ&#0b674d&lн&#0e6f50&lо&#127753&lʙ&#157f56&lᴇ&#198759&lн&#1c8e5b&lь&#1f965e&lᴋ&#239e61&lи&#26a664&lй`);
-        
-        bot.chat(`/cc &c👑 ${sender} снял с должности ${target}`);
-        sendMessage(bot, target, `&c&l|&f Вы были сняты с должности &e${sender}`);
-        if (addLog) addLog(`👑 ${sender} снял ${target} с должности`, 'warn');
-    }
-}
-
-// ============================================
-// /awarn add/del [ник] [причина] - Выговор персоналу
-// ============================================
-
-async function awarn(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    // Выдавать выговоры могут только с Ст.Модератора (уровень 3+)
-    if (staffRank.rank_level < 3) {
-        sendMessage(bot, sender, `&4&l|&c Выдавать выговоры могут сотрудники от Ст.Модератора!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/awarn add [ник] [причина]`);
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/awarn del [ник]`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    const target = cleanNick(args[1]);
-    const reason = args.slice(2).join(' ') || 'Не указана';
-    
-    if (!target || target.length < 2) {
-        sendMessage(bot, sender, `&4&l|&c Неверный никнейм!`);
-        return;
-    }
-    
-    const targetRank = await db.getStaffRank(target);
-    
-    // Нельзя выдать выговор вышестоящему
-    if (targetRank.rank_level >= staffRank.rank_level) {
-        sendMessage(bot, sender, `&4&l|&c Нельзя выдать выговор вышестоящему сотруднику!`);
-        return;
-    }
-    
-    if (action === 'add') {
-        const newWarnings = (targetRank.awarns || 0) + 1;
-        await db.run(`UPDATE staff_stats SET awarns = ? WHERE LOWER(minecraft_nick) = LOWER(?)`, [newWarnings, target]);
-        
-        sendMessage(bot, sender, `&a&l|&f Выговор выдан &e${target} &7(${newWarnings}/3)`);
-        sendMessage(bot, target, `&c&l|&f Вы получили выговор от &e${sender}&f. Причина: &e${reason}`);
-        bot.chat(`/cc &c⚠️ Выговор &e${target} &cот ${sender} (${newWarnings}/3)`);
-        
-        if (newWarnings >= 3) {
-            // Автоматическое снятие с должности при 3 выговорах
-            await db.run(`UPDATE staff_stats SET rank_level = 0, rank_name = NULL, awarns = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [target]);
-            await db.run(`UPDATE clan_members SET rank_name = 'Участник', rank_priority = 0 WHERE LOWER(minecraft_nick) = LOWER(?)`, [target]);
-            bot.chat(`/c rank ${target} &8⌜&e&l𐓏&8⌟ﾠ&#0b674d&lн&#0e6f50&lо&#127753&lʙ&#157f56&lᴇ&#198759&lн&#1c8e5b&lь&#1f965e&lᴋ&#239e61&lи&#26a664&lй`);
-            bot.chat(`/cc &c🔻 &e${target} &cснят с должности за 3 выговора!`);
-            sendMessage(bot, target, `&c&l|&f Вы сняты с должности за 3 выговора!`);
-            if (addLog) addLog(`🔻 ${target} снят с должности за 3 выговора`, 'error');
-        }
-        
-        if (addLog) addLog(`⚠️ ${sender} выдал выговор ${target} (${reason})`, 'warn');
-        
-    } else if (action === 'del') {
-        const newWarnings = Math.max(0, (targetRank.awarns || 0) - 1);
-        await db.run(`UPDATE staff_stats SET awarns = ? WHERE LOWER(minecraft_nick) = LOWER(?)`, [newWarnings, target]);
-        
-        sendMessage(bot, sender, `&a&l|&f Выговор снят с &e${target}`);
-        sendMessage(bot, target, `&a&l|&f С вас снят выговор от &e${sender}`);
-        if (addLog) addLog(`✅ ${sender} снял выговор с ${target}`, 'info');
-    }
-}
-
-// ============================================
-// /spam [on/off] - Включение/выключение авто-модерации
-// ============================================
-
-async function spam(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    // Только с Гл.Модератора (уровень 4+)
-    if (staffRank.rank_level < 4) {
-        sendMessage(bot, sender, `&4&l|&c Управлять авто-модерацией могут сотрудники от Гл.Модератора!`);
-        return;
-    }
-    
+// ==================== /ADMIN и /A ====================
+function adminManage(bot, username, args, source) {
     if (args.length === 0) {
-        const currentStatus = await db.getSetting('auto_mod_enabled');
-        const status = currentStatus === 'true' ? '✅ ВКЛЮЧЕНА' : '❌ ВЫКЛЮЧЕНА';
-        sendMessage(bot, sender, `&a&l|&f Авто-модерация: &e${status}`);
+        return msg(bot, username, '&#CA4E4E❌ /admin <add|del|list|info|resetdaily|setlimit>');
+    }
+
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
+
+    // ==================== ADD ====================
+    if (sub === 'add') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /admin add <ник> <роль>');
+        const target = subArgs[0];
+        const rankKey = subArgs[1].toLowerCase();
+        const validRanks = Object.keys(config.staffRanks);
+
+        if (!validRanks.includes(rankKey)) {
+            const rankNames = validRanks.map(r => r + ' (' + config.staffRanks[r].name + ')').join(', ');
+            return msg(bot, username, '&#CA4E4E❌ Неверный ранг. Доступные: ' + rankNames);
+        }
+
+        const issuerStaff = db.staff.get(username);
+        if (!issuerStaff || issuerStaff.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Вы не персонал');
+        if (issuerStaff.rank === 'curator' && rankKey === 'administrator') return msg(bot, username, '&#CA4E4E❌ Куратор не может назначить админа');
+
+        const issuerLevel = permissions.STAFF_HIERARCHY[issuerStaff.rank] || 0;
+        const targetLevel = permissions.STAFF_HIERARCHY[rankKey] || 0;
+        if (issuerLevel <= targetLevel && issuerStaff.rank !== 'administrator') {
+            return msg(bot, username, '&#CA4E4E❌ Нельзя назначить ранг выше или равный вашему');
+        }
+
+        const existingStaff = db.staff.get(target);
+        const result = db.staff.add(target, rankKey);
+
+        if (result.success) {
+            const rankConfig = config.staffRanks[rankKey];
+            if (rankConfig?.colorRank) bot.chat('/c rank ' + target + ' ' + rankConfig.colorRank);
+            logger.warn(username + ' назначил ' + target + ' на ' + rankKey);
+            msg(bot, username, '&#76C519✅ ' + target + ' назначен: &#FFB800' + (rankConfig?.name || rankKey));
+            cc(bot, '&#76C519📋 ' + target + ' → &#FFB800' + (rankConfig?.name || rankKey));
+        } else {
+            msg(bot, username, '&#CA4E4E❌ Ошибка назначения');
+        }
         return;
     }
-    
-    const action = args[0].toLowerCase();
-    
-    if (action === 'on') {
-        await db.setSetting('auto_mod_enabled', 'true', sender);
-        bot.chat(`/cc &a✅ Авто-модерация ВКЛЮЧЕНА ${sender}`);
-        if (addLog) addLog(`✅ ${sender} включил авто-модерацию`, 'info');
-    } else if (action === 'off') {
-        await db.setSetting('auto_mod_enabled', 'false', sender);
-        bot.chat(`/cc &c❌ Авто-модерация ВЫКЛЮЧЕНА ${sender}`);
-        if (addLog) addLog(`❌ ${sender} выключил авто-модерацию`, 'warn');
-    } else {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/spam [on/off]`);
+
+    // ==================== DEL ====================
+    if (sub === 'del') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /admin del <ник>');
+        const target = subArgs[0];
+        const targetStaff = db.staff.get(target);
+
+        if (!targetStaff || targetStaff.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ ' + target + ' не персонал');
+        if (!permissions.canManageStaff(username, target, db)) return msg(bot, username, '&#CA4E4E❌ Нельзя снять этого сотрудника');
+        if (targetStaff.rank === 'administrator' && !permissions.isAdmin(username, db)) return msg(bot, username, '&#CA4E4E❌ Только админ может снять админа');
+
+        const oldRank = targetStaff.rank;
+        const result = db.staff.remove(target);
+
+        if (result.success) {
+            bot.chat('/c rank ' + target + ' ' + config.clan.defaultRank);
+            logger.warn(username + ' снял ' + target + ' с ' + oldRank);
+            msg(bot, username, '&#76C519✅ ' + target + ' снят с должности');
+            cc(bot, '&#CA4E4E📋 ' + target + ' снят с персонала');
+        } else {
+            msg(bot, username, '&#CA4E4E❌ Ошибка снятия');
+        }
+        return;
     }
+
+    // ==================== LIST ====================
+    if (sub === 'list') {
+        const staffList = db.staff.getAll();
+        if (staffList.length === 0) return msg(bot, username, '&#D4D4D4Нет активного персонала');
+
+        const sorted = staffList.sort((a, b) => (permissions.STAFF_HIERARCHY[b.rank] || 0) - (permissions.STAFF_HIERARCHY[a.rank] || 0));
+
+        // Отправляем по 3 человека в сообщении
+        const parts = [];
+        for (let i = 0; i < sorted.length; i += 3) {
+            const chunk = sorted.slice(i, i + 3);
+            parts.push(chunk.map(s => {
+                const rc = config.staffRanks[s.rank];
+                return '&#FFB800' + (rc?.name || s.rank) + ' &#D4D4D4' + s.username + (s.warns > 0 ? ' &#CA4E4E[' + s.warns + ']' : '');
+            }).join(' &#D4D4D4| '));
+        }
+
+        msg(bot, username, '&#80C4C5👥 Персонал (' + sorted.length + '):');
+        parts.forEach(p => msg(bot, username, p));
+        return;
+    }
+
+    // ==================== INFO ====================
+    if (sub === 'info') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /admin info <ник>');
+        const target = subArgs[0];
+        const staff = db.staff.get(target);
+        if (!staff || staff.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ ' + target + ' не персонал');
+
+        const rc = config.staffRanks[staff.rank];
+        msg(bot, username,
+            '&#80C4C5👤 ' + target + ' &#D4D4D4| &#FFB800' + (rc?.name || staff.rank) +
+            ' &#D4D4D4| Уровень: &#76C519' + (permissions.STAFF_HIERARCHY[staff.rank] || 0)
+        );
+        msg(bot, username,
+            '&#D4D4D4Выговоров: ' + (staff.warns > 0 ? '&#CA4E4E' + staff.warns + '/3' : '&#76C5190') +
+            ' &#D4D4D4| Киков: ' + (staff.kicks_today || 0) +
+            ' &#D4D4D4| Мутов: ' + (staff.mutes_today || 0) +
+            ' &#D4D4D4| ЧС: ' + (staff.blacklists_today || 0)
+        );
+        msg(bot, username, '&#D4D4D4Назначен: &#76C519' + utils.formatDate(staff.promoted_at));
+        return;
+    }
+
+    // ==================== RESETDAILY ====================
+    if (sub === 'resetdaily') {
+        if (subArgs.length < 1) {
+            db.staff.resetDailyLimits();
+            logger.info(username + ' сбросил дневные лимиты');
+            return msg(bot, username, '&#76C519✅ Дневные лимиты сброшены для всех');
+        }
+        const target = subArgs[0];
+        const targetStaff = db.staff.get(target);
+        if (!targetStaff) return msg(bot, username, '&#CA4E4E❌ ' + target + ' не персонал');
+
+        db.run('UPDATE staff SET kicks_today = 0, mutes_today = 0, blacklists_today = 0 WHERE username_lower = ?', [target.toLowerCase()]);
+        logger.info(username + ' сбросил лимиты для ' + target);
+        msg(bot, username, '&#76C519✅ Лимиты сброшены для ' + target);
+        return;
+    }
+
+    // ==================== SETLIMIT ====================
+    if (sub === 'setlimit') {
+        if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /admin setlimit <ник> <kicks|mutes|blacklists> <значение>');
+        if (!permissions.isAdmin(username, db)) return msg(bot, username, '&#CA4E4E❌ Только администратор');
+
+        const target = subArgs[0];
+        const limitType = subArgs[1].toLowerCase();
+        const limitValue = parseInt(subArgs[2]);
+
+        if (!['kicks', 'mutes', 'blacklists'].includes(limitType)) return msg(bot, username, '&#CA4E4E❌ Тип: kicks, mutes, blacklists');
+        if (isNaN(limitValue) || limitValue < 0) return msg(bot, username, '&#CA4E4E❌ Неверное значение');
+
+        const targetStaff = db.staff.get(target);
+        if (!targetStaff) return msg(bot, username, '&#CA4E4E❌ ' + target + ' не персонал');
+
+        const colMap = { kicks: 'kicks_today', mutes: 'mutes_today', blacklists: 'blacklists_today' };
+        db.run('UPDATE staff SET ' + colMap[limitType] + ' = ? WHERE username_lower = ?', [limitValue, target.toLowerCase()]);
+
+        logger.warn(username + ' установил ' + limitType + ' = ' + limitValue + ' для ' + target);
+        msg(bot, username, '&#76C519✅ ' + target + ': ' + limitType + ' = ' + limitValue);
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ /admin <add|del|list|info|resetdaily|setlimit>');
 }
 
-// ============================================
-// /r [clan/chat] [on/off] - Реклама в чате клана
-// ============================================
+// ==================== /ARP (ADMIN ROLEPLAY) ====================
+function arpManage(bot, username, args, source) {
+    if (args.length === 0) {
+        return msg(bot, username, '&#CA4E4E❌ /arp <balance|rank|points|blacklist|payday|warn|stats|rp|idim|org|band|virus|economy|freeze|unfreeze|stopall|reloadbd>');
+    }
 
-async function r(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/r clan [on/off]`);
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/r chat [on/off]`);
-        return;
-    }
-    
-    const type = args[0].toLowerCase();
-    const action = args[1].toLowerCase();
-    
-    // Рекламу клана могут редактировать от Гл.Модератора
-    if (type === 'clan' && staffRank.rank_level < 4) {
-        sendMessage(bot, sender, `&4&l|&c Редактировать рекламу клана могут сотрудники от Гл.Модератора!`);
-        return;
-    }
-    
-    // Рекламу в чате могут редактировать от Ст.Модератора
-    if (type === 'chat' && staffRank.rank_level < 3) {
-        sendMessage(bot, sender, `&4&l|&c Редактировать рекламу в чате могут сотрудники от Ст.Модератора!`);
-        return;
-    }
-    
-    if (type === 'clan') {
-        if (action === 'on') {
-            await db.setSetting('clan_ad_enabled', 'true', sender);
-            bot.chat(`/cc &a✅ Реклама клана ВКЛЮЧЕНА`);
-            if (addLog) addLog(`✅ ${sender} включил рекламу клана`, 'info');
-        } else if (action === 'off') {
-            await db.setSetting('clan_ad_enabled', 'false', sender);
-            bot.chat(`/cc &c❌ Реклама клана ВЫКЛЮЧЕНА`);
-            if (addLog) addLog(`❌ ${sender} выключил рекламу клана`, 'warn');
-        }
-    } else if (type === 'chat') {
-        if (action === 'on') {
-            await db.setSetting('chat_ad_enabled', 'true', sender);
-            bot.chat(`/cc &a✅ Реклама в чате ВКЛЮЧЕНА`);
-            if (addLog) addLog(`✅ ${sender} включил рекламу в чате`, 'info');
-        } else if (action === 'off') {
-            await db.setSetting('chat_ad_enabled', 'false', sender);
-            bot.chat(`/cc &c❌ Реклама в чате ВЫКЛЮЧЕНА`);
-            if (addLog) addLog(`❌ ${sender} выключил рекламу в чате`, 'warn');
-        }
-    }
-}
+    const sub = args[0].toLowerCase();
+    const subArgs = args.slice(1);
 
-// ============================================
-// /logs [ник] [тип] [страница] - Логи игрока (→ Discord)
-// ============================================
+    // ==================== BALANCE ====================
+    if (sub === 'balance') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp balance <set|give|reset|del|info> <ник> [сумма]');
+        const action = subArgs[0].toLowerCase();
+        const target = subArgs[1];
 
-async function logs(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    // Доступно с Мл.Модератора
-    if (staffRank.rank_level < 1) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для просмотра логов!`);
-        return;
-    }
-    
-    if (args.length < 1) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/logs [ник] [тип] [страница]`);
-        sendMessage(bot, sender, `&7&l|&f Типы: &ecommands, punishments, money, chat`);
-        return;
-    }
-    
-    const target = cleanNick(args[0]);
-    const type = args[1] || 'punishments';
-    const page = parseInt(args[2]) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
-    
-    // Отправляем в Discord
-    const discord = global.botComponents.discord;
-    if (discord && discord.client) {
-        const channel = discord.client.channels.cache.get('1474633679442804798');
-        if (channel) {
-            let logMessage = `📋 **Логи игрока ${target}**\nТип: ${type}\nСтраница: ${page}\n\n`;
-            
-            if (type === 'punishments') {
-                const punishments = await db.all(`SELECT * FROM punishments WHERE LOWER(player) = LOWER(?) ORDER BY issued_at DESC LIMIT ? OFFSET ?`, [target, limit, offset]);
-                for (const p of punishments) {
-                    logMessage += `• ${p.type}: ${p.reason} (${p.issued_by})\n`;
-                }
-            } else if (type === 'money') {
-                const logs = await db.all(`SELECT * FROM money_logs WHERE LOWER(player) = LOWER(?) ORDER BY created_at DESC LIMIT ? OFFSET ?`, [target, limit, offset]);
-                for (const l of logs) {
-                    logMessage += `• ${l.type}: ${l.amount}₽ (${l.description})\n`;
-                }
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+        if (action === 'info') {
+            const balanceLogs = db.all('SELECT * FROM balance_logs WHERE username_lower = ? ORDER BY created_at DESC LIMIT 5', [target.toLowerCase()]);
+            msg(bot, username, '&#80C4C5💰 ' + target + ' &#D4D4D4| Баланс: &#76C519' + utils.formatMoney(tm.balance) + ' &#D4D4D4| Банк: &#76C519' + utils.formatMoney(tm.bank_balance));
+            if (balanceLogs.length > 0) {
+                const lastLog = balanceLogs[0];
+                msg(bot, username, '&#D4D4D4Последняя операция: ' + (lastLog.amount >= 0 ? '&a+' : '&c') + utils.formatMoney(lastLog.amount) + ' &#D4D4D4(' + lastLog.type + ')');
             }
-            
-            channel.send(logMessage);
-            sendMessage(bot, sender, `&a&l|&f Логи отправлены в Discord канал модерации!`);
-        }
-    } else {
-        sendMessage(bot, sender, `&4&l|&c Discord бот не подключён!`);
-    }
-    
-    if (addLog) addLog(`📋 ${sender} запросил логи ${target} (${type})`, 'info');
-}
-
-// ============================================
-// /stopall - Остановка всех RP процессов
-// ============================================
-
-async function stopall(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    if (staffRank.rank_level < 6) {
-        sendMessage(bot, sender, `&4&l|&c Только Администратор может использовать эту команду!`);
-        return;
-    }
-    
-    isStopped = !isStopped;
-    
-    if (isStopped) {
-        await db.setSetting('system_stopped', 'true', sender);
-        bot.chat(`/cc &c🛑 ${sender} ОСТАНОВИЛ все RP процессы!`);
-        bot.chat(`/cc &cБот не выполняет команды и не выдаёт наказаний до разморозки.`);
-        if (addLog) addLog(`🛑 ${sender} остановил все процессы`, 'error');
-    } else {
-        await db.setSetting('system_stopped', 'false', sender);
-        bot.chat(`/cc &a✅ ${sender} ВОЗОБНОВИЛ работу системы!`);
-        if (addLog) addLog(`✅ ${sender} возобновил работу системы`, 'success');
-    }
-}
-
-function isSystemStopped() {
-    return isStopped;
-}
-
-// ============================================
-// /reloadbd - Очистка БД (вайп)
-// ============================================
-
-async function reloadbd(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    if (staffRank.rank_level < 6) {
-        sendMessage(bot, sender, `&4&l|&c Только Администратор может использовать эту команду!`);
-        return;
-    }
-    
-    bot.chat(`/cc &c⚠️⚠️⚠️ ${sender} ЗАПУСКАЕТ ОЧИСТКУ БАЗЫ ДАННЫХ ⚠️⚠️⚠️`);
-    
-    await db.setSetting('last_wipe_date', new Date().toISOString(), sender);
-    
-    await db.run(`DELETE FROM clan_members WHERE rank_priority < 100`);
-    await db.run(`DELETE FROM rp_players WHERE structure = 'Гражданин'`);
-    await db.run(`DELETE FROM property WHERE is_available = 0`);
-    await db.run(`DELETE FROM punishments WHERE issued_at < datetime('now', '-30 days')`);
-    await db.run(`DELETE FROM clan_chat_logs WHERE sent_at < datetime('now', '-7 days')`);
-    await db.run(`DELETE FROM money_logs WHERE created_at < datetime('now', '-30 days')`);
-    await db.run(`UPDATE property SET is_available = 1, owner_nick = NULL, co_owner1 = NULL, co_owner2 = NULL`);
-    await db.run(`UPDATE staff_stats SET kicks_today = 0, mutes_today = 0, bl_today = 0, last_reset_date = date('now')`);
-    
-    bot.chat(`/cc &a✅ Очистка базы данных завершена!`);
-    bot.chat(`/cc &a📅 Дата вайпа: ${new Date().toLocaleString()}`);
-    if (addLog) addLog(`🗑️ ${sender} выполнил очистку БД (вайп)`, 'error');
-}
-
-// ============================================
-// /wipe - Полный вайп (требует подтверждения)
-// ============================================
-
-async function wipe(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    if (staffRank.rank_level < 6) {
-        sendMessage(bot, sender, `&4&l|&c Только Администратор может использовать эту команду!`);
-        return;
-    }
-    
-    if (args[0] !== 'CONFIRM') {
-        sendMessage(bot, sender, `&4&l|&c ⚠️ ОПАСНАЯ КОМАНДА! Это удалит ВСЕ данные!`);
-        sendMessage(bot, sender, `&7&l|&c Для подтверждения введите: &e/wipe CONFIRM`);
-        return;
-    }
-    
-    bot.chat(`/cc &c💀💀💀 ${sender} ЗАПУСКАЕТ ПОЛНЫЙ ВАЙП СЕРВЕРА 💀💀💀`);
-    
-    const tables = [
-        'clan_members', 'rp_players', 'property', 'property_residents',
-        'businesses', 'offices', 'licenses', 'org_members',
-        'money_logs', 'punishments', 'clan_blacklist', 'player_warnings',
-        'clan_chat_logs', 'private_messages_logs', 'verification_codes',
-        'linked_accounts', 'pvp_stats'
-    ];
-    
-    for (const table of tables) {
-        await db.run(`DELETE FROM ${table}`);
-        if (table !== 'clan_members' && table !== 'staff_stats') {
-            await db.run(`DELETE FROM sqlite_sequence WHERE name = ?`, [table]);
-        }
-    }
-    
-    await db.addClanMember('Ronch_', 'system');
-    await db.run(`INSERT OR REPLACE INTO staff_stats (minecraft_nick, rank_level, rank_name, hired_by) VALUES (?, 6, 'Администратор', 'system')`, ['ronch_']);
-    await db.run(`UPDATE clan_members SET rank_name = 'Администратор', rank_priority = 100 WHERE LOWER(minecraft_nick) = LOWER('Ronch_')`);
-    bot.chat(`/c rank Ronch_ ${clanRankDisplay[6]}`);
-    
-    bot.chat(`/cc &a✅ ПОЛНЫЙ ВАЙП ЗАВЕРШЁН! Сервер очищен.`);
-    if (addLog) addLog(`💀 ${sender} выполнил полный вайп сервера!`, 'error');
-}
-
-// ============================================
-// /kick [ник] [время] [причина] - Кик из клана с ЧС
-// ============================================
-
-async function clanKick(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    // Доступно всем модераторам (уровень 1+)
-    if (staffRank.rank_level < 1) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для кика игроков!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/kick [ник] [время] [причина]`);
-        sendMessage(bot, sender, `&7&l|&f Пример: &e/kick Ronch_ 31d Флуд`);
-        return;
-    }
-    
-    const target = cleanNick(args[0]);
-    const timeStr = args[1];
-    const reason = args.slice(2).join(' ') || 'Не указана';
-    
-    // Проверяем лимиты
-    const limitCheck = await db.checkStaffLimit(sender, 'kick');
-    if (!limitCheck.allowed) {
-        sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит киков на сегодня (${limitCheck.current}/${limitCheck.max})`);
-        return;
-    }
-    
-    // Нельзя кикнуть вышестоящего
-    const targetRank = await db.getStaffRank(target);
-    if (targetRank.rank_level >= staffRank.rank_level) {
-        sendMessage(bot, sender, `&4&l|&c Нельзя кикнуть вышестоящего сотрудника!`);
-        return;
-    }
-    
-    let days = 31;
-    if (timeStr.endsWith('d')) {
-        days = parseInt(timeStr);
-    } else if (timeStr.endsWith('h')) {
-        days = parseInt(timeStr) / 24;
-    }
-    
-    const durationMinutes = days * 24 * 60;
-    
-    bot.chat(`/c kick ${target}`);
-    await utils.sleep(500);
-    
-    await db.addPunishment(target, 'blacklist', reason, sender, durationMinutes, 'clan');
-    await db.removeClanMember(target);
-    await db.incrementStaffCounter(sender, 'kick');
-    
-    sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aкикнут из клана на &e${days} &aдней`);
-    sendMessage(bot, target, `&4&l|&c Вы кикнуты из клана Resistance на &e${days} &cдней`);
-    sendMessage(bot, target, `&4&l|&c Причина: &e${reason}`);
-    bot.chat(`/cc &c👢 &e${target} &cкикнут из клана на ${days} дней (${reason})`);
-    
-    if (addLog) addLog(`👢 ${sender} кикнул ${target} из клана на ${days} дней`, 'warn');
-}
-
-// ============================================
-// /mute [ник] [время] [причина] - Мут в клановом чате
-// ============================================
-
-async function clanMute(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    if (staffRank.rank_level < 1) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для мута игроков!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/mute [ник] [время] [причина]`);
-        sendMessage(bot, sender, `&7&l|&f Пример: &e/mute Ronch_ 30m Флуд`);
-        return;
-    }
-    
-    const target = cleanNick(args[0]);
-    const timeStr = args[1];
-    const reason = args.slice(2).join(' ') || 'Не указана';
-    
-    const limitCheck = await db.checkStaffLimit(sender, 'mute');
-    if (!limitCheck.allowed) {
-        sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит мутов на сегодня (${limitCheck.current}/${limitCheck.max})`);
-        return;
-    }
-    
-    const targetRank = await db.getStaffRank(target);
-    if (targetRank.rank_level >= staffRank.rank_level) {
-        sendMessage(bot, sender, `&4&l|&c Нельзя замутить вышестоящего сотрудника!`);
-        return;
-    }
-    
-    let minutes = 30;
-    if (timeStr.endsWith('m')) {
-        minutes = parseInt(timeStr);
-    } else if (timeStr.endsWith('h')) {
-        minutes = parseInt(timeStr) * 60;
-    } else if (timeStr.endsWith('d')) {
-        minutes = parseInt(timeStr) * 24 * 60;
-    }
-    
-    await db.addPunishment(target, 'mute', reason, sender, minutes, 'clan');
-    await db.incrementStaffCounter(sender, 'mute');
-    
-    bot.chat(`/c mute ${target} ${reason}`);
-    
-    sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aзамучен на &e${minutes} &aминут`);
-    sendMessage(bot, target, `&4&l|&c Вы получили мут на &e${minutes} &cминут. Причина: &e${reason}`);
-    bot.chat(`/cc &c🔇 &e${target} &cзамучен на ${minutes} минут (${reason})`);
-    
-    // Авто-размут через указанное время
-    setTimeout(async () => {
-        bot.chat(`/c unmute ${target}`);
-        sendMessage(bot, target, `&a&l|&f Ваш мут снят!`);
-        bot.chat(`/cc &a🔊 &e${target} &aразмучен автоматически`);
-    }, minutes * 60 * 1000);
-    
-    if (addLog) addLog(`🔇 ${sender} замутил ${target} на ${minutes} мин`, 'warn');
-}
-
-// ============================================
-// /blacklist [add/del] [ник] [время] [причина] - Чёрный список клана
-// ============================================
-
-async function blacklist(bot, sender, args, db, addLog) {
-    const staffRank = await db.getStaffRank(sender);
-    
-    if (staffRank.rank_level < 1) {
-        sendMessage(bot, sender, `&4&l|&c У вас нет прав для управления ЧС!`);
-        return;
-    }
-    
-    if (args.length < 2) {
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/blacklist add [ник] [время] [причина]`);
-        sendMessage(bot, sender, `&7&l|&f Использование: &e/blacklist del [ник]`);
-        return;
-    }
-    
-    const action = args[0].toLowerCase();
-    const target = cleanNick(args[1]);
-    
-    if (action === 'add') {
-        if (args.length < 3) {
-            sendMessage(bot, sender, `&7&l|&f Использование: &e/blacklist add [ник] [время] [причина]`);
             return;
         }
-        
-        const limitCheck = await db.checkStaffLimit(sender, 'blacklist');
-        if (!limitCheck.allowed) {
-            sendMessage(bot, sender, `&4&l|&c Вы исчерпали лимит ЧС на сегодня (${limitCheck.current}/${limitCheck.max})`);
+
+        if (action === 'set') {
+            const amount = parseFloat(subArgs[2]) || 0;
+            const diff = amount - tm.balance;
+            db.rpMembers.updateBalance(target, diff, 'admin_set', 'Установлен админом ' + username, username);
+            logger.warn(username + ' установил баланс ' + target + ' = ' + utils.formatMoney(amount));
+            msg(bot, username, '&#76C519✅ Баланс ' + target + ': &#FFB800' + utils.formatMoney(amount));
+            try { bot.chat('/msg ' + target + ' &#FFB800Ваш баланс изменён админом: ' + utils.formatMoney(amount)); } catch(e) {}
             return;
         }
-        
-        const timeStr = args[2];
-        const reason = args.slice(3).join(' ') || 'Не указана';
-        
-        const targetRank = await db.getStaffRank(target);
-        if (targetRank.rank_level >= staffRank.rank_level) {
-            sendMessage(bot, sender, `&4&l|&c Нельзя добавить в ЧС вышестоящего сотрудника!`);
+
+        if (action === 'give') {
+            const amount = parseFloat(subArgs[2]) || 0;
+            if (amount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма > 0');
+            db.rpMembers.updateBalance(target, amount, 'admin_give', 'Выдан админом ' + username, username);
+            logger.warn(username + ' выдал ' + utils.formatMoney(amount) + ' → ' + target);
+            msg(bot, username, '&#76C519✅ Выдано &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4→ ' + target);
+            try { bot.chat('/msg ' + target + ' &#76C519🎁 Админ выдал вам &#FFB800' + utils.formatMoney(amount)); } catch(e) {}
             return;
         }
-        
-        let days = 31;
-        if (timeStr.endsWith('d')) {
-            days = parseInt(timeStr);
-        } else if (timeStr.endsWith('h')) {
-            days = parseInt(timeStr) / 24;
+
+        if (action === 'reset') {
+            db.rpMembers.updateBalance(target, -tm.balance, 'admin_reset', 'Сброшен админом ' + username, username);
+            logger.warn(username + ' сбросил баланс ' + target);
+            msg(bot, username, '&#76C519✅ Баланс ' + target + ' сброшен');
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВаш баланс сброшен администратором'); } catch(e) {}
+            return;
         }
-        
-        const durationMinutes = days * 24 * 60;
-        
-        await db.addPunishment(target, 'blacklist', reason, sender, durationMinutes, 'clan');
-        await db.incrementStaffCounter(sender, 'blacklist');
-        
-        sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aдобавлен в ЧС на &e${days} &aдней`);
-        sendMessage(bot, target, `&4&l|&c Вы добавлены в ЧС клана на &e${days} &cдней`);
-        bot.chat(`/cc &c⛔ &e${target} &cдобавлен в ЧС на ${days} дней (${reason})`);
-        
-        if (addLog) addLog(`⛔ ${sender} добавил ${target} в ЧС на ${days} дней`, 'warn');
-        
-    } else if (action === 'del') {
-        await db.removePunishment(target, 'blacklist', sender, 'Снято администрацией');
-        
-        sendMessage(bot, sender, `&a&l|&f Игрок &e${target} &aудалён из ЧС`);
-        sendMessage(bot, target, `&a&l|&f Вы удалены из ЧС клана &e${sender}`);
-        bot.chat(`/cc &a✅ &e${target} &aудалён из ЧС`);
-        
-        if (addLog) addLog(`✅ ${sender} удалил ${target} из ЧС`, 'info');
+
+        if (action === 'del') {
+            const amount = parseFloat(subArgs[2]) || 0;
+            if (amount <= 0) return msg(bot, username, '&#CA4E4E❌ Сумма > 0');
+            if (tm.balance < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно средств! Баланс: ' + utils.formatMoney(tm.balance));
+            db.rpMembers.updateBalance(target, -amount, 'admin_remove', 'Снято админом ' + username, username);
+            logger.warn(username + ' снял ' + utils.formatMoney(amount) + ' у ' + target);
+            msg(bot, username, '&#76C519✅ Снято &#FFB800' + utils.formatMoney(amount) + ' &#D4D4D4у ' + target);
+            try { bot.chat('/msg ' + target + ' &#CA4E4EАдмин снял ' + utils.formatMoney(amount) + ' с вашего счёта'); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /arp balance <set|give|reset|del|info>');
+        return;
     }
+
+    // ==================== RANK ====================
+    if (sub === 'rank') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp rank <set|del|info> <ник> [структура] [ранг]');
+        const action = subArgs[0].toLowerCase();
+        const target = subArgs[1];
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+        if (action === 'info') {
+            if (!tm.organization) return msg(bot, username, '&#D4D4D4' + target + ' не состоит в организации');
+            const orgConfig = Object.values(config.organizations).find(o => o.name === tm.organization);
+            msg(bot, username,
+                '&#80C4C5👤 ' + target + ' &#D4D4D4| &#FFB800' + tm.organization +
+                ' &#D4D4D4| Ранг: &#76C519' + (tm.rank || 'Нет')
+            );
+            if (orgConfig && tm.rank && orgConfig.ranks[tm.rank]) {
+                const ri = orgConfig.ranks[tm.rank];
+                msg(bot, username, '&#D4D4D4Зарплата: &#76C519' + utils.formatMoney(ri.salary) + '/час &#D4D4D4| Уровень: &#76C519' + ri.level);
+            }
+            return;
+        }
+
+        if (action === 'set') {
+            if (subArgs.length < 4) return msg(bot, username, '&#CA4E4E❌ /arp rank set <ник> <ключ_структуры> <ранг>');
+            const orgKey = subArgs[2].toLowerCase();
+            const rank = subArgs.slice(3).join(' ');
+            const orgConfig = config.organizations[orgKey];
+
+            if (!orgConfig) {
+                const validOrgs = Object.keys(config.organizations).map(k => k + ' (' + config.organizations[k].name + ')').join(', ');
+                return msg(bot, username, '&#CA4E4E❌ Структура. Доступные: ' + validOrgs);
+            }
+            if (!orgConfig.ranks[rank]) {
+                return msg(bot, username, '&#CA4E4E❌ Неверный ранг. Доступные: ' + Object.keys(orgConfig.ranks).join(', '));
+            }
+
+            db.rpMembers.setOrganization(target, orgConfig.name, rank);
+            logger.warn(username + ' назначил ' + target + ' в ' + orgConfig.name + ' (' + rank + ')');
+            msg(bot, username, '&#76C519✅ ' + target + ' → &#FFB800' + orgConfig.name + ' &#D4D4D4(' + rank + ')');
+            try { bot.chat('/msg ' + target + ' &#76C519Вы назначены в &#FFB800' + orgConfig.name + ' &#D4D4D4(' + rank + ')'); } catch(e) {}
+            return;
+        }
+
+        if (action === 'del') {
+            const oldOrg = tm.organization;
+            const oldRank = tm.rank;
+            db.rpMembers.setOrganization(target, null, null);
+            logger.warn(username + ' снял ' + target + ' с ' + oldOrg + ' (' + oldRank + ')');
+            msg(bot, username, '&#76C519✅ ' + target + ' снят с должности (был: ' + oldOrg + ')');
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВы сняты с должности в ' + oldOrg); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /arp rank <set|del|info>');
+        return;
+    }
+
+    // ==================== POINTS ====================
+    if (sub === 'points') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp points <add|del|set|info> <ник> [количество]');
+        const action = subArgs[0].toLowerCase();
+        const target = subArgs[1];
+        const tm = db.rpMembers.get(target);
+        if (!tm || tm.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+        if (action === 'info') {
+            return msg(bot, username, '&#80C4C5⭐ Баллы ' + target + ': &#FFB800' + (tm.points || 0));
+        }
+        if (action === 'add') {
+            const amount = parseInt(subArgs[2]) || 0;
+            if (amount <= 0) return msg(bot, username, '&#CA4E4E❌ Количество > 0');
+            db.rpMembers.addPoints(target, amount);
+            logger.info(username + ' добавил ' + amount + ' баллов → ' + target);
+            msg(bot, username, '&#76C519✅ +' + amount + ' баллов → ' + target + ' (текущие: ' + ((tm.points || 0) + amount) + ')');
+            try { bot.chat('/msg ' + target + ' &#76C519⭐ +' + amount + ' баллов активности'); } catch(e) {}
+            return;
+        }
+        if (action === 'del') {
+            const amount = parseInt(subArgs[2]) || 0;
+            if (amount <= 0) return msg(bot, username, '&#CA4E4E❌ Количество > 0');
+            db.rpMembers.addPoints(target, -amount);
+            logger.info(username + ' снял ' + amount + ' баллов у ' + target);
+            msg(bot, username, '&#76C519✅ -' + amount + ' баллов у ' + target);
+            return;
+        }
+        if (action === 'set') {
+            const amount = parseInt(subArgs[2]) || 0;
+            if (amount < 0) return msg(bot, username, '&#CA4E4E❌ ≥ 0');
+            const diff = amount - (tm.points || 0);
+            db.rpMembers.addPoints(target, diff);
+            logger.info(username + ' установил ' + amount + ' баллов для ' + target);
+            msg(bot, username, '&#76C519✅ Баллы ' + target + ': &#FFB800' + amount);
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp points <add|del|set|info>');
+        return;
+    }
+
+    // ==================== BLACKLIST (ОРГАНИЗАЦИЙ) ====================
+    if (sub === 'blacklist' || sub === 'bl') {
+        if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp blacklist <add|del|check> <ник> <ключ_организации>');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'check') {
+            const target = subArgs[1];
+            const orgKey = subArgs[2].toLowerCase();
+            const orgConfig = config.organizations[orgKey];
+            if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+            const isBL = db.orgBlacklists.isBlacklisted(target, orgConfig.name);
+            msg(bot, username, '&#D4D4D4' + target + ' в ЧС ' + orgConfig.name + ': ' + (isBL ? '&#CA4E4EДа' : '&#76C519Нет'));
+            return;
+        }
+
+        if (action === 'add') {
+            const target = subArgs[1];
+            const orgKey = subArgs[2].toLowerCase();
+            const reason = subArgs.slice(3).join(' ') || 'Не указана';
+            const orgConfig = config.organizations[orgKey];
+            if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+
+            db.orgBlacklists.add(target, orgConfig.name, reason, username);
+            logger.warn(username + ' добавил ' + target + ' в ЧС ' + orgConfig.name);
+            msg(bot, username, '&#76C519✅ ' + target + ' в ЧС ' + orgConfig.name);
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВы в ЧС ' + orgConfig.name); } catch(e) {}
+            return;
+        }
+
+        if (action === 'del') {
+            const target = subArgs[1];
+            const orgKey = subArgs[2].toLowerCase();
+            const orgConfig = config.organizations[orgKey];
+            if (!orgConfig) return msg(bot, username, '&#CA4E4E❌ Неверная организация');
+
+            db.orgBlacklists.remove(target, orgConfig.name);
+            logger.info(username + ' удалил ' + target + ' из ЧС ' + orgConfig.name);
+            msg(bot, username, '&#76C519✅ ' + target + ' удалён из ЧС ' + orgConfig.name);
+            try { bot.chat('/msg ' + target + ' &#76C519Вы удалены из ЧС ' + orgConfig.name); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /arp blacklist <add|del|check>');
+        return;
+    }
+
+    // ==================== PAYDAY ====================
+    if (sub === 'payday') {
+        if (!permissions.isAdmin(username, db)) return msg(bot, username, '&#CA4E4E❌ Только администратор');
+
+        try {
+            const paydayModule = require('../payday');
+            paydayModule.processPayday(bot, true);
+            logger.warn(username + ' запустил внеплановый PayDay');
+            msg(bot, username, '&#76C519✅ Внеплановый PayDay запущен');
+            cc(bot, '&#FFB800💰 ' + username + ' запустил внеплановый PayDay!');
+        } catch(e) {
+            msg(bot, username, '&#CA4E4E❌ Ошибка PayDay: ' + e.message);
+        }
+        return;
+    }
+
+    // ==================== WARN ====================
+    if (sub === 'warn') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp warn <add|del|list> <ник> [причина]');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'list') {
+            const target = subArgs[1];
+            const m = db.rpMembers.get(target);
+            if (!m) return msg(bot, username, '&#CA4E4E❌ Игрок не найден');
+            msg(bot, username, '&#D4D4D4Предупреждения ' + target + ': ' + (m.warns > 0 ? '&#CA4E4E' + m.warns + '/3' : '&#76C5190'));
+            return;
+        }
+
+        if (action === 'add') {
+            const target = subArgs[1];
+            const reason = subArgs.slice(2).join(' ') || 'Не указана';
+            db.rpMembers.addWarn(target);
+            const updated = db.rpMembers.get(target);
+            const wc = updated?.warns || 0;
+
+            logger.warn(username + ' выдал предупреждение ' + target + ' (' + wc + '/3)');
+            try { bot.chat('/msg ' + target + ' &#FFB800⚠ Предупреждение ' + wc + '/3: ' + reason); } catch(e) {}
+
+            if (wc >= 3) {
+                db.rpMembers.setFrozen(target, true, '3 предупреждения от ' + username);
+                msg(bot, username, '&#CA4E4E🚫 ' + target + ': ' + wc + '/3! RP ЗАБЛОКИРОВАН!');
+                cc(bot, '&#CA4E4E🚫 ' + target + ' заблокирован в RP (3 предупреждения)');
+            } else {
+                msg(bot, username, '&#FFB800⚠ ' + target + ': предупреждение ' + wc + '/3');
+            }
+            return;
+        }
+
+        if (action === 'del') {
+            const target = subArgs[1];
+            db.run('UPDATE rp_members SET warns = MAX(0, warns - 1), last_warn_at = NULL WHERE username_lower = ?', [target.toLowerCase()]);
+            const updated = db.rpMembers.get(target);
+            logger.info(username + ' снял предупреждение с ' + target);
+            msg(bot, username, '&#76C519✅ Предупреждение снято с ' + target + ' (осталось: ' + (updated?.warns || 0) + ')');
+            try { bot.chat('/msg ' + target + ' &#76C519✅ С вас снято предупреждение'); } catch(e) {}
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /arp warn <add|del|list>');
+        return;
+    }
+
+    // ==================== STATS ====================
+    if (sub === 'stats') {
+        if (subArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp stats <ник>');
+        const target = subArgs[0];
+        const m = db.rpMembers.get(target);
+        if (!m || m.is_active !== 1) return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+        const clan = db.members.get(target);
+        const bank = db.bank.getAccount(target);
+        const props = db.properties.getOwned(target);
+
+        msg(bot, username,
+            '&#80C4C5📊 ' + target +
+            ' &#D4D4D4| ID: &#76C519' + m.id +
+            ' &#D4D4D4| Баланс: &#76C519' + utils.formatMoney(m.balance) +
+            ' &#D4D4D4| Банк: &#76C519' + utils.formatMoney(m.bank_balance)
+        );
+
+        msg(bot, username,
+            '&#D4D4D4' + (m.organization || 'Безработный') +
+            ' &#D4D4D4| ' + (m.rank || '—') +
+            ' &#D4D4D4| Баллы: &#FFB800' + (m.points || 0) +
+            ' &#D4D4D4| PayDay: &#FFB800' + (m.payday_count || 0) +
+            ' &#D4D4D4| Часов: &#76C519' + (m.total_hours || 0).toFixed(1)
+        );
+
+        if (clan) {
+            msg(bot, username,
+                '&#D4D4D4Убийств: &#CA4E4E' + (clan.kills || 0) +
+                ' &#D4D4D4| Смертей: &#FFB800' + (clan.deaths || 0) +
+                ' &#D4D4D4| K/D: &#80C4C5' + (clan.deaths > 0 ? (clan.kills / clan.deaths).toFixed(2) : clan.kills) +
+                ' &#D4D4D4| Имущества: &#76C519' + props.length
+            );
+        }
+        return;
+    }
+
+    // ==================== RP ====================
+    if (sub === 'rp') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp rp <del|freeze|unfreeze|blacklist|unblacklist> <ник> [причина]');
+        const action = subArgs[0].toLowerCase();
+        const target = subArgs[1];
+        const reason = subArgs.slice(2).join(' ') || 'Не указана';
+
+        const member = db.rpMembers.get(target);
+        if (!member || member.is_active !== 1 && action !== 'unfreeze') return msg(bot, username, '&#CA4E4E❌ Игрок не в RP');
+
+        if (action === 'del') {
+            db.rpMembers.removeRp(target);
+            logger.warn(username + ' забрал RP у ' + target + ': ' + reason);
+            msg(bot, username, '&#76C519✅ RP-доступ забран у ' + target);
+            cc(bot, '&#CA4E4E' + target + ' исключён из RP');
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВаш RP-доступ аннулирован: ' + reason); } catch(e) {}
+            return;
+        }
+        if (action === 'freeze') {
+            db.rpMembers.setFrozen(target, true, reason);
+            logger.warn(username + ' заморозил ' + target + ': ' + reason);
+            msg(bot, username, '&#76C519✅ ' + target + ' заморожен');
+            try { bot.chat('/msg ' + target + ' &#CA4E4EВаш профиль заморожен: ' + reason); } catch(e) {}
+            return;
+        }
+        if (action === 'unfreeze') {
+            db.rpMembers.setFrozen(target, false);
+            logger.info(username + ' разморозил ' + target);
+            msg(bot, username, '&#76C519✅ ' + target + ' разморожен');
+            try { bot.chat('/msg ' + target + ' &#76C519Ваш профиль разморожен'); } catch(e) {}
+            return;
+        }
+        if (action === 'blacklist') {
+            db.run('UPDATE rp_members SET blacklisted_from_rp = 1 WHERE username_lower = ?', [target.toLowerCase()]);
+            logger.warn(username + ' заблокировал ' + target + ' в RP: ' + reason);
+            msg(bot, username, '&#76C519✅ ' + target + ' заблокирован в RP');
+            return;
+        }
+        if (action === 'unblacklist') {
+            db.run('UPDATE rp_members SET blacklisted_from_rp = 0 WHERE username_lower = ?', [target.toLowerCase()]);
+            logger.info(username + ' разблокировал ' + target + ' в RP');
+            msg(bot, username, '&#76C519✅ ' + target + ' разблокирован в RP');
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp rp <del|freeze|unfreeze|blacklist|unblacklist>');
+        return;
+    }
+
+    // ==================== IDIM ====================
+    if (sub === 'idim') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp idim <add|del|info|list> <ник> [номер]');
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'list') {
+            const target = subArgs[1];
+            const props = db.properties.getOwned(target);
+            if (props.length === 0) return msg(bot, username, '&#D4D4D4У ' + target + ' нет имущества');
+            const list = props.map(p => '&b#' + p.property_id + ' ' + p.property_type).join(' | ');
+            msg(bot, username, '&#80C4C5🏠 Имущество ' + target + ' (' + props.length + '): ' + list);
+            return;
+        }
+
+        if (action === 'add') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp idim add <ник> <номер>');
+            const target = subArgs[1];
+            const propertyId = subArgs[2];
+            if (!utils.isValidPropertyId(propertyId)) return msg(bot, username, '&#CA4E4E❌ Неверный ID');
+            const propertyConfig = config.getPropertyInfo(propertyId);
+            const existing = db.properties.get(propertyId);
+            if (existing?.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' уже занято (' + existing.owner + ')');
+
+            db.properties.grant(propertyId, target, username);
+            const regionName = config.clan.regionPrefix + propertyId;
+            bot.chat('/rg addmember ' + regionName + ' ' + target);
+            logger.warn(username + ' выдал #' + propertyId + ' → ' + target);
+            msg(bot, username, '&#76C519✅ Имущество #' + propertyId + ' (' + propertyConfig.type + ') выдано ' + target);
+            try { bot.chat('/msg ' + target + ' &#76C519Вам выдано имущество #' + propertyId); } catch(e) {}
+            return;
+        }
+
+        if (action === 'del') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp idim del <ник> <номер>');
+            const target = subArgs[1];
+            const propertyId = subArgs[2];
+            const existing = db.properties.get(propertyId);
+            if (!existing?.is_owned) return msg(bot, username, '&#CA4E4E❌ #' + propertyId + ' не занято');
+
+            db.properties.remove(propertyId);
+            const regionName = config.clan.regionPrefix + propertyId;
+            bot.chat('/rg removemember ' + regionName + ' ' + target);
+            logger.warn(username + ' забрал #' + propertyId + ' у ' + target);
+            msg(bot, username, '&#76C519✅ Имущество #' + propertyId + ' забрано у ' + target);
+            try { bot.chat('/msg ' + target + ' &#CA4E4EУ вас забрано имущество #' + propertyId); } catch(e) {}
+            return;
+        }
+
+        if (action === 'info') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp idim info <номер>');
+            const propertyId = subArgs[1];
+            const prop = db.properties.get(propertyId);
+            const propConfig = config.getPropertyInfo(propertyId);
+            if (!propConfig) return msg(bot, username, '&#CA4E4E❌ Не найдено');
+
+            const typeNames = { apartment: 'Кв', house: 'Дом', office: 'Офис', business: 'Бизнес', port: 'Порт' };
+            if (prop?.is_owned) {
+                msg(bot, username, '&#80C4C5🏠 #' + propertyId + ' ' + (typeNames[propConfig.type] || propConfig.type) + ' &#D4D4D4| Владелец: &#76C519' + prop.owner + ' &#D4D4D4| Цена: &#76C519' + utils.formatMoney(propConfig.price));
+                if (prop.co_owner_1) msg(bot, username, '&#D4D4D4Сожители: &#76C519' + prop.co_owner_1 + (prop.co_owner_2 ? ', ' + prop.co_owner_2 : ''));
+            } else {
+                msg(bot, username, '&#80C4C5🏠 #' + propertyId + ' ' + (typeNames[propConfig.type] || propConfig.type) + ' &#76C519Свободно &#D4D4D4| Цена: &#76C519' + utils.formatMoney(propConfig.price));
+            }
+            return;
+        }
+
+        msg(bot, username, '&#CA4E4E❌ /arp idim <add|del|info|list>');
+        return;
+    }
+
+    // ==================== ORG ====================
+    if (sub === 'org') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp org <freeze|unfreeze|budget|materials|bonus|taxrate|info> <ключ>');
+        const action = subArgs[0].toLowerCase();
+        const orgKey = subArgs[1]?.toLowerCase();
+
+        if (!orgKey || !config.organizations[orgKey]) {
+            return msg(bot, username, '&#CA4E4E❌ Неверная организация. ' + Object.keys(config.organizations).join(', '));
+        }
+
+        const orgConfig = config.organizations[orgKey];
+
+        if (action === 'freeze') {
+            const reason = subArgs.slice(2).join(' ') || 'Не указана';
+            db.orgBudgets.setFrozen(orgKey, true, reason);
+            logger.warn(username + ' заморозил ' + orgConfig.name);
+            msg(bot, username, '&#76C519✅ ' + orgConfig.name + ' заморожена');
+            cc(bot, '&#CA4E4E⚠ ' + orgConfig.name + ' заморожена!');
+            return;
+        }
+        if (action === 'unfreeze') {
+            db.orgBudgets.setFrozen(orgKey, false);
+            logger.info(username + ' разморозил ' + orgConfig.name);
+            msg(bot, username, '&#76C519✅ ' + orgConfig.name + ' разморожена');
+            cc(bot, '&#76C519✅ ' + orgConfig.name + ' разморожена');
+            return;
+        }
+        if (action === 'budget') {
+            if (subArgs.length < 3) {
+                const budget = db.orgBudgets.get(orgKey);
+                msg(bot, username, '&#80C4C5💰 ' + orgConfig.name + ' &#D4D4D4| Бюджет: &#76C519' + utils.formatMoney(budget?.budget || orgConfig.budget) + ' &#D4D4D4| Материалы: &#FFB800' + (budget?.materials || 0));
+                return;
+            }
+            const budgetAction = subArgs[2].toLowerCase();
+            const amount = parseFloat(subArgs[3]) || 0;
+
+            if (budgetAction === 'set') {
+                const current = db.orgBudgets.get(orgKey);
+                const diff = amount - (current?.budget || 0);
+                db.orgBudgets.updateBudget(orgKey, diff);
+                logger.warn(username + ' установил бюджет ' + orgConfig.name + ' = ' + utils.formatMoney(amount));
+                msg(bot, username, '&#76C519✅ Бюджет ' + orgConfig.name + ': &#FFB800' + utils.formatMoney(amount));
+                return;
+            }
+            if (budgetAction === 'add') {
+                db.orgBudgets.updateBudget(orgKey, amount);
+                msg(bot, username, '&#76C519✅ +' + utils.formatMoney(amount) + ' → ' + orgConfig.name);
+                return;
+            }
+            msg(bot, username, '&#CA4E4E❌ /arp org budget <ключ> <set|add> <сумма>');
+            return;
+        }
+        if (action === 'materials') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp org materials <ключ> <set|add|del> <количество>');
+            const matAction = subArgs[2].toLowerCase();
+            const amount = parseInt(subArgs[3]) || 0;
+
+            if (matAction === 'set') {
+                const current = db.orgBudgets.get(orgKey);
+                db.orgBudgets.updateMaterials(orgKey, amount - (current?.materials || 0));
+                msg(bot, username, '&#76C519✅ Материалы ' + orgConfig.name + ': &#FFB800' + amount);
+                return;
+            }
+            if (matAction === 'add') {
+                db.orgBudgets.updateMaterials(orgKey, amount);
+                msg(bot, username, '&#76C519✅ +' + amount + ' материалов → ' + orgConfig.name);
+                return;
+            }
+            if (matAction === 'del') {
+                const current = db.orgBudgets.get(orgKey);
+                if ((current?.materials || 0) < amount) return msg(bot, username, '&#CA4E4E❌ Недостаточно. Текущие: ' + (current?.materials || 0));
+                db.orgBudgets.updateMaterials(orgKey, -amount);
+                msg(bot, username, '&#76C519✅ -' + amount + ' материалов из ' + orgConfig.name);
+                return;
+            }
+            return;
+        }
+        if (action === 'bonus') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp org bonus <ключ> <процент>');
+            const percent = parseFloat(subArgs[2]) / 100;
+            db.orgBudgets.setBonus(orgKey, percent);
+            logger.info(username + ' установил бонус ' + orgConfig.name + ' = ' + (percent * 100).toFixed(0) + '%');
+            msg(bot, username, '&#76C519✅ Бонус ' + orgConfig.name + ': &#FFB800' + (percent * 100).toFixed(0) + '%');
+            return;
+        }
+        if (action === 'taxrate') {
+            if (subArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp org taxrate <ключ> <ставка_%>');
+            const rate = parseFloat(subArgs[2]) / 100;
+            db.orgBudgets.setTaxRate(orgKey, rate);
+            logger.info(username + ' установил налог ' + orgConfig.name + ' = ' + (rate * 100).toFixed(1) + '%');
+            msg(bot, username, '&#76C519✅ Налог ' + orgConfig.name + ': &#FFB800' + (rate * 100).toFixed(1) + '%');
+            return;
+        }
+        if (action === 'info') {
+            const budget = db.orgBudgets.get(orgKey);
+            const members = db.all('SELECT COUNT(*) as c FROM rp_members WHERE organization = ? AND is_active = 1', [orgConfig.name])[0]?.c || 0;
+            msg(bot, username,
+                '&#80C4C5🏛️ ' + orgConfig.name +
+                ' &#D4D4D4| Бюджет: &#76C519' + utils.formatMoney(budget?.budget || orgConfig.budget) +
+                ' &#D4D4D4| Сотрудников: &#FFB800' + members +
+                ' &#D4D4D4| Статус: ' + (budget?.is_frozen ? '&#CA4E4EЗаморожена' : '&#76C519Активна')
+            );
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp org <freeze|unfreeze|budget|materials|bonus|taxrate|info>');
+        return;
+    }
+
+    // ==================== BAND ====================
+    if (sub === 'band') {
+        if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp band <create|delete|freeze|unfreeze|setleader|warn|kick|info|list|members|balance|materials>');
+        const action = subArgs[0].toLowerCase();
+        const bandArgs = subArgs.slice(1);
+
+        if (action === 'create') {
+            if (bandArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp band create <название> <цветное_название> [лидер]');
+            const result = db.gangs.create(bandArgs[0], bandArgs[1], bandArgs[2] || username);
+            if (result.success) {
+                logger.warn(username + ' создал банду "' + bandArgs[0] + '"');
+                msg(bot, username, '&#76C519✅ Банда "' + bandArgs[1] + '&r" создана! Лидер: ' + (bandArgs[2] || username));
+                cc(bot, '&#FFB800🔫 Новая банда: ' + bandArgs[1]);
+            } else {
+                msg(bot, username, '&#CA4E4E❌ ' + (result.reason === 'gang_exists' ? 'Уже существует' : 'Ошибка'));
+            }
+            return;
+        }
+        if (action === 'delete') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band delete <название>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.delete(gang.id);
+            logger.warn(username + ' удалил банду "' + bandArgs[0] + '"');
+            msg(bot, username, '&#76C519✅ Банда удалена');
+            return;
+        }
+        if (action === 'freeze') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band freeze <название> [причина]');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.freeze(gang.id, bandArgs.slice(1).join(' ') || 'Не указана');
+            msg(bot, username, '&#76C519✅ Банда заморожена');
+            return;
+        }
+        if (action === 'unfreeze') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band unfreeze <название>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.unfreeze(gang.id);
+            msg(bot, username, '&#76C519✅ Банда разморожена');
+            return;
+        }
+        if (action === 'setleader') {
+            if (bandArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp band setleader <название> <ник>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.setLeader(gang.id, bandArgs[1]);
+            msg(bot, username, '&#76C519✅ Новый лидер: ' + bandArgs[1]);
+            return;
+        }
+        if (action === 'warn') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band warn <название> [причина]');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.addWarn(gang.id);
+            const updated = db.gangs.get(bandArgs[0]);
+            if (updated.warns >= 3) {
+                db.gangs.freeze(gang.id, '3 выговора');
+                msg(bot, username, '&#CA4E4E🚫 Выговор ' + updated.warns + '/3! Банда ЗАМОРОЖЕНА!');
+                cc(bot, '&#CA4E4E🚫 Банда "' + bandArgs[0] + '" заморожена (3 выговора)');
+            } else {
+                msg(bot, username, '&#FFB800⚠ Выговор ' + updated.warns + '/3');
+            }
+            return;
+        }
+        if (action === 'kick') {
+            if (bandArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp band kick <название> <ник>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            db.gangs.removeMember(gang.id, bandArgs[1]);
+            msg(bot, username, '&#76C519✅ ' + bandArgs[1] + ' исключён');
+            return;
+        }
+        if (action === 'info') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band info <название>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            const members = db.gangs.getMembers(gang.id);
+            msg(bot, username,
+                (gang.color_name || gang.name) +
+                ' &#D4D4D4| Лидер: &#76C519' + gang.leader +
+                ' &#D4D4D4| Баланс: &#76C519' + utils.formatMoney(gang.balance) +
+                ' &#D4D4D4| Мат: &#FFB800' + gang.materials +
+                ' &#D4D4D4| Участников: &#FFB800' + members.length
+            );
+            return;
+        }
+        if (action === 'list') {
+            const gangs = db.gangs.getAll();
+            if (gangs.length === 0) return msg(bot, username, '&#D4D4D4Нет активных банд');
+            const list = gangs.map(g => (g.color_name || g.name) + ' &#D4D4D4(' + g.leader + ')').join(' | ');
+            msg(bot, username, '&#80C4C5🔫 Банды (' + gangs.length + '): ' + list);
+            return;
+        }
+        if (action === 'members') {
+            if (bandArgs.length < 1) return msg(bot, username, '&#CA4E4E❌ /arp band members <название>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            const members = db.gangs.getMembers(gang.id);
+            msg(bot, username, '&#80C4C5👥 ' + bandArgs[0] + ' (' + members.length + '): ' + members.map(m => m.username).join(', '));
+            return;
+        }
+        if (action === 'balance') {
+            if (bandArgs.length < 2) {
+                const gang = db.gangs.get(bandArgs[0]);
+                if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+                return msg(bot, username, '&#80C4C5💰 ' + bandArgs[0] + ': &#76C519' + utils.formatMoney(gang.balance));
+            }
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            const balAction = bandArgs[1].toLowerCase();
+            const amount = parseFloat(bandArgs[2]) || 0;
+
+            if (balAction === 'set') {
+                db.gangs.updateBalance(gang.id, amount - gang.balance);
+                msg(bot, username, '&#76C519✅ Баланс: &#FFB800' + utils.formatMoney(amount));
+            } else if (balAction === 'add') {
+                db.gangs.updateBalance(gang.id, amount);
+                msg(bot, username, '&#76C519✅ +' + utils.formatMoney(amount));
+            } else {
+                msg(bot, username, '&#CA4E4E❌ /arp band balance <название> <set|add> <сумма>');
+            }
+            return;
+        }
+        if (action === 'materials') {
+            if (bandArgs.length < 3) return msg(bot, username, '&#CA4E4E❌ /arp band materials <название> <set|add|del> <количество>');
+            const gang = db.gangs.get(bandArgs[0]);
+            if (!gang) return msg(bot, username, '&#CA4E4E❌ Не найдена');
+            const matAction = bandArgs[1].toLowerCase();
+            const amount = parseInt(bandArgs[2]) || 0;
+
+            if (matAction === 'set') {
+                db.gangs.updateMaterials(gang.id, amount - gang.materials);
+                msg(bot, username, '&#76C519✅ Материалы: &#FFB800' + amount);
+            } else if (matAction === 'add') {
+                db.gangs.updateMaterials(gang.id, amount);
+                msg(bot, username, '&#76C519✅ +' + amount + ' материалов');
+            } else if (matAction === 'del') {
+                db.gangs.updateMaterials(gang.id, -amount);
+                msg(bot, username, '&#76C519✅ -' + amount + ' материалов');
+            } else {
+                msg(bot, username, '&#CA4E4E❌ /arp band materials <название> <set|add|del>');
+            }
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp band <create|delete|freeze|unfreeze|setleader|warn|kick|info|list|members|balance|materials>');
+        return;
+    }
+
+    // ==================== VIRUS ====================
+    if (sub === 'virus') {
+        if (subArgs.length < 1) {
+            const enabled = db.settings.getBoolean('virus_enabled');
+            const chance = db.settings.getNumber('virus_chance') || config.virus.defaultChance;
+            msg(bot, username, '&#80C4C5🦠 Вирус: ' + (enabled ? '&#76C519Вкл' : '&#CA4E4EВыкл') + ' &#D4D4D4| Шанс: &#FFB800' + (chance * 100).toFixed(0) + '%');
+            return;
+        }
+
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'on') {
+            db.settings.set('virus_enabled', 'true');
+            db.settings.set('virus_chance', String(config.virus.highChance));
+            logger.warn(username + ' включил вирус (40%)');
+            msg(bot, username, '&#CA4E4E🦠 Вирус ВКЛЮЧЕН! Шанс: 40%');
+            cc(bot, '&#CA4E4E🦠 ВНИМАНИЕ! Вирус активирован! Шанс заражения: 40%');
+            return;
+        }
+        if (action === 'off') {
+            db.settings.set('virus_enabled', 'false');
+            logger.info(username + ' выключил вирус');
+            msg(bot, username, '&#76C519✅ Вирус выключен');
+            cc(bot, '&#76C519✅ Вирус деактивирован');
+            return;
+        }
+        if (action === 'normal') {
+            db.settings.set('virus_enabled', 'true');
+            db.settings.set('virus_chance', String(config.virus.defaultChance));
+            msg(bot, username, '&#76C519✅ Нормальный режим (5%)');
+            return;
+        }
+        if (action === 'chance') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp virus chance <0-100>');
+            const chancePercent = parseFloat(subArgs[1]);
+            if (isNaN(chancePercent) || chancePercent < 0 || chancePercent > 100) return msg(bot, username, '&#CA4E4E❌ 0-100');
+            const chance = chancePercent / 100;
+            db.settings.set('virus_chance', String(chance));
+            logger.info(username + ' установил шанс вируса: ' + chancePercent + '%');
+            msg(bot, username, '&#76C519✅ Шанс заражения: &#FFB800' + chancePercent + '%');
+            return;
+        }
+        if (action === 'infect') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp virus infect <ник> [часы]');
+            const target = subArgs[1];
+            const hours = parseInt(subArgs[2]) || 48;
+            db.rpMembers.setSick(target, 'admin_infection', hours);
+            logger.warn(username + ' заразил ' + target + ' на ' + hours + 'ч');
+            msg(bot, username, '&#76C519✅ ' + target + ' заражён на ' + hours + 'ч');
+            try { bot.chat('/msg ' + target + ' &#CA4E4E🦠 Вы заражены вирусом на ' + hours + 'ч'); } catch(e) {}
+            return;
+        }
+        if (action === 'cure') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp virus cure <ник>');
+            const target = subArgs[1];
+            db.rpMembers.healFromSick(target, 'admin_cure');
+            logger.info(username + ' вылечил ' + target);
+            msg(bot, username, '&#76C519✅ ' + target + ' вылечен');
+            try { bot.chat('/msg ' + target + ' &#76C519✅ Вы вылечены администратором'); } catch(e) {}
+            return;
+        }
+        if (action === 'cureall') {
+            const sickMembers = db.all("SELECT * FROM rp_members WHERE is_sick = 1 AND is_active = 1");
+            for (const m of sickMembers) db.rpMembers.healFromSick(m.username, 'admin_cure_all');
+            logger.warn(username + ' вылечил всех (' + sickMembers.length + ')');
+            msg(bot, username, '&#76C519✅ Вылечено: &#FFB800' + sickMembers.length + ' игроков');
+            cc(bot, '&#76C519✅ Все больные вылечены администратором');
+            return;
+        }
+        if (action === 'stats') {
+            const sickMembers = db.all("SELECT * FROM rp_members WHERE is_sick = 1 AND is_active = 1");
+            msg(bot, username, '&#80C4C5🦠 Статистика &#D4D4D4| Больных: &#CA4E4E' + sickMembers.length + ' &#D4D4D4| Шанс: &#FFB800' + ((db.settings.getNumber('virus_chance') || 0.05) * 100).toFixed(0) + '%');
+            if (sickMembers.length > 0 && sickMembers.length <= 10) {
+                msg(bot, username, '&#D4D4D4Больные: ' + sickMembers.map(m => m.username).join(', '));
+            }
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp virus <on|off|normal|chance|infect|cure|cureall|stats>');
+        return;
+    }
+
+    // ==================== ECONOMY ====================
+    if (sub === 'economy') {
+        if (subArgs.length < 1) {
+            const taxRate = db.settings.getNumber('economy_tax_rate') || 0.01;
+            const allOrgs = db.orgBudgets.getAll();
+            const totalBudget = allOrgs.reduce((s, o) => s + o.budget, 0);
+            msg(bot, username, '&#80C4C5💰 Экономика &#D4D4D4| Налог: &#FFB800' + (taxRate * 100).toFixed(1) + '% &#D4D4D4| Бюджет орг: &#76C519' + utils.formatMoney(totalBudget));
+            return;
+        }
+
+        const action = subArgs[0].toLowerCase();
+
+        if (action === 'tax') {
+            if (subArgs.length < 2) return msg(bot, username, '&#CA4E4E❌ /arp economy tax <ставка_%>');
+            const rate = parseFloat(subArgs[1]) / 100;
+            if (isNaN(rate) || rate < 0 || rate > 1) return msg(bot, username, '&#CA4E4E❌ 0-100%');
+            db.settings.set('economy_tax_rate', String(rate));
+            logger.warn(username + ' изменил налог: ' + (rate * 100).toFixed(1) + '%');
+            msg(bot, username, '&#76C519✅ Налог: &#FFB800' + (rate * 100).toFixed(1) + '%');
+            cc(bot, '&#FFB800💰 Ставка налога изменена: ' + (rate * 100).toFixed(1) + '%');
+            return;
+        }
+        if (action === 'info') {
+            const rpMembers = db.rpMembers.getAll();
+            const totalMoney = rpMembers.reduce((s, m) => s + m.balance + m.bank_balance, 0);
+            msg(bot, username, '&#80C4C5📊 Экономика &#D4D4D4| Игроков: &#FFB800' + rpMembers.length + ' &#D4D4D4| Денег: &#76C519' + utils.formatMoney(totalMoney));
+            return;
+        }
+        msg(bot, username, '&#CA4E4E❌ /arp economy <tax|info>');
+        return;
+    }
+
+    // ==================== FREEZE / UNFREEZE ====================
+    if (sub === 'freeze') {
+        const reason = subArgs.join(' ') || 'Не указана';
+        db.settings.set('global_freeze', 'true');
+        if (process.send) process.send({ type: 'global_freeze', enabled: true });
+        logger.warn(username + ' активировал глобальную заморозку!');
+        msg(bot, username, '&#CA4E4E⚠ Глобальная заморозка активирована!');
+        cc(bot, '&#CA4E4E⚠ ГЛОБАЛЬНАЯ ЗАМОРОЗКА! Все системы остановлены.');
+        return;
+    }
+    if (sub === 'unfreeze') {
+        db.settings.set('global_freeze', 'false');
+        if (process.send) process.send({ type: 'global_freeze', enabled: false });
+        logger.warn(username + ' снял глобальную заморозку');
+        msg(bot, username, '&#76C519✅ Системы восстановлены');
+        cc(bot, '&#76C519✅ Глобальная заморозка снята!');
+        return;
+    }
+
+    // ==================== STOPALL ====================
+    if (sub === 'stopall') {
+        if (!permissions.isAdmin(username, db)) return msg(bot, username, '&#CA4E4E❌ Только администратор');
+        db.settings.set('global_freeze', 'true');
+        if (process.send) process.send({ type: 'global_freeze', enabled: true });
+        logger.error(username + ' активировал STOPALL!');
+        msg(bot, username, '&#CA4E4E⛔ STOPALL! ВСЕ СИСТЕМЫ ОСТАНОВЛЕНЫ!');
+        cc(bot, '&#CA4E4E⛔ STOPALL! Команды не выполняются.');
+        return;
+    }
+
+    // ==================== RELOADBD ====================
+    if (sub === 'reloadbd') {
+        if (!permissions.isAdmin(username, db)) return msg(bot, username, '&#CA4E4E❌ Только администратор');
+        db.run('DELETE FROM clan_chat_logs');
+        db.run('DELETE FROM private_message_logs');
+        logger.warn(username + ' очистил логи чата');
+        msg(bot, username, '&#76C519✅ Логи чата очищены');
+        return;
+    }
+
+    msg(bot, username, '&#CA4E4E❌ Неизвестная подкоманда /arp');
 }
 
-// ============================================
-// ЭКСПОРТ
-// ============================================
+// ==================== /STOPALL и /RELOADBD ====================
+function stopAll(bot, username, args, source) {
+    return arpManage(bot, username, ['stopall'], source);
+}
+function reloadDb(bot, username, args, source) {
+    return arpManage(bot, username, ['reloadbd'], source);
+}
 
-module.exports = {
-    admin,
-    awarn,
-    spam,
-    r,
-    logs,
-    stopall,
-    reloadbd,
-    wipe,
-    isSystemStopped,
-    clanKick,
-    clanMute,
-    blacklist
-};
+// ==================== ЭКСПОРТ ====================
+module.exports = { adminManage, arpManage, stopAll, reloadDb };

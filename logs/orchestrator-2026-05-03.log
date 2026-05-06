@@ -1,0 +1,442 @@
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:33:40] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 8252)
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:33:40] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:33:41] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:33:42] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:33:42] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:33:42] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:33:42] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:33:42] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 16352)
+[2026-05-03 00:33:42] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:33:42] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:33:42] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот отключён: socketClosed
+[2026-05-03 00:33:42] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот кикнут: {"extra":[{"text":"Игрок с таким ником уже онлайн"}],"text":""}
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:33:44] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 23040)
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:33:44] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:33:44] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:34:12] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:34:12] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:34:13] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:34:13] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:34:13] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:34:13] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот отключён: socketClosed
+[2026-05-03 00:34:13] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот кикнут: {"extra":[{"color":"red","text":"Вы уже подключены к этому прокси!"}],"text":""}
+[2026-05-03 00:34:15] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:34:15] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:34:15] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:34:43] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот уже активен, пропускаем инициализацию
+[2026-05-03 00:34:43] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] Основной бот уже активен, пропускаем инициализацию
+[2026-05-03 00:34:55] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:44:53] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:44:53] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:44:53] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:44:53] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:44:55] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 24500)
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:44:55] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:44:56] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:44:56] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:44:56] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:44:56] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:44:57] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 2224)
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:44:57] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:44:57] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:44:59] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 15040)
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:44:59] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:44:59] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:44:59] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:50:07] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:50:07] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:50:07] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:50:07] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:50:09] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 11120)
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:50:09] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:50:10] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:50:10] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:50:10] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:50:10] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:50:11] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 4384)
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:50:11] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:50:11] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:50:13] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 21344)
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:50:13] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:50:13] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:50:13] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все обработчики инициализированы
+[2026-05-03 00:50:28] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:50:29] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:50:30] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:51:56] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:51:56] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:51:56] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:51:56] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:51:58] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 28336)
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:51:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:52:00] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 38944)
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:52:00] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:52:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:52:00] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:52:00] [ORCHESTRATOR] [ERROR] [MinecraftBot:IPC] КРИТИЧЕСКАЯ ошибка: commandProcessor is not defined
+[2026-05-03 00:52:00] [ORCHESTRATOR] [ERROR] [MinecraftBot:IPC] ReferenceError: commandProcessor is not defined
+    at initializeHandlers (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:502:26)
+    at EventEmitter.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:209:9)
+    at EventEmitter.emit (node:events:530:35)
+    at Client.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\mineflayer\lib\plugins\game.js:105:9)
+    at Client.emit (node:events:530:35)
+    at emitPacket (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\minecraft-protocol\src\client.js:85:12)
+    at FullPacketParser.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\minecraft-protocol\src\client.js:114:9)
+    at FullPacketParser.emit (node:events:518:28)
+    at addChunk (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\readable-stream\lib\internal\streams\readable.js:323:12)
+    at readableAddChunk (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\readable-stream\lib\internal\streams\readable.js:300:9)
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:52:02] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 27028)
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:52:02] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:52:02] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:52:02] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:52:02] [ORCHESTRATOR] [ERROR] [MinecraftBot:IPC] КРИТИЧЕСКАЯ ошибка: commandProcessor is not defined
+[2026-05-03 00:52:02] [ORCHESTRATOR] [ERROR] [MinecraftBot:IPC] ReferenceError: commandProcessor is not defined
+    at initializeHandlers (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:502:26)
+    at EventEmitter.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:209:9)
+    at EventEmitter.emit (node:events:530:35)
+    at Client.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\mineflayer\lib\plugins\game.js:105:9)
+    at Client.emit (node:events:530:35)
+    at emitPacket (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\minecraft-protocol\src\client.js:85:12)
+    at FullPacketParser.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\minecraft-protocol\src\client.js:114:9)
+    at FullPacketParser.emit (node:events:518:28)
+    at addChunk (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\readable-stream\lib\internal\streams\readable.js:323:12)
+    at readableAddChunk (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\node_modules\readable-stream\lib\internal\streams\readable.js:300:9)
+[2026-05-03 00:52:20] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:53:25] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:53:25] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:53:25] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:53:25] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:53:58] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 39748)
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:53:58] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:53:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:53:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:53:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:53:59] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:54:00] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 12236)
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:54:00] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Обработчики команд загружены
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:54:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:54:02] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 35444)
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:54:02] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:54:02] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Обработчики команд загружены
+[2026-05-03 00:54:02] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:54:15] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:55:57] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:55:57] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:55:57] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:55:57] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:55:58] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:55:58] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 38644)
+[2026-05-03 00:55:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:55:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:55:59] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:56:00] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:56:00] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 15092)
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:56:00] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:56:01] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:56:01] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:56:02] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 36108)
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:56:02] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:56:02] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:56:03] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:56:03] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:56:03] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 00:56:03] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 00:56:03] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 00:56:03] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:56:14] [ORCHESTRATOR] [WARN] [MinecraftBot:IPC] commandProcessor не инициализирован
+[2026-05-03 00:58:01] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 00:58:01] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 00:58:01] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 00:58:01] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 00:58:04] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 19848)
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:58:04] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 00:58:05] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 00:58:05] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 00:58:05] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 00:58:05] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 00:58:06] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 33008)
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:58:06] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 00:58:06] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 00:58:08] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 39128)
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 00:58:08] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 00:58:08] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 00:58:08] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 00:59:48] [ORCHESTRATOR] [ERROR] [MinecraftBot:IPC] Необработанный Promise rejection: TypeError: utils.sleep is not a function
+[2026-05-03 01:14:14] [ORCHESTRATOR] [WARN] WebServer: аварийное завершение (код 3221225786)
+[2026-05-03 01:14:14] [ORCHESTRATOR] [WARN] WebServer: перезапуск через 5с...
+[2026-05-03 01:14:14] [ORCHESTRATOR] [WARN] MinecraftBot: аварийное завершение (код 3221225786)
+[2026-05-03 01:14:14] [ORCHESTRATOR] [WARN] MinecraftBot: перезапуск через 30с...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Оркестратор Resistance City инициализирован
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Окружение: production
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Временная зона: Europe/Moscow
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Путь к БД: ./data/hohols.db
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS]   RESISTANCE CITY ECOSYSTEM v5.0.0
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS]   Свободный Город «Сопротивление»
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS]   Запуск экосистемы...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS] ══════════════════════════════════════════════
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Планирование запуска DiscordBot через 0с...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Планирование запуска MinecraftBot через 2с...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Планирование запуска WebServer через 4с...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Все процессы запланированы к запуску
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] Запуск DiscordBot (Discord бот для команд, верификации и логирования)...
+[2026-05-03 01:14:16] [ORCHESTRATOR] [SUCCESS] DiscordBot запущен (PID: 7780)
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 01:14:16] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Загружено 9 команд
+[2026-05-03 01:14:17] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Discord бот Resistance#3415 запущен!
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Команды зарегистрированы для сервера 1466550097205792768
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [DiscordBot:IPC] Периодические задачи Discord запущены
+[2026-05-03 01:14:18] [ORCHESTRATOR] [SUCCESS] DiscordBot: подтвердил готовность к работе
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] Запуск MinecraftBot (Minecraft бот на Mineflayer для внутриигрового взаимодействия)...
+[2026-05-03 01:14:18] [ORCHESTRATOR] [SUCCESS] MinecraftBot запущен (PID: 15488)
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 01:14:18] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 01:14:18] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 01:14:19] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Периодические задачи модерации запущены
+[2026-05-03 01:14:19] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Модуль модерации инициализирован
+[2026-05-03 01:14:19] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] Запуск WebServer (Веб-сервер с админ-панелью и публичным сайтом)...
+[2026-05-03 01:14:20] [ORCHESTRATOR] [SUCCESS] WebServer запущен (PID: 34540)
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] База данных успешно инициализирована из schema.sql
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] Модуль базы данных полностью загружен и готов к работе
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╔══════════════════════════════════════════╗
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  WEB SERVER — RESISTANCE CITY v5.0.0     ║
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╠══════════════════════════════════════════╣
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Адрес: http://0.0.0.0:3000              ║
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ║  Режим: production                    ║
+[2026-05-03 01:14:20] [ORCHESTRATOR] [INFO] [WebServer:IPC] ╚══════════════════════════════════════════╝
+[2026-05-03 01:14:20] [ORCHESTRATOR] [SUCCESS] WebServer: подтвердил готовность к работе
+[2026-05-03 01:14:21] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-03 01:14:21] [ORCHESTRATOR] [SUCCESS] MinecraftBot: подтвердил готовность к работе
+[2026-05-03 01:14:21] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] chatHandler загружен
+[2026-05-03 01:14:21] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] commandProcessor загружен, тип: object
+[2026-05-03 01:14:21] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] processCommand найден
+[2026-05-03 01:14:21] [ORCHESTRATOR] [INFO] [MinecraftBot:IPC] Все доступные обработчики инициализированы

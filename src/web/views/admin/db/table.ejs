@@ -1,144 +1,215 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Таблица <%= typeof tableName !== 'undefined' ? tableName : '' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
     <style>
-        /* Базовые стили как в dashboard.ejs, добавим специфичные для таблиц */
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
-        :root { --bg-color:#f5f7fa; --text-color:#333; --card-bg:#ffffff; --header-bg:rgba(255,255,255,0.95); --border-color:rgba(0,0,0,0.1); --primary:#4a3aff; --primary-hover:#3728e0; --footer-color:#999; --gradient-2:linear-gradient(45deg,#6343d4,#aa4eff); --shadow-md:0 15px 40px rgba(0,0,0,0.1); --shadow-lg:0 20px 50px rgba(0,0,0,0.2); }
-        [data-theme="dark"] { --bg-color:#0b0c1e; --text-color:#e0e0e0; --card-bg:#1a1b2f; --header-bg:rgba(10,10,20,0.95); --border-color:rgba(255,255,255,0.1); --primary:#aa4eff; --primary-hover:#8a3fcc; --footer-color:#666; }
-        body { background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
-        .logo { display: flex; align-items: center; gap: 15px; }
-        .logo img { height: 50px; filter: drop-shadow(0 0 10px rgba(170,78,255,0.5)); }
-        .logo h2 { font-size: 1.8rem; background: var(--gradient-2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
-        .user-info { display: flex; align-items: center; gap: 20px; }
-        .btn-logout { padding: 8px 20px; background: var(--gradient-2); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; transition: transform 0.3s; }
-        .btn-logout:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(170,78,255,0.4); }
-        .theme-toggle { background: none; border: none; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-color); }
-        .theme-toggle:hover { background: rgba(128,128,128,0.2); }
-        .container { max-width: 1400px; margin: 40px auto; padding: 0 20px; }
-        h1 { font-size: 2.5rem; margin-bottom: 20px; background: var(--gradient-2); -webkit-background-clip: text;
--webkit-text-fill-color: transparent;
-background-clip: text;
-color: transparent; display: inline-block; }
-        .table-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
-        .btn { padding: 10px 25px; border: none; border-radius: 30px; background: var(--gradient-2); color: white; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: transform 0.2s; }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(170,78,255,0.4); }
-        .btn-secondary { background: var(--primary); }
-        .pagination { display: flex; gap: 10px; align-items: center; }
-        .pagination a { padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; text-decoration: none; color: var(--text-color); }
-        .pagination span { padding: 8px 12px; }
-        .table-wrapper { overflow-x: auto; background: var(--card-bg); border-radius: 20px; padding: 20px; border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th { background: var(--primary); color: white; padding: 12px; text-align: left; }
-        td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        tr:hover { background: rgba(170,78,255,0.1); }
-        .actions { display: flex; gap: 10px; }
-        .edit-btn, .delete-btn { background: none; border: none; cursor: pointer; color: var(--primary); font-size: 1.2rem; transition: color 0.2s; }
-        .delete-btn { color: #ff4757; }
-        .delete-form { display: inline; }
-        .footer { text-align: center; padding: 30px 0; color: var(--footer-color); border-top: 1px solid var(--border-color); margin-top: 50px; }
-        .notification { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 15px 25px; border-radius: 30px; background: white; box-shadow: var(--shadow-lg); border-left: 5px solid; animation: slideIn 0.3s; }
-        .notification.success { border-color: #00d25b; background: #d4edda; color: #155724; }
-        .notification.error { border-color: #ff4757; background: #f8d7da; color: #721c24; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+        .table-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .table-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .table-nav a:hover {
+            color: var(--primary-lighter);
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .data-table thead th {
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .data-table tbody td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .data-table tbody tr:hover td {
+            background: rgba(99,67,212,0.05);
+        }
+        .table-container-scroll {
+            max-height: 600px;
+            overflow: auto;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+        }
+        .row-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            width: 300px;
+        }
     </style>
 </head>
 <body>
-    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
-    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+    <%- include('../../partials/header', { page: 'admin' }) %>
 
-    <header class="header">
-        <div class="logo"><img src="/images/logo.jpg" alt="Resistance"><h2>Resistance Admin</h2></div>
-        <div class="user-info">
-            <span><%= user.username %></span>
-            <button id="theme-toggle" class="theme-toggle"><svg class="sun" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="moon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
-            <a href="/admin/logout" class="btn-logout">Выйти</a>
-        </div>
-    </header>
+    <div class="admin-layout">
+        <%- include('../../partials/sidebar', { page: 'database' }) %>
 
-    <div class="container">
-        <h1>Таблица: <%= table %></h1>
-        <div class="table-controls">
-            <a href="/admin/db/<%= table %>/new" class="btn">➕ Добавить запись</a>
-            <div class="pagination">
-                <% if (page > 1) { %>
-                    <a href="/admin/db/<%= table %>?page=<%= page-1 %>">← Пред.</a>
-                <% } %>
-                <span>Стр. <%= page %> из <%= totalPages %></span>
-                <% if (page < totalPages) { %>
-                    <a href="/admin/db/<%= table %>?page=<%= page+1 %>">След. →</a>
+        <div class="admin-content">
+            <!-- НАВИГАЦИЯ -->
+            <div class="table-nav">
+                <a href="/admin/db">🗄️ БД</a>
+                <span style="color: var(--text-muted);">/</span>
+                <strong style="color: var(--text-bright);"><%= typeof tableName !== 'undefined' ? tableName : '' %></strong>
+                <span class="badge badge-info"><%= typeof totalRows !== 'undefined' ? totalRows : 0 %> записей</span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <h1 class="text-gradient" style="margin-bottom: 0; font-size: 1.5rem;">📋 <%= typeof tableName !== 'undefined' ? tableName : '' %></h1>
+                <div style="display: flex; gap: 8px;">
+                    <a href="/admin/db/new/<%= typeof tableName !== 'undefined' ? tableName : '' %>" class="btn btn-primary btn-sm">➕ Новая запись</a>
+                    <button class="btn btn-sm btn-outline" onclick="location.reload()">🔄 Обновить</button>
+                </div>
+            </div>
+
+            <!-- ПОИСК -->
+            <div class="search-bar">
+                <input type="text" id="tableSearch" class="form-input" placeholder="Поиск по таблице..." oninput="filterTable()">
+                <span style="color: var(--text-muted); font-size: 0.85rem;" id="searchResult"></span>
+            </div>
+
+            <!-- ТАБЛИЦА -->
+            <div class="card">
+                <div class="table-container-scroll">
+                    <table class="data-table" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">ID</th>
+                                <% if (typeof columns !== 'undefined' && columns && columns.length > 0) { %>
+                                    <% for (var i = 0; i < columns.length; i++) { %>
+                                        <% if (columns[i] !== 'id') { %>
+                                            <th><%= columns[i] %></th>
+                                        <% } %>
+                                    <% } %>
+                                <% } %>
+                                <th style="width: 80px;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (typeof rows !== 'undefined' && rows && rows.length > 0) { %>
+                                <% for (var r = 0; r < rows.length; r++) { 
+                                    var row = rows[r];
+                                %>
+                                    <tr>
+                                        <td><%= row.id %></td>
+                                        <% if (typeof columns !== 'undefined' && columns && columns.length > 0) { %>
+                                            <% for (var c = 0; c < columns.length; c++) { 
+                                                var col = columns[c];
+                                                if (col === 'id') continue;
+                                                var value = row[col];
+                                                var displayValue = value !== null && value !== undefined ? String(value) : '—';
+                                                if (displayValue.length > 100) displayValue = displayValue.substring(0, 100) + '...';
+                                            %>
+                                                <td title="<%= value !== null && value !== undefined ? String(value) : '' %>"><%= displayValue %></td>
+                                            <% } %>
+                                        <% } %>
+                                        <td>
+                                            <div class="row-actions">
+                                                <a href="/admin/db/edit/<%= typeof tableName !== 'undefined' ? tableName : '' %>/<%= row.id %>" class="btn btn-sm btn-outline" title="Редактировать">✏️</a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% } %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="100" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                        Нет записей в таблице
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ПАГИНАЦИЯ -->
+                <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+                    <div class="pagination" style="margin-top: 20px;">
+                        <% if (typeof currentPage !== 'undefined' && currentPage > 1) { %>
+                            <a href="/admin/db/table/<%= typeof tableName !== 'undefined' ? tableName : '' %>?page=<%= currentPage - 1 %>">←</a>
+                        <% } else { %>
+                            <span class="disabled">←</span>
+                        <% } %>
+
+                        <% for (var p = Math.max(1, (typeof currentPage !== 'undefined' ? currentPage : 1) - 2); p <= Math.min((typeof totalPages !== 'undefined' ? totalPages : 1), (typeof currentPage !== 'undefined' ? currentPage : 1) + 2); p++) { %>
+                            <a href="/admin/db/table/<%= typeof tableName !== 'undefined' ? tableName : '' %>?page=<%= p %>"
+                               class="<%= p === (typeof currentPage !== 'undefined' ? currentPage : 1) ? 'active' : '' %>"><%= p %></a>
+                        <% } %>
+
+                        <% if (typeof currentPage !== 'undefined' && typeof totalPages !== 'undefined' && currentPage < totalPages) { %>
+                            <a href="/admin/db/table/<%= typeof tableName !== 'undefined' ? tableName : '' %>?page=<%= currentPage + 1 %>">→</a>
+                        <% } else { %>
+                            <span class="disabled">→</span>
+                        <% } %>
+                    </div>
                 <% } %>
             </div>
         </div>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <% columns.forEach(col => { %>
-                            <th><%= col.name %></th>
-                        <% }) %>
-                        <th>Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% rows.forEach(row => { %>
-                        <tr>
-                            <% columns.forEach(col => { %>
-                                <td><%= row[col.name] %></td>
-                            <% }) %>
-                            <td class="actions">
-                                <a href="/admin/db/<%= table %>/edit/<%= row.id %>" class="edit-btn">✏️</a>
-                                <form class="delete-form" method="POST" action="/admin/db/<%= table %>/delete/<%= row.id %>" onsubmit="return confirm('Удалить запись?');">
-                                    <button type="submit" class="delete-btn">🗑️</button>
-                                </form>
-                            </td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        </div>
-        <div style="margin-top: 30px;">
-            <a href="/admin/db" class="btn btn-secondary">← Назад к таблицам</a>
-        </div>
     </div>
 
-    <footer class="footer"><p>Resistance City Project • 2026</p></footer>
-
     <script>
-        (function() {
-            const toggle = document.getElementById('theme-toggle');
-            const sun = toggle.querySelector('.sun');
-            const moon = toggle.querySelector('.moon');
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                sun.style.display = 'none';
-                moon.style.display = 'block';
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-                sun.style.display = 'block';
-                moon.style.display = 'none';
-            }
-            toggle.addEventListener('click', () => {
-                const current = document.documentElement.getAttribute('data-theme');
-                const newTheme = current === 'light' ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                if (newTheme === 'dark') {
-                    sun.style.display = 'none';
-                    moon.style.display = 'block';
+        function filterTable() {
+            var input = document.getElementById('tableSearch');
+            var filter = input.value.toLowerCase();
+            var table = document.getElementById('dataTable');
+            var rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            var visibleCount = 0;
+
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                var text = row.textContent || row.innerText || '';
+                if (text.toLowerCase().indexOf(filter) > -1) {
+                    row.style.display = '';
+                    visibleCount++;
                 } else {
-                    sun.style.display = 'block';
-                    moon.style.display = 'none';
+                    row.style.display = 'none';
                 }
-            });
-        })();
-        setTimeout(() => { document.querySelectorAll('.notification').forEach(el => el.remove()); }, 5000);
+            }
+
+            var resultEl = document.getElementById('searchResult');
+            if (filter) {
+                resultEl.textContent = 'Найдено: ' + visibleCount;
+            } else {
+                resultEl.textContent = '';
+            }
+        }
     </script>
+
+    <%- include('../../partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

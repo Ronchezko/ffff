@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= typeof title !== 'undefined' ? title : 'Ошибка' %> — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .error-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            padding: 40px 20px;
+        }
+        .error-card {
+            max-width: 550px;
+            width: 100%;
+            text-align: center;
+            padding: 48px 36px;
+            border-radius: var(--radius-xl);
+            animation: fadeInUp 0.5s ease forwards;
+        }
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+        .error-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--danger);
+            margin-bottom: 16px;
+        }
+        .error-message {
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            line-height: 1.7;
+        }
+        .error-details {
+            background: rgba(202,78,78,0.05);
+            border: 1px solid rgba(202,78,78,0.2);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin: 16px 0;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .error-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/header', { page: 'admin' }) %>
+
+    <div class="admin-layout">
+        <%- include('../partials/sidebar', { page: 'dashboard' }) %>
+
+        <div class="admin-content">
+            <div class="error-container">
+                <div class="card error-card" style="border-color: var(--danger);">
+                    <span class="error-icon">⚠️</span>
+                    <h2 class="error-title"><%= typeof title !== 'undefined' ? title : 'Произошла ошибка' %></h2>
+                    <p class="error-message">
+                        <%= typeof error !== 'undefined' ? error : 'Неизвестная ошибка. Попробуйте обновить страницу или вернуться позже.' %>
+                    </p>
+
+                    <% if (typeof details !== 'undefined' && details) { %>
+                        <div class="error-details"><%= details %></div>
+                    <% } %>
+
+                    <% if (typeof stack !== 'undefined' && stack && typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') { %>
+                        <details style="margin: 12px 0; text-align: left;">
+                            <summary style="cursor: pointer; color: var(--text-muted); font-size: 0.85rem;">Техническая информация</summary>
+                            <div class="error-details" style="margin-top: 8px;"><%= stack %></div>
+                        </details>
+                    <% } %>
+
+                    <div class="error-actions">
+                        <a href="/admin/dashboard" class="btn btn-primary">📊 На дашборд</a>
+                        <a href="javascript:history.back()" class="btn btn-outline">← Назад</a>
+                        <button class="btn btn-outline" onclick="location.reload()">🔄 Обновить</button>
+                    </div>
+
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 20px;">
+                        Если ошибка повторяется — обратитесь к разработчику.<br>
+                        Время: <%= new Date().toLocaleString('ru-RU') %>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+    <script src="/js/theme.js"></script>
+</body>
+</html>

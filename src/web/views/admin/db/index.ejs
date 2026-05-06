@@ -1,102 +1,198 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>База данных | Resistance</title>
-    <link rel="icon" type="image/png" href="/images/logo.jpg">
+    <meta name="robots" content="noindex, nofollow">
+    <title>База данных — Resistance Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
     <style>
-        /* Те же общие стили, что в dashboard.ejs */
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, sans-serif; }
-        :root { --bg-color:#f5f7fa; --text-color:#333; --card-bg:#ffffff; --header-bg:rgba(255,255,255,0.95); --border-color:rgba(0,0,0,0.1); --primary:#4a3aff; --primary-hover:#3728e0; --nav-link-color:#333; --nav-link-hover:#4a3aff; --footer-color:#999; --gradient-2:linear-gradient(45deg,#6343d4,#aa4eff); --shadow-md:0 15px 40px rgba(0,0,0,0.1); --shadow-lg:0 20px 50px rgba(0,0,0,0.2); }
-        [data-theme="dark"] { --bg-color:#0b0c1e; --text-color:#e0e0e0; --card-bg:#1a1b2f; --header-bg:rgba(10,10,20,0.95); --border-color:rgba(255,255,255,0.1); --primary:#aa4eff; --primary-hover:#8a3fcc; --nav-link-color:#e0e0e0; --nav-link-hover:#aa4eff; --footer-color:#666; }
-        body { background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; min-height: 100vh; }
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
-        .logo { display: flex; align-items: center; gap: 15px; }
-        .logo img { height: 50px; filter: drop-shadow(0 0 10px rgba(170,78,255,0.5)); }
-        .logo h2 { font-size: 1.8rem; background: var(--gradient-2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: transparent; }
-        .user-info { display: flex; align-items: center; gap: 20px; }
-        .btn-logout { padding: 8px 20px; background: var(--gradient-2); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; transition: transform 0.3s; }
-        .btn-logout:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(170,78,255,0.4); }
-        .theme-toggle { background: none; border: none; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-color); }
-        .theme-toggle:hover { background: rgba(128,128,128,0.2); }
-        .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
-        h1 { font-size: 2.5rem; margin-bottom: 30px; background: var(--gradient-2); --webkit-background-clip: text;
--webkit-text-fill-color: transparent;
-background-clip: text;
-color: transparent; display: inline-block; }
-        .table-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr)); gap: 20px; margin-top: 30px; }
-        .table-item { background: var(--card-bg); border-radius: 20px; padding: 20px; border: 1px solid var(--border-color); transition: transform 0.3s; }
-        .table-item:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--primary); }
-        .table-item a { text-decoration: none; color: var(--text-color); font-size: 1.3rem; font-weight: 600; display: block; text-align: center; }
-        .footer { text-align: center; padding: 30px 0; color: var(--footer-color); border-top: 1px solid var(--border-color); margin-top: 50px; }
-        .notification { position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 15px 25px; border-radius: 30px; background: white; box-shadow: var(--shadow-lg); border-left: 5px solid; animation: slideIn 0.3s; }
-        .notification.success { border-color: #00d25b; background: #d4edda; color: #155724; }
-        .notification.error { border-color: #ff4757; background: #f8d7da; color: #721c24; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+        .db-table-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .db-table-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            color: var(--text-primary);
+            display: block;
+        }
+        .db-table-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+            transform: translateY(-2px);
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        .db-table-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .db-table-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-lighter));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .db-table-info {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+        }
+        .db-table-count {
+            font-weight: 700;
+            color: var(--info);
+        }
+        .db-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .db-stat-item {
+            text-align: center;
+            padding: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+        }
+        .db-stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-lighter);
+        }
+        .db-stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
-    <% if (success) { %><div class="notification success"><%= success %></div><% } %>
-    <% if (error) { %><div class="notification error"><%= error %></div><% } %>
+    <%- include('../../partials/header', { page: 'admin' }) %>
 
-    <header class="header">
-        <div class="logo"><img src="/images/logo.jpg" alt="Resistance"><h2>Resistance Admin</h2></div>
-        <div class="user-info">
-            <span><%= user.username %></span>
-            <button id="theme-toggle" class="theme-toggle"><svg class="sun" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="moon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
-            <a href="/admin/logout" class="btn-logout">Выйти</a>
-        </div>
-    </header>
+    <div class="admin-layout">
+        <%- include('../../partials/sidebar', { page: 'database' }) %>
 
-    <div class="container">
-        <h1>База данных</h1>
-        <p style="margin-bottom:20px;">Выберите таблицу для просмотра или управления:</p>
-        <div class="table-list">
-            <% tables.forEach(table => { %>
-                <div class="table-item">
-                    <a href="/admin/db/<%= table.name %>"><%= table.name %></a>
+        <div class="admin-content">
+            <h1 class="text-gradient" style="margin-bottom: 8px;">🗄️ База данных</h1>
+            <p style="color: var(--text-secondary); margin-bottom: 32px;">
+                Прямой доступ к таблицам базы данных Resistance
+            </p>
+
+            <!-- СТАТИСТИКА БД -->
+            <div class="db-stats">
+                <div class="db-stat-item">
+                    <div class="db-stat-value"><%= typeof tableCount !== 'undefined' ? tableCount : 0 %></div>
+                    <div class="db-stat-label">Таблиц</div>
                 </div>
-            <% }) %>
-        </div>
-        <div style="margin-top:40px;">
-            <a href="/admin/dashboard" class="btn-logout" style="background:var(--primary);">← Назад</a>
+                <div class="db-stat-item">
+                    <div class="db-stat-value"><%= typeof totalRows !== 'undefined' ? totalRows : 0 %></div>
+                    <div class="db-stat-label">Всего записей</div>
+                </div>
+                <div class="db-stat-item">
+                    <div class="db-stat-value"><%= typeof dbSize !== 'undefined' ? dbSize : '0' %> MB</div>
+                    <div class="db-stat-label">Размер БД</div>
+                </div>
+                <div class="db-stat-item">
+                    <div class="db-stat-value"><%= typeof lastBackup !== 'undefined' && lastBackup ? lastBackup : '—' %></div>
+                    <div class="db-stat-label">Последний бэкап</div>
+                </div>
+            </div>
+
+            <!-- СПИСОК ТАБЛИЦ -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📋 Таблицы базы данных</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-outline" onclick="refreshTables()">🔄 Обновить</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="db-table-list">
+                        <% if (typeof tables !== 'undefined' && tables && tables.length > 0) { %>
+                            <% for (var i = 0; i < tables.length; i++) { 
+                                var table = tables[i];
+                                var icons = {
+                                    'members': '👤',
+                                    'rp_members': '📋',
+                                    'balance_logs': '💰',
+                                    'punishment_logs': '🔨',
+                                    'clan_chat_logs': '💬',
+                                    'staff': '👥',
+                                    'settings': '⚙️',
+                                    'verification_codes': '🔗',
+                                    'properties': '🏠',
+                                    'businesses': '🏪',
+                                    'offices': '🏛️',
+                                    'licenses': '📄',
+                                    'organizations': '🏢',
+                                    'gangs': '🔫',
+                                    'robbery_parties': '💰',
+                                    'army_supplies': '🛡️',
+                                    'diseases': '🦠',
+                                    'medical_books': '📕',
+                                    'education': '🎓',
+                                    'bank_accounts': '🏦',
+                                    'bank_transactions': '💳',
+                                    'jail_records': '🔒',
+                                    'fines': '📋',
+                                    'vacations': '🏖️',
+                                    'staff_warns': '⚠️',
+                                    'org_warns': '⚠️',
+                                    'org_blacklists': '🚫',
+                                    'command_cooldowns': '⏱️',
+                                    'private_message_logs': '✉️',
+                                    'active_duties': '🟢',
+                                };
+                                var icon = icons[table.name] || '📦';
+                            %>
+                                <a href="/admin/db/table/<%= table.name %>" class="db-table-card">
+                                    <div class="db-table-name">
+                                        <div class="db-table-icon"><%= icon %></div>
+                                        <%= table.name %>
+                                    </div>
+                                    <div class="db-table-info">
+                                        <span>Записей:</span>
+                                        <span class="db-table-count"><%= table.rowCount || 0 %></span>
+                                    </div>
+                                </a>
+                            <% } %>
+                        <% } else { %>
+                            <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+                                <div style="font-size: 2rem; margin-bottom: 8px;">📭</div>
+                                <p>Нет данных о таблицах</p>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <footer class="footer"><p>Resistance City Project • 2026</p></footer>
-
     <script>
-        // Переключение темы (аналогично)
-        (function() {
-            const toggle = document.getElementById('theme-toggle');
-            const sun = toggle.querySelector('.sun');
-            const moon = toggle.querySelector('.moon');
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                sun.style.display = 'none';
-                moon.style.display = 'block';
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-                sun.style.display = 'block';
-                moon.style.display = 'none';
-            }
-            toggle.addEventListener('click', () => {
-                const current = document.documentElement.getAttribute('data-theme');
-                const newTheme = current === 'light' ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                if (newTheme === 'dark') {
-                    sun.style.display = 'none';
-                    moon.style.display = 'block';
-                } else {
-                    sun.style.display = 'block';
-                    moon.style.display = 'none';
-                }
-            });
-        })();
-        setTimeout(() => { document.querySelectorAll('.notification').forEach(el => el.remove()); }, 5000);
+        function refreshTables() {
+            location.reload();
+        }
     </script>
+
+    <%- include('../../partials/footer') %>
+    <script src="/js/theme.js"></script>
 </body>
 </html>

@@ -1,0 +1,78 @@
+<aside class="sidebar">
+    <div style="padding: 16px 24px; border-bottom: 1px solid var(--border); margin-bottom: 8px;">
+        <div style="font-weight: 700; color: var(--text-bright); font-size: 0.95rem;">Админ-панель</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            <%= typeof locals !== 'undefined' && locals && locals.user ? locals.user.username : 'Администратор' %>
+        </div>
+    </div>
+    
+    <a href="/admin/dashboard" class="<%= typeof page !== 'undefined' && page === 'dashboard' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">📊</span> Дашборд
+    </a>
+    <a href="/admin/players" class="<%= typeof page !== 'undefined' && page === 'players' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">👥</span> Игроки
+    </a>
+    <a href="/admin/properties" class="<%= typeof page !== 'undefined' && page === 'properties' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">🏠</span> Имущество
+    </a>
+    <a href="/admin/logs" class="<%= typeof page !== 'undefined' && page === 'logs' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">📋</span> Логи
+    </a>
+    <a href="/admin/settings" class="<%= typeof page !== 'undefined' && page === 'settings' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">⚙️</span> Настройки
+    </a>
+    <a href="/admin/console" class="<%= typeof page !== 'undefined' && page === 'console' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">💻</span> Консоль
+    </a>
+    
+    <div style="border-top: 1px solid var(--border); margin: 8px 0; padding: 8px 0;"></div>
+    
+    <a href="/admin/db" class="<%= typeof page !== 'undefined' && page === 'database' ? 'active' : '' %>">
+        <span style="margin-right: 8px;">🗄️</span> База данных
+    </a>
+    <a href="/admin/restart" class="<%= typeof page !== 'undefined' && page === 'restart' ? 'active' : '' %>" style="color: var(--warning);">
+        <span style="margin-right: 8px;">🔄</span> Перезапуск
+    </a>
+    
+    <div style="border-top: 1px solid var(--border); margin: 8px 0; padding: 8px 0;"></div>
+    
+    <a href="/" target="_blank">
+        <span style="margin-right: 8px;">🏠</span> На сайт
+    </a>
+    <a href="/admin/logout" style="color: var(--danger);">
+        <span style="margin-right: 8px;">🚪</span> Выход
+    </a>
+</aside>
+
+<style>
+    .sidebar {
+        width: 260px;
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border);
+        padding: 20px 0;
+        flex-shrink: 0;
+        min-height: calc(100vh - 64px);
+    }
+    .sidebar a {
+        display: flex;
+        align-items: center;
+        padding: 12px 24px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all 0.15s ease;
+        border-left: 3px solid transparent;
+    }
+    .sidebar a:hover {
+        color: var(--text-bright);
+        background: rgba(99,67,212,0.1);
+        border-left-color: var(--primary);
+        text-decoration: none;
+    }
+    .sidebar a.active {
+        color: var(--text-bright);
+        background: rgba(99,67,212,0.2);
+        border-left-color: var(--primary-light);
+    }
+</style>

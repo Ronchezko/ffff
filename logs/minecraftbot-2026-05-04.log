@@ -1,0 +1,196 @@
+[2026-05-04 06:35:39.475] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-04 06:35:39.477] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-04 06:35:39.479] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-04 06:35:39.479] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-04 06:35:39.480] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-04 06:35:39.480] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-04 06:35:39.480] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-04 06:35:39.481] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-04 06:35:39.481] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-04 06:35:39.481] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:35:39.512] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-04T03:35:39.128Z"}
+[2026-05-04 06:35:39.692] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:35:39.700] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:35:39.701] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:35:39.701] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:35:39.937] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-04 06:35:39.938] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-04 06:35:39.938] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:35:39.953] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:35:41.700] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:35:42.036] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:35:42.036] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:35:42.037] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:35:42.037] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:35:42.037] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:35:42.084] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:35:44.049] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:35:44.702] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:35:47.048] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:36:47.004] [WARN] [MinecraftBot] Основной бот отключён: socketClosed
+[2026-05-04 06:36:47.004] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 1/20)
+[2026-05-04 06:36:47.006] [WARN] [MinecraftBot] Основной бот кикнут: {"extra":[{"color":"red","text":"Вы написали запрещенные символы в чат (\\u000A)"}],"text":""}
+[2026-05-04 06:36:47.006] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 2/20)
+[2026-05-04 06:37:17.014] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:37:17.017] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:37:17.140] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:37:17.141] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:37:17.142] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:37:17.142] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:37:17.143] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:37:17.214] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:37:17.322] [WARN] [MinecraftBot] Основной бот отключён: socketClosed
+[2026-05-04 06:37:17.323] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 1/20)
+[2026-05-04 06:37:17.324] [WARN] [MinecraftBot] Основной бот кикнут: {"extra":[{"color":"red","text":"Вы уже подключены к этому прокси!"}],"text":""}
+[2026-05-04 06:37:17.325] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 2/20)
+[2026-05-04 06:37:19.154] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:37:19.485] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:37:19.486] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:37:19.487] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:37:19.487] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:37:19.488] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:37:19.552] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:37:21.486] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:37:22.143] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:37:24.488] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:37:30.741] [WARN] [MinecraftBot] Основной бот отключён: socketClosed
+[2026-05-04 06:37:30.742] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 1/20)
+[2026-05-04 06:37:30.743] [WARN] [MinecraftBot] Основной бот кикнут: {"extra":[{"color":"red","text":"Вы написали запрещенные символы в чат (\\u000A)"}],"text":""}
+[2026-05-04 06:37:30.743] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 2/20)
+[2026-05-04 06:37:47.328] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:37:47.331] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:37:47.384] [WARN] [MinecraftBot] Основной бот отключён: socketClosed
+[2026-05-04 06:37:47.384] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 3/20)
+[2026-05-04 06:37:47.385] [WARN] [MinecraftBot] Основной бот кикнут: {"extra":[{"color":"red","text":"Вы зашли на сервер с другого майнкрафта"}],"text":""}
+[2026-05-04 06:37:47.386] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 4/20)
+[2026-05-04 06:37:47.459] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:37:47.460] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:37:47.461] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:37:47.461] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:37:47.462] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:37:47.508] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:37:49.466] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:37:49.786] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:37:49.787] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:37:49.787] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:37:49.788] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:37:49.788] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:37:49.851] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:37:51.797] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:37:52.466] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:37:54.796] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:38:00.749] [WARN] [MinecraftBot] Основной бот уже активен, пропускаем инициализацию
+[2026-05-04 06:38:00.750] [WARN] [MinecraftBot] Основной бот уже активен, пропускаем инициализацию
+[2026-05-04 06:38:17.393] [WARN] [MinecraftBot] Основной бот уже активен, пропускаем инициализацию
+[2026-05-04 06:38:17.394] [WARN] [MinecraftBot] Основной бот уже активен, пропускаем инициализацию
+[2026-05-04 06:38:46.997] [INFO] [MinecraftBot] Регистрация Ronch_ отменена по таймауту
+[2026-05-04 06:40:46.641] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-04 06:40:46.644] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-04 06:40:46.646] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-04 06:40:46.647] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-04 06:40:46.647] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-04 06:40:46.648] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-04 06:40:46.648] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-04 06:40:46.648] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-04 06:40:46.648] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-04 06:40:46.649] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:40:46.672] [ERROR] [MinecraftBot] Ошибка создания основного бота: Cannot read properties of undefined (reading 'bind')
+[2026-05-04 06:40:46.673] [ERROR] [MinecraftBot] TypeError: Cannot read properties of undefined (reading 'bind')
+    at setupBotEvents (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:160:35)
+    at initMainBot (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:121:9)
+    at Object.<anonymous> (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:705:1)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+[2026-05-04 06:40:46.673] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 1/20)
+[2026-05-04 06:40:46.703] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-04T03:40:46.384Z"}
+[2026-05-04 06:41:16.681] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:41:16.684] [ERROR] [MinecraftBot] Ошибка создания основного бота: Cannot read properties of undefined (reading 'bind')
+[2026-05-04 06:41:16.685] [ERROR] [MinecraftBot] TypeError: Cannot read properties of undefined (reading 'bind')
+    at setupBotEvents (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:160:35)
+    at initMainBot (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:121:9)
+    at Timeout._onTimeout (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:428:13)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[2026-05-04 06:41:16.685] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 2/20)
+[2026-05-04 06:41:46.701] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:41:46.702] [ERROR] [MinecraftBot] Ошибка создания основного бота: Cannot read properties of undefined (reading 'bind')
+[2026-05-04 06:41:46.703] [ERROR] [MinecraftBot] TypeError: Cannot read properties of undefined (reading 'bind')
+    at setupBotEvents (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:160:35)
+    at initMainBot (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:121:9)
+    at Timeout._onTimeout (C:\Users\Пользователь\Desktop\Projects\Resistance\Bots\ffff\src\minecraft\index.js:428:13)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[2026-05-04 06:41:46.703] [INFO] [MinecraftBot] Планирование переподключения основного бота через 30с (попытка 3/20)
+[2026-05-04 06:44:21.287] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-04 06:44:21.288] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-04 06:44:21.290] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-04 06:44:21.291] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-04 06:44:21.291] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-04 06:44:21.291] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-04 06:44:21.291] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-04 06:44:21.292] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-04 06:44:21.292] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-04 06:44:21.292] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:44:21.314] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-04T03:44:21.054Z"}
+[2026-05-04 06:44:21.484] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:44:21.492] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:44:21.493] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:44:21.494] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:44:21.720] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-04 06:44:21.721] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-04 06:44:21.721] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:44:21.737] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:44:23.485] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:44:23.828] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:44:23.829] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:44:23.829] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:44:23.830] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:44:23.830] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:44:23.895] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:44:25.834] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:44:26.485] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:44:28.842] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:46:29.881] [INFO] [MinecraftBot] Регистрация Ronch_ отменена по таймауту
+[2026-05-04 06:49:38.584] [SUCCESS] [MinecraftBot] База данных успешно инициализирована из schema.sql
+[2026-05-04 06:49:38.586] [SUCCESS] [MinecraftBot] Модуль базы данных полностью загружен и готов к работе
+[2026-05-04 06:49:38.587] [INFO] [MinecraftBot] ╔══════════════════════════════════════════╗
+[2026-05-04 06:49:38.588] [INFO] [MinecraftBot] ║  MINECRAFT BOT — RESISTANCE CITY v5.0.0 ║
+[2026-05-04 06:49:38.588] [INFO] [MinecraftBot] ╚══════════════════════════════════════════╝
+[2026-05-04 06:49:38.588] [INFO] [MinecraftBot] Сервер: ru.dexland.org:25565
+[2026-05-04 06:49:38.589] [INFO] [MinecraftBot] Основной бот: YT_FLATT807
+[2026-05-04 06:49:38.589] [INFO] [MinecraftBot] Резервный бот: xxx_toper_xxx
+[2026-05-04 06:49:38.589] [INFO] [MinecraftBot] Прокси: выключен
+[2026-05-04 06:49:38.590] [INFO] [MinecraftBot] Инициализация основного бота: YT_FLATT807
+[2026-05-04 06:49:38.641] [INFO] [MinecraftBot] Получено init-сообщение от оркестратора: {"type":"init","processName":"MinecraftBot","timestamp":"2026-05-04T03:49:38.344Z"}
+[2026-05-04 06:49:38.767] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:49:38.775] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:49:38.776] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:49:38.776] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:49:39.005] [SUCCESS] [MinecraftBot] Периодические задачи модерации запущены
+[2026-05-04 06:49:39.005] [SUCCESS] [MinecraftBot] Модуль модерации инициализирован
+[2026-05-04 06:49:39.006] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:49:39.022] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:49:40.769] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:49:41.223] [SUCCESS] [MinecraftBot] Основной бот YT_FLATT807 авторизован на сервере
+[2026-05-04 06:49:41.224] [SUCCESS] [MinecraftBot] chatHandler загружен
+[2026-05-04 06:49:41.224] [SUCCESS] [MinecraftBot] commandProcessor загружен, тип: object
+[2026-05-04 06:49:41.225] [SUCCESS] [MinecraftBot] processCommand найден
+[2026-05-04 06:49:41.225] [SUCCESS] [MinecraftBot] Все доступные обработчики инициализированы
+[2026-05-04 06:49:41.271] [INFO] [MinecraftBot] Основной бот появился в мире
+[2026-05-04 06:49:43.224] [INFO] [MinecraftBot] Основной бот: выполняем вход...
+[2026-05-04 06:49:43.769] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:49:46.224] [INFO] [MinecraftBot] Основной бот: подключаемся к серверу клана...
+[2026-05-04 06:49:57.619] [INFO] [MinecraftBot] ✅ Ronch_ успешно зарегистрировался в RP! (ID: 1)
+[2026-05-04 06:50:09.759] [ERROR] [MinecraftBot] Необработанный Promise rejection: ReferenceError: cleanNick is not defined
+[2026-05-04 06:50:14.820] [ERROR] [MinecraftBot] Необработанный Promise rejection: ReferenceError: cleanNick is not defined
+[2026-05-04 06:52:29.662] [WARN] [MinecraftBot] PayDay: бот не подключён, пропускаем
+[2026-05-04 06:52:29.663] [WARN] [MinecraftBot] Ronch_ запустил внеплановый PayDay
+[2026-05-04 06:53:03.200] [WARN] [MinecraftBot] Ronch_ назначен в Полиция (МВД) без образования
+[2026-05-04 06:53:03.201] [WARN] [MinecraftBot] Ronch_ назначил Ronch_ в Полиция (МВД) (Полковник)
+[2026-05-04 06:55:51.200] [ERROR] [MinecraftBot] Обработчик не найден: player.playerId
+[2026-05-04 06:56:40.481] [ERROR] [MinecraftBot] Обработчик не найден: player.money10t
